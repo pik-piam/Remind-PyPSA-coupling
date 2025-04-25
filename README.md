@@ -13,6 +13,14 @@ The tools are currently in development, with as test cases PyPSA-EUR for Germany
 4. Run PyPSA workflow (dedicated repos or pypsa-earth)
 5. ETL for REMIND (This repo_)
 
+# Installation (local editable copy)
+We recommend using `uv`. 
+1. install uv
+2. in the project workspace run `uv pip install -e .`
+3. make a venv `uv venv` at `project/.venv`
+4. sync venv with requirements `uv sync`
+
+# Package description
 
 ### Technology mapping
 
@@ -24,4 +32,5 @@ The tools are currently in development, with as test cases PyPSA-EUR for Germany
 
 
 ### Temporal transformations
+
 
