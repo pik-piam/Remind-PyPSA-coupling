@@ -1,0 +1,23 @@
+
+site_name: REMIND-PyPSA Coupling Tools
+
+theme:
+  name: "readthedocs"
+docs_dir: "./docs"
+
+# Due to snakemake workflow, we need to include the 'scripts' directory in the python path
+plugins:
+- search
+- gen-files:
+    scripts:
+    - docs/autogen_ref_pages.py
+- mkdocstrings:
+    default_handler: python
+    handlers:
+      python:
+        paths: ["./src"]
+
+nav:
+  - Home: index.md
+  - Tutorials: tutorials.md
+  - Reference: Reference.md
