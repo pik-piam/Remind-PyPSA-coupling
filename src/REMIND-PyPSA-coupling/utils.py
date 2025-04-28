@@ -7,7 +7,24 @@ import functools
 import gamspy
 
 
-def read_remind_regions(mapping_path: os.PathLike, separator=",") -> pd.DataFrame:
+def read_remind_csv(file_path: os.PathLike, names: list = None, skiprows=1) -> pd.DataFrame:
+    """read an exported csv from remind (a single table of the gam db)
+
+    Args:
+        file_path (os.PathLike): path to the csv file
+        names (list, optional): rename columns. Defaults to None.
+        skiprows (int, optional): rows to skip in reading (header). Defaults to 1.
+
+    Returns:
+        pd.DataFrame: the data
+    """
+    df = pd.read_csv(file_path, names=names, skiprows=skiprows)
+    if "variable" in df.columns:
+        df.drop(columns=["variable"], inplace=True)
+    return df
+
+
+def read_remind_regions_csv(mapping_path: os.PathLike, separator=",") -> pd.DataFrame:
     """read the export from remind
 
     Args:
@@ -22,7 +39,7 @@ def read_remind_regions(mapping_path: os.PathLike, separator=",") -> pd.DataFram
     return regions
 
 
-def read_descriptions(file_path: os.PathLike) -> pd.DataFrame:
+def read_remind_descriptions_csv(file_path: os.PathLike) -> pd.DataFrame:
     """read the exported description from remind
     Args:
         file_path (os.PathLike): csv export from gamsconnect/embedded python
