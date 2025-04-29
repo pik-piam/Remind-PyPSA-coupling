@@ -7,21 +7,45 @@ import functools
 
 # import gamspy
 
+# translate to pypsa
+REMIND_NAME_MAP = {
+    "ttot": "year",
+    "all_regi": "region",
+    "all_te": "technology",
+    "tePy32": "technology",
+    "char": "parameter",
+    "all_enty": "carrier",
+}
 
-def read_remind_csv(file_path: os.PathLike, names: list = None, skiprows=1) -> pd.DataFrame:
+
+def _fix_repeated_columns(cols) -> pd.DataFrame:
+    found, result = [], []
+    for i in range(len(cols)):
+        if not cols[i] in found:
+            result.append(cols[i])
+        else:
+            result.append(cols[i] + f"_{found.count(cols[i])}")
+        found.append(cols[i])
+    return result
+
+
+def read_remind_csv(file_path: os.PathLike, **kwargs) -> pd.DataFrame:
     """read an exported csv from remind (a single table of the gam db)
 
     Args:
         file_path (os.PathLike): path to the csv file
-        names (list, optional): rename columns. Defaults to None.
-        skiprows (int, optional): rows to skip in reading (header). Defaults to 1.
+        **kwargs: additional arguments for pd.read_csv
 
     Returns:
-        pd.DataFrame: the data
+        pd.DataFrame: the data.
     """
-    df = pd.read_csv(file_path, names=names, skiprows=skiprows)
-    if "variable" in df.columns:
-        df.drop(columns=["variable"], inplace=True)
+    df = pd.read_csv(file_path, **kwargs)
+    # in case the parameter depended on the same set, all columns are suffixed with _1, _2, etc.
+    df.columns = df.columns.str.replace(r"_\d$", "", regex=True)
+    df.rename(columns=REMIND_NAME_MAP, inplace=True)
+
+    df.columns = _fix_repeated_columns(df.columns)
+
     return df
 
 
@@ -84,3 +108,12 @@ def validate_file_list(file_list):
     for file in file_list:
         if not os.path.isfile(file):
             raise FileNotFoundError(f"File {file} does not exist.")
+
+
+def write_cost_data(cost_data: pd.DataFrame, output_dir: os.PathLike):
+    """Write the cost data to a folder, with one CSV file per year.
+
+    Args:
+        cost_data (pd.DataFrame): The cost data to write.
+        output_dir (os.PathLike): The directory to write the file to.
+    """

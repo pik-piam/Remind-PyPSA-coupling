@@ -11,15 +11,24 @@ import os
 import country_converter as coco
 from utils import read_remind_csv, read_remind_regions_csv, read_remind_descriptions_csv
 
-STOR_TECHS = ["h2stor", "btstor", "phs"]
 MW_C = 12  # g/mol
 MW_CO2 = 2 * 16 + MW_C  # g/mol
 UNIT_CONVERSION = {
     "capex": 1e6,  # TUSD/TW(h) to USD/MW(h)
     "VOM": 1e6 / 8760,  # TUSD/TWa to USD/MWh
     "FOM": 100,  # p.u to percent
-    # TODO double check
     "co2_intensity": 1e9 * (MW_CO2 / MW_C) / 8760 / 1e6,  # Gt_C/TWa to t_CO2/MWh
+}
+
+STOR_TECHS = ["h2stor", "btstor", "phs"]
+REMIND_PARAM_MAP = {
+    "tech_data": "pm_data",
+    "capex": "p32_capCost",
+    "eta": "pm_eta_conv",
+    # TODO export converged too
+    "fuel_costs": "p32_PEPriceAvg",
+    "discount_r": "p32_discountRate",
+    "co2_intensity": "pm_emifac",
 }
 
 
@@ -48,65 +57,34 @@ def _expand_years(df: pd.DataFrame, years: list) -> pd.DataFrame:
 
 # TODO: soft-coe remind names
 def make_pypsa_like_costs(
-    paths: dict,
+    frames: dict[pd.DataFrame],
     region: str,
 ) -> pd.DataFrame:
-    """translate the REMIND costs into pypsa format.
+    """translate the REMIND costs into pypsa format for a single region.
     Args:
-        paths (dict): dictionary with the paths to the data
+        frames: dictionary with the REMIND data tables to be transformed
         region (str): region to filter the data
     Returns:
         pd.DataFrame: DataFrame containing cost data for a region.
     """
-    # TODO split into sep function
-    # TODO remove extra years
 
-    # read the data
-    tech_data = read_remind_csv(
-        paths["pm_data"],
-        names=["variable", "region", "parameter", "technology", "value"],
-        skiprows=1,
-    )
-    pypsa_names = ["variable", "year", "region", "technology", "value"]
-    capex = read_remind_csv(paths["capex"], names=pypsa_names, skiprows=1)
-    eta = read_remind_csv(paths["eta"], names=pypsa_names, skiprows=1)
-    fuel_costs = read_remind_csv(paths["fuels"], names=pypsa_names, skiprows=1)
-    dscnt_r = read_remind_csv(
-        paths["discount_r"], names=["index", "variable", "year", "value"], skiprows=1
-    ).drop(columns="index")
+    years = frames["capex"].year.unique()
+    capex = transform_capex(frames["capex"])
 
-    co2_intens = read_remind_csv(
-        paths["co2_intensity"],
-        names=[
-            "variable",
-            "year",
-            "region",
-            "carrier1",
-            "carrier2",
-            "technology",
-            "emission_type",
-            "value",
-        ],
-        skiprows=1,
-    )
+    # transform the data
+    vom = transform_vom(frames["tech_data"].query("parameter == 'omv'"))
+    fom = transform_fom(frames["tech_data"].query("parameter == 'omf'"))
+    lifetime = transform_lifetime(frames["tech_data"].query("parameter == 'lifetime'"))
 
-    # transform individual data
-    capex = transform_capex(capex)
-    capex[(capex.year == 2025)].drop(columns=["region"])
-    years = capex.year.unique()
+    co2_intens = transform_co2_intensity(frames["co2_intensity"], region, years)
+    eta = transform_efficiency(frames["eta"], region, years)
+    fuel_costs = transform_fuels(frames["fuel_costs"])
+    discount_rate = transform_discount_rate(frames["discount_r"])
 
-    vom = transform_vom(tech_data.query("parameter == 'omv'"))
-    fom = transform_fom(tech_data.query("parameter == 'omf'"))
-    lifetime = transform_lifetime(tech_data.query("parameter == 'lifetime'"))
-
-    transform_co2_intensity(co2_intens, region, years)
-    eta = transform_efficiency(eta, years)
-    fuel_costs = transform_fuels(fuel_costs)
-
-    discount_rate = transform_discount_rate(dscnt_r)
+    del frames
 
     # stitch together in pypsa format
-    frames = {
+    cost_frames = {
         "capex": capex,
         "eta": eta,
         "fuel": fuel_costs,
@@ -116,24 +94,26 @@ def make_pypsa_like_costs(
         "fom": fom,
         "discount_rate": discount_rate,
     }
-    # add missing years
-    for label, frame in frames.items():
+
+    # add years to table with time-indep data
+    for label, frame in cost_frames.items():
         if not "year" in frame.columns:
-            frames[label] = _expand_years(frame, capex.year.unique())
-    # add missing techs
-    for label, frame in frames.items():
+            cost_frames[label] = _expand_years(frame, capex.year.unique())
+    # add missing techs for tech agnostic data
+    for label, frame in cost_frames.items():
         if not "technology" in frame.columns:
-            frames[label] = pd.concat(
+            cost_frames[label] = pd.concat(
                 [frame.assign(technology=tech) for tech in capex.technology.unique()]
             )
-    # add missing regions
-    for label, frame in frames.items():
+    # add missing regions to global data
+    for label, frame in cost_frames.items():
         if not "region" in frame.columns:
-            frames[label] = pd.concat([frame.assign(region=region)])
+            cost_frames[label] = pd.concat([frame.assign(region=region)])
     column_order = ["technology", "year", "parameter", "value", "unit", "source"]
 
+    # merge the dataframes for the region
     costs_remind = pd.concat(
-        [frame.query("region == @region")[column_order] for frame in frames.values()], axis=0
+        [frame.query("region == @region")[column_order] for frame in cost_frames.values()], axis=0
     ).reset_index(drop=True)
     costs_remind.sort_values(by=["technology", "year", "parameter"], key=_key_sort, inplace=True)
 
@@ -169,8 +149,15 @@ def transform_co2_intensity(
         pd.DataFrame: Transformed CO2 intensity data.
     """
     # TODO Co2 equivalent
-    co2_intens = co2_intensity.query(
-        "carrier2 == 'seel' & emission_type == 'co2' & region == @region & year in @years"
+    co2_intens = co2_intensity.rename(
+        columns={
+            "carrier": "from_carrier",
+            "carrier_1": "to_carrier",
+            "carrier_2": "emission_type",
+        },
+    )
+    co2_intens = co2_intens.query(
+        "to_carrier == 'seel' & emission_type == 'co2' & region == @region & year in @years"
     )
     co2_intens = co2_intens.assign(
         parameter="CO2 intensity", unit="t_CO2/MWh_th", source=co2_intens.technology + " REMIND"
@@ -181,7 +168,7 @@ def transform_co2_intensity(
 
 def transform_discount_rate(discount_rate: pd.DataFrame) -> pd.DataFrame:
     discount_rate = discount_rate.assign(parameter="discount rate", unit="p.u.", source="REMIND")
-    return discount_rate.drop(columns=["index"])
+    return discount_rate
 
 
 def transform_efficiency(
@@ -226,10 +213,10 @@ def transform_fuels(fuels: pd.DataFrame) -> pd.DataFrame:
 
     # Unit conversion from TUSD/TWa to USD/MWh
     # Special treatment for nuclear fuel uranium (peur): Fuel costs are originally in TUSD/Mt = USD/g_U (TUSD/Tg) -> adjust unit
-    fuels.loc[~(fuels["technology"] == "peur"), "value"] *= 1e6 / 8760
+    fuels.loc[~(fuels["carrier"] == "peur"), "value"] *= 1e6 / 8760
     fuels = fuels.assign(parameter="fuel", unit="USD/MWh_th")
-    fuels = fuels.assign(source=fuels.technology + " REMIND")
-    fuels.loc[fuels["technology"] == "peur", "unit"] = "USD/g_U"
+    fuels = fuels.assign(source=fuels.carrier + " REMIND")
+    fuels.loc[fuels["carrier"] == "peur", "unit"] = "USD/g_U"
 
     return fuels
 
@@ -256,3 +243,36 @@ def transform_vom(vom: pd.DataFrame) -> pd.DataFrame:
     vom.loc[:, "value"] *= UNIT_CONVERSION["VOM"]
     vom = vom.assign(unit="USD/MWh", source=vom.technology + " REMIND", parameter="VOM")
     return vom
+
+
+def map_to_pypsa_tech(cost_frames: pd.DataFrame, map: pd.DataFrame) -> pd.DataFrame:
+    """Map the REMIND technology names to pypsa technoloies using the conversions specified in the
+    map config
+
+    Args:
+        cost_frames (pd.DataFrame): DataFrame containing REMIND cost data.
+        map (pd.DataFrame): DataFrame containing the mapping funcs and names from REMIND to pypsa technologies.
+
+    Returns:
+        pd.DataFrame: DataFrame with mapped technology names.
+    """
+
+
+if __name__ == "__main__":
+
+    region = "CHA"  # China w Maccau, Taiwan
+
+    # make paths
+    # the remind export uses the name of the symbol as the file name
+    base_path = "/home/ivanra/documents/gams_learning/pypsa_export/"
+    paths = {
+        key: os.path.join(base_path, value + ".csv") for key, value in REMIND_PARAM_MAP.items()
+    }
+
+    # load the data
+    frames = {k: read_remind_csv(v) for k, v in paths.items()}
+
+    # make a pypsa like cost table
+    costs_remind = make_pypsa_like_costs(frames, region)
+
+    # apply the mappings to pypsa tech
