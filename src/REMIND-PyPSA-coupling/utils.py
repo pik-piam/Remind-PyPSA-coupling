@@ -4,7 +4,8 @@ import os
 import pandas as pd
 import country_converter as coco
 import functools
-import gamspy
+
+# import gamspy
 
 
 def read_remind_csv(file_path: os.PathLike, names: list = None, skiprows=1) -> pd.DataFrame:
