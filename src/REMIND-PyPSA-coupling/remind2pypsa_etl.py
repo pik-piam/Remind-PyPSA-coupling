@@ -11,6 +11,8 @@ Extract data from Remind, transform it for pypsa PyPSA and write it to files
 import pandas as pd
 import os
 import country_converter as coco
+from collections.abc import Iterable
+
 from utils import read_remind_csv, read_remind_regions_csv, read_remind_descriptions_csv
 
 MW_C = 12  # g/mol
@@ -31,17 +33,19 @@ REMIND_PARAM_MAP = {
     "fuel_costs": "p32_PEPriceAvg",
     "discount_r": "p32_discountRate",
     "co2_intensity": "pm_emifac",
+    "weights_gen": "p32_weightGen",
 }
 
 
 # TODO add actual functions
-MAPPING_FUNCTIONS = {
-    "set_value": 1,
-    "use_remind": 1,
-    "use_remind_with_learning_from": 1,
-    "use_pypsa": 1,
-    "weigh_remind_by": 1,
-}
+MAPPING_FUNCTIONS = [
+    "set_value",
+    "use_remind",
+    "use_remind_with_learning_from",
+    "use_pypsa",
+    "weigh_remind_by_gen",
+    "weigh_remind_by_capacity",
+]
 
 
 def _key_sort(col):
@@ -263,7 +267,7 @@ def map_to_pypsa_tech(
     remind_costs_formatted: pd.DataFrame,
     pypsa_costs: pd.DataFrame,
     mappings: pd.DataFrame,
-    years: np.array | pd.Index = None,
+    years: list | Iterable = None,
 ) -> pd.DataFrame:
     """Map the REMIND technology names to pypsa technoloies using the conversions specified in the
     map config
@@ -272,7 +276,7 @@ def map_to_pypsa_tech(
         cost_frames (pd.DataFrame): DataFrame containing REMIND cost data.
         pypsa_costs (pd.DataFrame): DataFrame containing pypsa cost data.
         mappings (pd.DataFrame): DataFrame containing the mapping funcs and names from REMIND to pypsa technologies.
-        years (np.array | pd.Index, optional): years to be used. Defaults to None (use remidn dat)
+        years (Iterable, optional): years to be used. Defaults to None (use remidn dat)
     Returns:
         pd.DataFrame: DataFrame with mapped technology names.
     """
@@ -309,60 +313,7 @@ def map_to_pypsa_tech(
     # TODO check lengths are as expected
 
 
-def _use_pypsa(
-    mappings: pd.DataFrame,
-    pypsa_costs: pd.DataFrame,
-    years: np.array | pd.index,
-    extrapolation="constant",
-) -> pd.DataFrame:
-    """Use the pypsa costs for requested technologies (e.g. are not in REMIND)
-
-    Args:
-        mappings (pd.DataFrame): DataFrame containing the tech REMIND to pypsa mapping
-        pypsa_costs (pd.DataFrame): DataFrame containing pypsa cost data.
-        years (np.array | pd.index): data years to be used
-        extrpolation (str, Optional): how to handle missing years.
-            Defaults to "constant_extrapolation" (last data yr used for missing)
-
-    Returns:
-        pd.DataFrame: DataFrame with mapped technology data.
-    """
-
-    from_pypsa = mappings.query("mapper == 'use_pypsa'").merge(
-        pypsa_costs,
-        left_on=["PyPSA_tech", "parameter"],
-        right_on=["technology", "parameter"],
-        how="left",
-    )
-
-    from_pypsa.rename(columns={"unit_x": "expected_unit", "unit_y": "unit"}, inplace=True)
-    from_pypsa.reference = from_pypsa.source
-
-    # === Add missing years to the pypsa data using the last pypsa year ===
-    missing_yrs = set(years).difference(from_pypsa.year.unique())
-
-    missing_yrs = [float(yr) for yr in missing_yrs]
-    if (list(missing_yrs) < from_pypsa.year.max()).any():
-        raise ValueError("The PyPSA data is missing years before its last year")
-
-    if not missing_yrs:
-        pass
-    elif extrapolation == "constant":
-        final_yr_data = from_pypsa.query("year==@from_pypsa.year.max()")
-        constant_extrapol = pd.concat([final_yr_data.assign(year=yr) for yr in missing_yrs])
-        pd.concat([from_pypsa, constant_extrapol]).reset_index(drop=True)
-    else:
-        raise ValueError(f"Unknown extrapolation method: {extrapolation}")
-
-    # Validate pypsa completeness
-    if from_pypsa[from_pypsa.year.isna()].parameter.any():
-        raise ValueError(
-            f"Missing data in pypsa data for {from_pypsa[from_pypsa.year.isna()].PyPSA_tech} "
-            "Check the mappings and the pypsa data"
-        )
-    return from_pypsa
-
-
+# TODO ? move to a class
 def _learn_investment_from_proxy(
     mappings: pd.DataFrame,
     pypsa_costs: pd.DataFrame,
@@ -427,6 +378,98 @@ def _learn_investment_from_proxy(
     return proxy_invest
 
 
+def _use_pypsa(
+    mappings: pd.DataFrame,
+    pypsa_costs: pd.DataFrame,
+    years: Iterable,
+    extrapolation="constant",
+) -> pd.DataFrame:
+    """Use the pypsa costs for requested technologies (e.g. are not in REMIND)
+
+    Args:
+        mappings (pd.DataFrame): DataFrame containing the tech REMIND to pypsa mapping
+        pypsa_costs (pd.DataFrame): DataFrame containing pypsa cost data.
+        years (Iterable): data years to be used
+        extrpolation (str, Optional): how to handle missing years.
+            Defaults to "constant_extrapolation" (last data yr used for missing)
+
+    Returns:
+        pd.DataFrame: DataFrame with mapped technology data.
+    """
+
+    from_pypsa = mappings.query("mapper == 'use_pypsa'").merge(
+        pypsa_costs,
+        left_on=["PyPSA_tech", "parameter"],
+        right_on=["technology", "parameter"],
+        how="left",
+    )
+
+    from_pypsa.rename(columns={"unit_x": "expected_unit", "unit_y": "unit"}, inplace=True)
+    from_pypsa.reference = from_pypsa.source
+
+    # === Add missing years to the pypsa data using the last pypsa year ===
+    missing_yrs = set(years).difference(from_pypsa.year.unique())
+
+    missing_yrs = [float(yr) for yr in missing_yrs]
+    if (list(missing_yrs) < from_pypsa.year.max()).any():
+        raise ValueError("The PyPSA data is missing years before its last year")
+
+    if not missing_yrs:
+        pass
+    elif extrapolation == "constant":
+        final_yr_data = from_pypsa.query("year==@from_pypsa.year.max()")
+        constant_extrapol = pd.concat([final_yr_data.assign(year=yr) for yr in missing_yrs])
+        pd.concat([from_pypsa, constant_extrapol]).reset_index(drop=True)
+    else:
+        raise ValueError(f"Unknown extrapolation method: {extrapolation}")
+
+    # Validate pypsa completeness
+    if from_pypsa[from_pypsa.year.isna()].parameter.any():
+        raise ValueError(
+            f"Missing data in pypsa data for {from_pypsa[from_pypsa.year.isna()].PyPSA_tech} "
+            "Check the mappings and the pypsa data"
+        )
+    return from_pypsa
+
+
+def _weigh_remind_by(
+    remind_costs_formatted: pd.DataFrame, weights: pd.DataFrame, mappings: pd.DataFrame
+) -> pd.DataFrame:
+    """Weigh the REMIND costs by the weights
+
+    Args:
+        remind_costs_formatted (pd.DataFrame): DataFrame containing REMIND cost data.
+        weights (pd.DataFrame): DataFrame containing the weights.
+        mappings (pd.DataFrame): DataFrame containing the tech mappings from REMIND to pypsa.
+
+    Returns:
+        pd.DataFrame: DataFrame with weighed technology names.
+    """
+
+    # entries that need to be weighted accross remind techs
+    to_weigh = mappings.query("mapper.str.startswith('weigh_remind_by_')")
+    to_weigh = to_weigh.assign(weigh_by=to_weigh["mapper"].str.split("weigh_remind_by_").str[1])
+
+    # explode list of weight techs (rows dim)
+    weightings = to_weigh.explode("reference").reset_index()
+    weightings.rename(columns={"index": "weightgroup", "unit": "map_unit"}, inplace=True)
+
+    # apply the weights (use the original row id as grouping)
+    to_weigh.loc[:, "value"] = weightings.groupby("id_weight").apply(
+        lambda x: (x.value * x.weight).sum() / x.weight.sum()
+    )
+
+    # validate that units matched (unique) # !! should check nans too
+    units_ok = weightings.groupby("id_weight").unit.apply(pd.Series.nunique) == 1
+    if not units_ok.all():
+        named_unit_check = pd.concat([to_weigh, units_ok], axis=1)[["PyPSA_tech", "unit"]]
+        raise ValueError(
+            "Units not do not match for weights:", named_unit_check[~named_unit_check["unit"]]
+        )
+
+    return to_weigh
+
+
 # TODO make mappings a dataclass not a pandas
 def validate_mappings(mappings: pd.DataFrame):
     """validate the mapping of the technologies to pypsa technologies
@@ -485,6 +528,21 @@ if __name__ == "__main__":
 
     # load the data
     frames = {k: read_remind_csv(v) for k, v in paths.items()}
+    # TODO remove region filters everywhere
+    # frames = {k: df.query("region == @region") if "region" in df.columns for k, df in frames.items()}
+
+    # make the stitched weight frames
+    weight_frames = [frames[k].assign(weightby=k) for k in frames if k.startswith("weights")]
+    weights = pd.concat(
+        [
+            df.rename(columns={"carrier": "technology", "value": "weight"})
+            .query("region==@region")
+            .drop(columns="region")
+            for df in weight_frames
+        ]
+    )
+    # add weights by techs
+    remind_formatted = remind_formatted.merge(weights, on=["technology", "year"], how="left")
 
     # make a pypsa like cost table, with remind values
     costs_remind = make_pypsa_like_costs(frames, region)
@@ -492,6 +550,14 @@ if __name__ == "__main__":
     # load the mapping
     mappings = pd.read_csv(os.path.abspath("../../data") + "/techmapping_remind2py.csv")
     validate_mappings(mappings)
+
+    def _list(x: str):
+        """in case of csv input"""
+        if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
+            return x.replace("[", "").replace("]", "").split(", ")
+        return x
+
+    mappings["reference"] = mappings["reference"].apply(_list)
 
     # load pypsa costs
     pypsa_costs_dir = os.path.abspath("../../../PyPSA-China-PIK/resources/data/costs")
