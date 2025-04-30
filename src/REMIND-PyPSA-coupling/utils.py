@@ -46,6 +46,9 @@ def read_remind_csv(file_path: os.PathLike, **kwargs) -> pd.DataFrame:
 
     df.columns = _fix_repeated_columns(df.columns)
 
+    if "value" in df.columns:
+        df.loc[:, "value"] = df.value.astype(float)
+
     return df
 
 
@@ -110,10 +113,17 @@ def validate_file_list(file_list):
             raise FileNotFoundError(f"File {file} does not exist.")
 
 
-def write_cost_data(cost_data: pd.DataFrame, output_dir: os.PathLike):
+def write_cost_data(cost_data: pd.DataFrame, output_dir: os.PathLike, descript: str = None):
     """Write the cost data to a folder, with one CSV file per year.
 
     Args:
         cost_data (pd.DataFrame): The cost data to write.
         output_dir (os.PathLike): The directory to write the file to.
+        descript (str, optional): optioal description to add to the file name
     """
+
+    for name, group in cost_data.groupby("year"):
+        if descript:
+            name = f"{name}_{descript}"
+        export_p = os.path.join(output_dir, f"costs_remind_{name}.csv")
+        group.to_csv(export_p, index=False)

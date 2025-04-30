@@ -2,6 +2,8 @@
 Extract data from Remind, transform it for pypsa PyPSA and write it to files
 """
 
+# TODO add Cb/Cv
+
 # TODO centralise remind column name mapping and use a set -> name
 
 # TODO add remind model version to the cost provenance
@@ -29,6 +31,16 @@ REMIND_PARAM_MAP = {
     "fuel_costs": "p32_PEPriceAvg",
     "discount_r": "p32_discountRate",
     "co2_intensity": "pm_emifac",
+}
+
+
+# TODO add actual functions
+MAPPING_FUNCTIONS = {
+    "set_value": 1,
+    "use_remind": 1,
+    "use_remind_with_learning_from": 1,
+    "use_pypsa": 1,
+    "weigh_remind_by": 1,
 }
 
 
@@ -94,6 +106,8 @@ def make_pypsa_like_costs(
         "fom": fom,
         "discount_rate": discount_rate,
     }
+
+    # TODO Can do more efficient operations with join
 
     # add years to table with time-indep data
     for label, frame in cost_frames.items():
@@ -217,7 +231,7 @@ def transform_fuels(fuels: pd.DataFrame) -> pd.DataFrame:
     fuels = fuels.assign(parameter="fuel", unit="USD/MWh_th")
     fuels = fuels.assign(source=fuels.carrier + " REMIND")
     fuels.loc[fuels["carrier"] == "peur", "unit"] = "USD/g_U"
-
+    fuels = fuels.assign(technology=fuels.carrier)
     return fuels
 
 
@@ -245,17 +259,217 @@ def transform_vom(vom: pd.DataFrame) -> pd.DataFrame:
     return vom
 
 
-def map_to_pypsa_tech(cost_frames: pd.DataFrame, map: pd.DataFrame) -> pd.DataFrame:
+def map_to_pypsa_tech(
+    remind_costs_formatted: pd.DataFrame,
+    pypsa_costs: pd.DataFrame,
+    mappings: pd.DataFrame,
+    years: np.array | pd.Index = None,
+) -> pd.DataFrame:
     """Map the REMIND technology names to pypsa technoloies using the conversions specified in the
     map config
 
     Args:
         cost_frames (pd.DataFrame): DataFrame containing REMIND cost data.
-        map (pd.DataFrame): DataFrame containing the mapping funcs and names from REMIND to pypsa technologies.
-
+        pypsa_costs (pd.DataFrame): DataFrame containing pypsa cost data.
+        mappings (pd.DataFrame): DataFrame containing the mapping funcs and names from REMIND to pypsa technologies.
+        years (np.array | pd.Index, optional): years to be used. Defaults to None (use remidn dat)
     Returns:
         pd.DataFrame: DataFrame with mapped technology names.
     """
+    if not years:
+        years = remind_costs_formatted.year.unique()
+
+    # direct mapping of remind
+    use_remind = (
+        mappings.query("mapper == 'use_remind'")
+        .drop("unit", axis=1)
+        .merge(
+            remind_costs_formatted,
+            left_on=["reference", "parameter"],
+            right_on=["technology", "parameter"],
+            how="left",
+        )
+    )
+
+    direct_input = mappings.query("mapper == 'set_value'").rename(columns={"reference": "value"})
+    direct_input.assign(source="direct_input from coupling mapping")
+
+    # pypsa values
+    from_pypsa = _use_pypsa(mappings, pypsa_costs, years)
+
+    # techs with proxy learnign
+    proxy_learning = _learn_investment_from_proxy(
+        mappings, pypsa_costs, remind_costs_formatted, ref_year=years.min()
+    )
+
+    # TODO add weigh_remind_by
+
+    # TODO concat
+
+    # TODO check lengths are as expected
+
+
+def _use_pypsa(
+    mappings: pd.DataFrame,
+    pypsa_costs: pd.DataFrame,
+    years: np.array | pd.index,
+    extrapolation="constant",
+) -> pd.DataFrame:
+    """Use the pypsa costs for requested technologies (e.g. are not in REMIND)
+
+    Args:
+        mappings (pd.DataFrame): DataFrame containing the tech REMIND to pypsa mapping
+        pypsa_costs (pd.DataFrame): DataFrame containing pypsa cost data.
+        years (np.array | pd.index): data years to be used
+        extrpolation (str, Optional): how to handle missing years.
+            Defaults to "constant_extrapolation" (last data yr used for missing)
+
+    Returns:
+        pd.DataFrame: DataFrame with mapped technology data.
+    """
+
+    from_pypsa = mappings.query("mapper == 'use_pypsa'").merge(
+        pypsa_costs,
+        left_on=["PyPSA_tech", "parameter"],
+        right_on=["technology", "parameter"],
+        how="left",
+    )
+
+    from_pypsa.rename(columns={"unit_x": "expected_unit", "unit_y": "unit"}, inplace=True)
+    from_pypsa.reference = from_pypsa.source
+
+    # === Add missing years to the pypsa data using the last pypsa year ===
+    missing_yrs = set(years).difference(from_pypsa.year.unique())
+
+    missing_yrs = [float(yr) for yr in missing_yrs]
+    if (list(missing_yrs) < from_pypsa.year.max()).any():
+        raise ValueError("The PyPSA data is missing years before its last year")
+
+    if not missing_yrs:
+        pass
+    elif extrapolation == "constant":
+        final_yr_data = from_pypsa.query("year==@from_pypsa.year.max()")
+        constant_extrapol = pd.concat([final_yr_data.assign(year=yr) for yr in missing_yrs])
+        pd.concat([from_pypsa, constant_extrapol]).reset_index(drop=True)
+    else:
+        raise ValueError(f"Unknown extrapolation method: {extrapolation}")
+
+    # Validate pypsa completeness
+    if from_pypsa[from_pypsa.year.isna()].parameter.any():
+        raise ValueError(
+            f"Missing data in pypsa data for {from_pypsa[from_pypsa.year.isna()].PyPSA_tech} "
+            "Check the mappings and the pypsa data"
+        )
+    return from_pypsa
+
+
+def _learn_investment_from_proxy(
+    mappings: pd.DataFrame,
+    pypsa_costs: pd.DataFrame,
+    remind_costs_formatted: pd.DataFrame,
+    ref_year: int,
+):
+    """For techs missing in REMIND, take a pypsa tech and apply learning from a proxy REMIND tech
+
+    Args:
+        mappings (pd.DataFrame): DataFrame containing the tech mappings from REMIND to pypsa.
+        pypsa_costs (pd.DataFrame): DataFrame containing pypsa cost data.
+        remind_costs_formatted (pd.DataFrame): DataFrame containing REMIND cost data (pypsa-like).
+        ref_year (int): reference year for scaling
+    Returns:
+        pd.DataFrame: DataFrame with scaled investment costs.
+    """
+
+    ref_tech_names = mappings.query("mapper == 'use_remind_with_learning_from'")[
+        ["PyPSA_tech", "reference"]
+    ].set_index("reference")
+    # if mapping is empty for use_reminfd_with_learning_from, return empty
+    if not ref_tech_names.shape[0]:
+        return pd.DataFrame()
+
+    ref_tech_names.reset_index(inplace=True)
+    ref_tech_names.rename(columns={"reference": "technology"}, inplace=True)
+
+    base_yr_investmnt = pypsa_costs.query(
+        "technology in @ref_tech_names.PyPSA_tech.unique() & year == @ref_year & parameter == 'investment'"
+    ).set_index("technology")
+    base_yr_investmnt = base_yr_investmnt.value.to_dict()
+
+    # TODO check all references are available
+    scaling = remind_costs_formatted.query(
+        "technology in @ref_tech_names.technology & parameter == 'investment'"
+    )
+
+    scaling.loc[:, "value"] = (
+        scaling.set_index(["technology"])
+        .groupby(level=[0])
+        .apply(lambda x: x.value / x[x.year == x.year.min()].value)
+        .values
+    )
+
+    # merge
+    proxy_invest = scaling.merge(
+        ref_tech_names,
+        left_on="technology",
+        right_on="technology",
+        how="left",
+        right_index=False,
+        left_index=False,
+    )
+    proxy_invest.technology = proxy_invest.PyPSA_tech
+    proxy_invest.drop(columns=["PyPSA_tech"], inplace=True)
+
+    # multiply the scaling factor with the base year investment
+    proxy_invest.loc[:, "value"] = (
+        proxy_invest.technology.map(base_yr_investmnt) * proxy_invest.value
+    )
+
+    return proxy_invest
+
+
+# TODO make mappings a dataclass not a pandas
+def validate_mappings(mappings: pd.DataFrame):
+    """validate the mapping of the technologies to pypsa technologies
+    Args:
+        mappings (pd.DataFrame): DataFrame containing the mapping funcs and names from REMIND to pypsa technologies.
+    Raises:
+        ValueError: if mappers not allowed
+        ValueError: if columns not expected
+        ValueError: if proxy learning (use_remind_with_learning_from) is used for something other than invest
+
+    """
+
+    # validate columns
+    EXPECTED_COLUMNS = ["PyPSA_tech", "parameter", "mapper", "reference", "unit", "comment"]
+    if not sorted(mappings.columns) == sorted(EXPECTED_COLUMNS):
+        raise ValueError(
+            f"Invalid mapping. Allowed columns are {["PyPSA_tech","parameter","mapper","reference","unit","comment"]}"
+        )
+
+    # validate mappers allowed
+    forbidden_mappers = set(mappings.mapper.unique()).difference(MAPPING_FUNCTIONS.keys())
+    if forbidden_mappers:
+        raise ValueError(f"Forbidden mappers found in mappings: {forbidden_mappers}")
+
+    # validate proxy learning
+    proxy_learning = mappings.query("mapper == 'use_remind_with_learning_from'")
+    proxy_params = set(proxy_learning.parameter)
+    if proxy_params.difference({"investment"}):
+        raise ValueError(f"Proxy learning is only allowed for investment but Found: {proxy_params}")
+
+    # validate numeric
+    set_vals = mappings.query("mapper == 'set_value'")["reference"]
+    try:
+        set_vals.astype(float)
+    except ValueError as e:
+        raise ValueError(f"set_value reference values must be numeric but: {e}")
+
+    # check uniqueness
+    counts = mappings.groupby(["PyPSA_tech", "parameter"]).count()
+    repeats = counts[counts.values > 1]
+    if len():
+        raise ValueError(f"Mappings are not unique: n repeats:\n {repeats} ")
+        # should validate that remind references are actually in the remind export
 
 
 if __name__ == "__main__":
@@ -272,7 +486,18 @@ if __name__ == "__main__":
     # load the data
     frames = {k: read_remind_csv(v) for k, v in paths.items()}
 
-    # make a pypsa like cost table
+    # make a pypsa like cost table, with remind values
     costs_remind = make_pypsa_like_costs(frames, region)
+
+    # load the mapping
+    mappings = pd.read_csv(os.path.abspath("../../data") + "/techmapping_remind2py.csv")
+    validate_mappings(mappings)
+
+    # load pypsa costs
+    pypsa_costs_dir = os.path.abspath("../../../PyPSA-China-PIK/resources/data/costs")
+    pypsa_cost_files = [os.path.join(pypsa_costs_dir, f) for f in os.listdir(p)]
+    pypsa_costs = pd.read_csv(pypsa_cost_files.pop())
+    for f in pypsa_cost_files:
+        pypsa_costs = pd.concat([pypsa_costs, pd.read_csv(f)])
 
     # apply the mappings to pypsa tech
