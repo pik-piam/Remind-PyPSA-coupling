@@ -20,10 +20,24 @@ We recommend using `uv`.
 3. make a venv `uv venv` at `project/.venv`
 4. sync venv with requirements `uv sync`
 
-# Package description
+# Usage
+This package is intended for use in combination with REMIND and PyPSA, as part of a snakemake workflow
+
+Examples: Coming at some point
+
+# Mappings and ETL operations
 
 ### Technology mapping
+The technology mapping is controlled by the a tech mapping file. Only (PyPSA_technology, parameter) key pairs specified in the mapping will be written out.
 
+For each key pair, a mapping method can be spefied:
+- set_value: directly set the value to that specified in the "reference" column
+- use_remind: use the remind tech specified in the "reference column"
+- use_pypsa: use the pypsa name. The "reference" column has no effect
+- use_remind_weighed_by:
+- use_remind_with_learning_from: this is intended for technologies that are not implemented in REMIND. The base year cost will be set from pypsa and the cost will decrease in time as per the REMIND technology specified in the "reference" column. This method is only valid for "investment" costs
+
+Validation will be applied to the mappings file and input costs.
 
 ### Regional disaggregation
 
