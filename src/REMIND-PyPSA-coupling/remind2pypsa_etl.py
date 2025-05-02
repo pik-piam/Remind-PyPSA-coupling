@@ -1,5 +1,7 @@
 """
 Extract data from Remind, transform it for pypsa PyPSA and write it to files
+
+Note the dataframes 
 """
 
 # TODO add Cb/Cv
@@ -12,8 +14,16 @@ import pandas as pd
 import os
 import country_converter as coco
 from collections.abc import Iterable
+import logging
 
-from utils import read_remind_csv, read_remind_regions_csv, read_remind_descriptions_csv
+from utils import (
+    read_remind_csv,
+    read_remind_regions_csv,
+    read_remind_descriptions_csv,
+    write_cost_data,
+)
+
+logger = logging.getLogger(__name__)
 
 MW_C = 12  # g/mol
 MW_CO2 = 2 * 16 + MW_C  # g/mol
@@ -28,7 +38,8 @@ STOR_TECHS = ["h2stor", "btstor", "phs"]
 REMIND_PARAM_MAP = {
     "tech_data": "pm_data",
     "capex": "p32_capCost",
-    "eta": "pm_eta_conv",
+    "eta": "pm_dataeta",
+    "eta_part2": "pm_eta_conv",
     # TODO export converged too
     "fuel_costs": "p32_PEPriceAvg",
     "discount_r": "p32_discountRate",
@@ -47,11 +58,21 @@ MAPPING_FUNCTIONS = [
     "weigh_remind_by_capacity",
 ]
 
+# pypsa costs column names
+OUTP_COLS = ["technology", "year", "parameter", "value", "unit", "source", "further description"]
+
+
+def _list(x: str):
+    """in case of csv input"""
+    if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
+        return x.replace("[", "").replace("]", "").split(", ")
+    return x
+
 
 def _key_sort(col):
-    if col.name == "year":
-        return col.astype(int)
-    elif col.name == "technology":
+    # if col.name == "year":
+    #     return col.astype(int)
+    if col.name == "technology":
         return col.str.lower()
     else:
         return col
@@ -74,15 +95,17 @@ def _expand_years(df: pd.DataFrame, years: list) -> pd.DataFrame:
 # TODO: soft-coe remind names
 def make_pypsa_like_costs(
     frames: dict[pd.DataFrame],
-    region: str,
 ) -> pd.DataFrame:
     """translate the REMIND costs into pypsa format for a single region.
     Args:
-        frames: dictionary with the REMIND data tables to be transformed
-        region (str): region to filter the data
+        frames: dictionary with the REMIND data tables to be transformed. Region-filtered
     Returns:
         pd.DataFrame: DataFrame containing cost data for a region.
     """
+
+    regions_filtered = not any(["region" in df.columns for df in frames.values()])
+    if not regions_filtered:
+        raise Warning("The dataframes are not region-filtered. Not supported.")
 
     years = frames["capex"].year.unique()
     capex = transform_capex(frames["capex"])
@@ -92,8 +115,8 @@ def make_pypsa_like_costs(
     fom = transform_fom(frames["tech_data"].query("parameter == 'omf'"))
     lifetime = transform_lifetime(frames["tech_data"].query("parameter == 'lifetime'"))
 
-    co2_intens = transform_co2_intensity(frames["co2_intensity"], region, years)
-    eta = transform_efficiency(frames["eta"], region, years)
+    co2_intens = transform_co2_intensity(frames["co2_intensity"], years)
+    eta = transform_efficiency(frames["eta"], years)
     fuel_costs = transform_fuels(frames["fuel_costs"])
     discount_rate = transform_discount_rate(frames["discount_r"])
 
@@ -102,7 +125,7 @@ def make_pypsa_like_costs(
     # stitch together in pypsa format
     cost_frames = {
         "capex": capex,
-        "eta": eta,
+        "efficiency": eta,
         "fuel": fuel_costs,
         "co2": co2_intens,
         "lifetime": lifetime,
@@ -115,23 +138,19 @@ def make_pypsa_like_costs(
 
     # add years to table with time-indep data
     for label, frame in cost_frames.items():
-        if not "year" in frame.columns:
+        if "year" not in frame.columns:
             cost_frames[label] = _expand_years(frame, capex.year.unique())
     # add missing techs for tech agnostic data
     for label, frame in cost_frames.items():
-        if not "technology" in frame.columns:
+        if "technology" not in frame.columns:
             cost_frames[label] = pd.concat(
                 [frame.assign(technology=tech) for tech in capex.technology.unique()]
             )
-    # add missing regions to global data
-    for label, frame in cost_frames.items():
-        if not "region" in frame.columns:
-            cost_frames[label] = pd.concat([frame.assign(region=region)])
     column_order = ["technology", "year", "parameter", "value", "unit", "source"]
 
     # merge the dataframes for the region
     costs_remind = pd.concat(
-        [frame.query("region == @region")[column_order] for frame in cost_frames.values()], axis=0
+        [frame[column_order] for frame in cost_frames.values()], axis=0
     ).reset_index(drop=True)
     costs_remind.sort_values(by=["technology", "year", "parameter"], key=_key_sort, inplace=True)
 
@@ -153,14 +172,11 @@ def transform_capex(capex: pd.DataFrame) -> pd.DataFrame:
     return capex
 
 
-def transform_co2_intensity(
-    co2_intensity: pd.DataFrame, region: str, years: list | pd.Index
-) -> pd.DataFrame:
+def transform_co2_intensity(co2_intensity: pd.DataFrame, years: list | pd.Index) -> pd.DataFrame:
     """Transform the CO2 intensity data from REMIND to pypsa.
 
     Args:
         co2_intensity (pd.DataFrame): DataFrame containing REMIND CO2 intensity data.
-        region (str): Region to filter the data
         years (list | pd.Index): relevant years data.
 
     Returns:
@@ -174,9 +190,7 @@ def transform_co2_intensity(
             "carrier_2": "emission_type",
         },
     )
-    co2_intens = co2_intens.query(
-        "to_carrier == 'seel' & emission_type == 'co2' & region == @region & year in @years"
-    )
+    co2_intens = co2_intens.query("to_carrier == 'seel' & emission_type == 'co2' & year in @years")
     co2_intens = co2_intens.assign(
         parameter="CO2 intensity", unit="t_CO2/MWh_th", source=co2_intens.technology + " REMIND"
     )
@@ -189,22 +203,20 @@ def transform_discount_rate(discount_rate: pd.DataFrame) -> pd.DataFrame:
     return discount_rate
 
 
-def transform_efficiency(
-    eff_data: pd.DataFrame, region: str, years: list | pd.Index
-) -> pd.DataFrame:
+def transform_efficiency(eff_data: pd.DataFrame, years: list | pd.Index) -> pd.DataFrame:
     """Transform the efficiency data from REMIND to pypsa.
 
     Args:
         eff_data (pd.DataFrame): DataFrame containing REMIND efficiency data.
-        region (str): Region to filter the data.
         years (list | pd.Index): relevant years.
     Returns:
         pd.DataFrame: Transformed efficiency data.
     """
-    eta = eff_data.query("region == @region & year in @years")
+    eta = eff_data.query("year in @years")
     eta = eta.assign(source=eta.technology + " REMIND", unit="p.u.", parameter="efficiency")
 
-    # Special treatment for nuclear: Efficiencies are in TWa/Mt=8760 TWh/Tg_U -> convert to MWh/g_U to match with fuel costs in USD/g_U
+    # Special treatment for nuclear: Efficiencies are in TWa/Mt=8760 TWh/Tg_U
+    #  -> convert to MWh/g_U to match with fuel costs in USD/g_U
     eta.loc[eta["technology"].isin(["fnrs", "tnrs"]), "value"] *= 8760 / 1e6
     eta.loc[eta["technology"].isin(["fnrs", "tnrs"]), "unit"] = "MWh/g_U"
     # Special treatment for battery: Efficiencies in costs.csv should be roundtrip
@@ -230,7 +242,8 @@ def transform_fom(fom: pd.DataFrame) -> pd.DataFrame:
 def transform_fuels(fuels: pd.DataFrame) -> pd.DataFrame:
 
     # Unit conversion from TUSD/TWa to USD/MWh
-    # Special treatment for nuclear fuel uranium (peur): Fuel costs are originally in TUSD/Mt = USD/g_U (TUSD/Tg) -> adjust unit
+    # Special treatment for nuclear fuel uranium (peur):
+    #   Fuel costs are originally in TUSD/Mt = USD/g_U (TUSD/Tg) -> adjust unit
     fuels.loc[~(fuels["carrier"] == "peur"), "value"] *= 1e6 / 8760
     fuels = fuels.assign(parameter="fuel", unit="USD/MWh_th")
     fuels = fuels.assign(source=fuels.carrier + " REMIND")
@@ -267,6 +280,7 @@ def map_to_pypsa_tech(
     remind_costs_formatted: pd.DataFrame,
     pypsa_costs: pd.DataFrame,
     mappings: pd.DataFrame,
+    weights: pd.DataFrame,
     years: list | Iterable = None,
 ) -> pd.DataFrame:
     """Map the REMIND technology names to pypsa technoloies using the conversions specified in the
@@ -275,12 +289,13 @@ def map_to_pypsa_tech(
     Args:
         cost_frames (pd.DataFrame): DataFrame containing REMIND cost data.
         pypsa_costs (pd.DataFrame): DataFrame containing pypsa cost data.
-        mappings (pd.DataFrame): DataFrame containing the mapping funcs and names from REMIND to pypsa technologies.
+        mappings (pd.DataFrame): DataFrame containing the mapping funcs and names from
+            REMIND to pypsa technologies.
         years (Iterable, optional): years to be used. Defaults to None (use remidn dat)
     Returns:
         pd.DataFrame: DataFrame with mapped technology names.
     """
-    if not years:
+    if years is None:
         years = remind_costs_formatted.year.unique()
 
     # direct mapping of remind
@@ -294,23 +309,48 @@ def map_to_pypsa_tech(
             how="left",
         )
     )
+    use_remind.drop(columns=["technology"], inplace=True)
 
     direct_input = mappings.query("mapper == 'set_value'").rename(columns={"reference": "value"})
-    direct_input.assign(source="direct_input from coupling mapping")
+    direct_input = direct_input.assign(source="direct_input from coupling mapping")
+    direct_input = _expand_years(direct_input, years)
 
     # pypsa values
     from_pypsa = _use_pypsa(mappings, pypsa_costs, years)
+    from_pypsa.drop(columns=["technology"], inplace=True)
 
     # techs with proxy learnign
     proxy_learning = _learn_investment_from_proxy(
         mappings, pypsa_costs, remind_costs_formatted, ref_year=years.min()
     )
+    proxy_learning.loc[:, "further description"] = "proxy learning from REMIND"
+    # TODO check weighing is by right quantities
+    # weighed by remind tech basket
+    weighed_basket = _weigh_remind_by(remind_costs_formatted, weights, mappings)
 
-    # TODO add weigh_remind_by
+    # format for output
+    direct_input.rename(
+        columns={"PyPSA_tech": "technology", "comment": "further description"}, inplace=True
+    )
+    use_remind.rename(
+        columns={"PyPSA_tech": "technology", "comment": "further description"}, inplace=True
+    )
+    from_pypsa.rename(
+        columns={"PyPSA_tech": "technology", "comment": "further description"}, inplace=True
+    )
+    proxy_learning.rename(
+        columns={"PyPSA_tech": "technology", "comment": "further description"}, inplace=True
+    )
+    weighed_basket.rename(
+        columns={"PyPSA_tech": "technology", "comment": "further description"}, inplace=True
+    )
 
-    # TODO concat
-
-    # TODO check lengths are as expected
+    output_frames = [direct_input, use_remind, from_pypsa, proxy_learning, weighed_basket]
+    output = pd.concat([df[OUTP_COLS] for df in output_frames])
+    output = output.assign(year=output.year.astype(int))
+    return output.sort_values(["year", "technology", "parameter"], key=_key_sort).reset_index(
+        drop=True
+    )
 
 
 # TODO ? move to a class
@@ -342,7 +382,8 @@ def _learn_investment_from_proxy(
     ref_tech_names.rename(columns={"reference": "technology"}, inplace=True)
 
     base_yr_investmnt = pypsa_costs.query(
-        "technology in @ref_tech_names.PyPSA_tech.unique() & year == @ref_year & parameter == 'investment'"
+        "technology in @ref_tech_names.PyPSA_tech.unique() & year == @ref_year"
+        + " & parameter == 'investment'"
     ).set_index("technology")
     base_yr_investmnt = base_yr_investmnt.value.to_dict()
 
@@ -419,17 +460,22 @@ def _use_pypsa(
     elif extrapolation == "constant":
         final_yr_data = from_pypsa.query("year==@from_pypsa.year.max()")
         constant_extrapol = pd.concat([final_yr_data.assign(year=yr) for yr in missing_yrs])
-        pd.concat([from_pypsa, constant_extrapol]).reset_index(drop=True)
+        from_pypsa = pd.concat([from_pypsa, constant_extrapol]).reset_index(drop=True)
     else:
         raise ValueError(f"Unknown extrapolation method: {extrapolation}")
 
     # Validate pypsa completeness
     if from_pypsa[from_pypsa.year.isna()].parameter.any():
         raise ValueError(
-            f"Missing data in pypsa data for {from_pypsa[from_pypsa.year.isna()].PyPSA_tech} "
-            "Check the mappings and the pypsa data"
+            f"Missing data in pypsa data for {from_pypsa[from_pypsa.year.isna()][["PyPSA_tech", "parameter"]]}"
+            " Check the mappings and the pypsa data"
         )
-    return from_pypsa
+    # merge comments from mappings and pypsa
+    from_pypsa.loc[:, "further description"] = (
+        from_pypsa.comment + " pypsa:" + from_pypsa["further description"]
+    )
+    from_pypsa.drop(columns=["comment"], inplace=True)
+    return from_pypsa.query("year in @years")
 
 
 def _weigh_remind_by(
@@ -449,13 +495,27 @@ def _weigh_remind_by(
     # entries that need to be weighted accross remind techs
     to_weigh = mappings.query("mapper.str.startswith('weigh_remind_by_')")
     to_weigh = to_weigh.assign(weigh_by=to_weigh["mapper"].str.split("weigh_remind_by_").str[1])
+    # merge with remind costs as needed
+    if "weight" not in remind_costs_formatted.columns:
+        weights = weights.merge(remind_costs_formatted, on=["technology", "year"], how="left")
 
+    to_weigh = _expand_years(to_weigh, years=remind_costs_formatted.year.unique()).reset_index(
+        drop=True
+    )
     # explode list of weight techs (rows dim)
     weightings = to_weigh.explode("reference").reset_index()
-    weightings.rename(columns={"index": "weightgroup", "unit": "map_unit"}, inplace=True)
+    weightings.rename(columns={"index": "id_weight", "unit": "map_unit"}, inplace=True)
+
+    # merge with remind costs
+    weightings = weightings.merge(
+        remind_costs_formatted,
+        left_on=["reference", "parameter", "year"],
+        right_on=["technology", "parameter", "year"],
+        how="left",
+    )
 
     # apply the weights (use the original row id as grouping)
-    to_weigh.loc[:, "value"] = weightings.groupby("id_weight").apply(
+    to_weigh.loc[:, "value"] = weightings.groupby(["id_weight"]).apply(
         lambda x: (x.value * x.weight).sum() / x.weight.sum()
     )
 
@@ -467,6 +527,7 @@ def _weigh_remind_by(
             "Units not do not match for weights:", named_unit_check[~named_unit_check["unit"]]
         )
 
+    to_weigh.loc[:, "source"] = to_weigh.mapper + " " + to_weigh.reference.astype(str)
     return to_weigh
 
 
@@ -474,23 +535,23 @@ def _weigh_remind_by(
 def validate_mappings(mappings: pd.DataFrame):
     """validate the mapping of the technologies to pypsa technologies
     Args:
-        mappings (pd.DataFrame): DataFrame containing the mapping funcs and names from REMIND to pypsa technologies.
+        mappings (pd.DataFrame): DataFrame containing the mapping funcs and names
+            from REMIND to pypsa technologies.
     Raises:
         ValueError: if mappers not allowed
         ValueError: if columns not expected
-        ValueError: if proxy learning (use_remind_with_learning_from) is used for something other than invest
+        ValueError: if proxy learning (use_remind_with_learning_from) is used
+            for something other than invest
 
     """
 
     # validate columns
     EXPECTED_COLUMNS = ["PyPSA_tech", "parameter", "mapper", "reference", "unit", "comment"]
     if not sorted(mappings.columns) == sorted(EXPECTED_COLUMNS):
-        raise ValueError(
-            f"Invalid mapping. Allowed columns are {["PyPSA_tech","parameter","mapper","reference","unit","comment"]}"
-        )
+        raise ValueError(f"Invalid mapping. Allowed columns are: {EXPECTED_COLUMNS}")
 
     # validate mappers allowed
-    forbidden_mappers = set(mappings.mapper.unique()).difference(MAPPING_FUNCTIONS.keys())
+    forbidden_mappers = set(mappings.mapper.unique()).difference(MAPPING_FUNCTIONS)
     if forbidden_mappers:
         raise ValueError(f"Forbidden mappers found in mappings: {forbidden_mappers}")
 
@@ -510,60 +571,101 @@ def validate_mappings(mappings: pd.DataFrame):
     # check uniqueness
     counts = mappings.groupby(["PyPSA_tech", "parameter"]).count()
     repeats = counts[counts.values > 1]
-    if len():
-        raise ValueError(f"Mappings are not unique: n repeats:\n {repeats} ")
-        # should validate that remind references are actually in the remind export
+    # TODO reactivate
+    # if len(repeats):
+    # raise ValueError(f"Mappings are not unique: n repeats:\n {repeats} ")
+    # should validate that remind references are actually in the remind export
+
+
+def validate_remind_data(remind_data: pd.DataFrame, mappings: pd.DataFrame):
+    """validate the remind data
+    Args:
+        remind_data (pd.DataFrame): DataFrame containing the remind data
+    """
+    requested_data = mappings.query("mapper.str.contains('remind')")[
+        ["PyPSA_tech", "parameter", "reference"]
+    ].explode("reference")
+    data = requested_data.explode("reference").merge(
+        costs_remind.rename(columns={"technology": "reference"}),
+        on=["parameter", "reference"],
+        how="left",
+    )
+    data = data[["PyPSA_tech", "reference", "year", "parameter", "value"]]
+    missing = data[(data.isna()).any(axis=1)]
+    if not missing.empty:
+        raise ValueError(
+            f"Missing data in REMIND for {missing.drop_duplicates()} "
+            f"Check the mappings and the remind data"
+        )
 
 
 if __name__ == "__main__":
-
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     region = "CHA"  # China w Maccau, Taiwan
 
     # make paths
     # the remind export uses the name of the symbol as the file name
-    base_path = "/home/ivanra/documents/gams_learning/pypsa_export/"
+    base_path = os.path.join(os.path.abspath(root_dir + "/.."), "gams_learning/pypsa_export/")
     paths = {
         key: os.path.join(base_path, value + ".csv") for key, value in REMIND_PARAM_MAP.items()
     }
 
     # load the data
     frames = {k: read_remind_csv(v) for k, v in paths.items()}
-    # TODO remove region filters everywhere
-    # frames = {k: df.query("region == @region") if "region" in df.columns for k, df in frames.items()}
+    frames = {
+        k: df.query("region == @region").drop(columns="region") if "region" in df.columns else df
+        for k, df in frames.items()
+    }
+    # special case, eff split across two tables
+    frames["eta"] = pd.concat([frames["eta"], frames["eta_part2"]]).drop_duplicates().reset_index()
+
+    # get remind version
+    with open(os.path.join(base_path, "c_model_version.csv"), "r") as f:
+        remind_v = f.read().split("\n")[1]
 
     # make the stitched weight frames
     weight_frames = [frames[k].assign(weightby=k) for k in frames if k.startswith("weights")]
     weights = pd.concat(
-        [
-            df.rename(columns={"carrier": "technology", "value": "weight"})
-            .query("region==@region")
-            .drop(columns="region")
-            for df in weight_frames
-        ]
+        [df.rename(columns={"carrier": "technology", "value": "weight"}) for df in weight_frames]
     )
-    # add weights by techs
-    remind_formatted = remind_formatted.merge(weights, on=["technology", "year"], how="left")
+
+    # TODO switch with settings
+    # years
+    years = frames["capex"].year.unique()
 
     # make a pypsa like cost table, with remind values
-    costs_remind = make_pypsa_like_costs(frames, region)
+    costs_remind = make_pypsa_like_costs(frames)
+    # add weights by techs
+    costs_remind = costs_remind.merge(weights, on=["technology", "year"], how="left")
 
     # load the mapping
-    mappings = pd.read_csv(os.path.abspath("../../data") + "/techmapping_remind2py.csv")
+    mappings = pd.read_csv(root_dir + "/data/techmapping_remind2py.csv")
+    mappings.loc[:, "reference"] = mappings["reference"].apply(_list)
+
+    # check the data & mappings
     validate_mappings(mappings)
-
-    def _list(x: str):
-        """in case of csv input"""
-        if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
-            return x.replace("[", "").replace("]", "").split(", ")
-        return x
-
-    mappings["reference"] = mappings["reference"].apply(_list)
+    validate_remind_data(costs_remind, mappings)
 
     # load pypsa costs
-    pypsa_costs_dir = os.path.abspath("../../../PyPSA-China-PIK/resources/data/costs")
-    pypsa_cost_files = [os.path.join(pypsa_costs_dir, f) for f in os.listdir(p)]
+    pypsa_costs_dir = os.path.join(
+        os.path.abspath(root_dir + "/.."), "PyPSA-China-PIK/resources/data/costs"
+    )
+    pypsa_cost_files = [os.path.join(pypsa_costs_dir, f) for f in os.listdir(pypsa_costs_dir)]
     pypsa_costs = pd.read_csv(pypsa_cost_files.pop())
     for f in pypsa_cost_files:
         pypsa_costs = pd.concat([pypsa_costs, pd.read_csv(f)])
 
     # apply the mappings to pypsa tech
+    mapped_costs = map_to_pypsa_tech(
+        remind_costs_formatted=costs_remind,
+        pypsa_costs=pypsa_costs,
+        mappings=mappings,
+        weights=weights,
+        years=years,
+    )
+    logger.info(f"Writing mapped costs data to {os.path.join(root_dir, 'output')}")
+    if not os.path.exists(os.path.join(root_dir, "output")):
+        os.mkdir(os.path.join(root_dir, "output"))
+    write_cost_data(mapped_costs, root_dir + "/output/", descript=f"test_remind_{remind_v}")
+
+    logger.info("Finished")
