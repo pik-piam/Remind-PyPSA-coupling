@@ -621,7 +621,7 @@ if __name__ == "__main__":
 
     # get remind version
     with open(os.path.join(base_path, "c_model_version.csv"), "r") as f:
-        remind_v = f.read().split("\n")[1]
+        remind_v = f.read().split("\n")[1].replace(",", "").replace(" ", "")
 
     # make the stitched weight frames
     weight_frames = [frames[k].assign(weightby=k) for k in frames if k.startswith("weights")]
@@ -664,8 +664,11 @@ if __name__ == "__main__":
         years=years,
     )
     logger.info(f"Writing mapped costs data to {os.path.join(root_dir, 'output')}")
+    descript = f"test_remind_{remind_v}"
     if not os.path.exists(os.path.join(root_dir, "output")):
         os.mkdir(os.path.join(root_dir, "output"))
-    write_cost_data(mapped_costs, root_dir + "/output/", descript=f"test_remind_{remind_v}")
+    if not os.path.exists(os.path.join(root_dir, "output", descript)):
+        os.mkdir(os.path.join(root_dir, "output", descript))
+    write_cost_data(mapped_costs, root_dir + "/output/", descript=descript)
 
     logger.info("Finished")

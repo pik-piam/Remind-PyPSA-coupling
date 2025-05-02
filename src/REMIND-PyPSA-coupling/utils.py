@@ -122,8 +122,8 @@ def write_cost_data(cost_data: pd.DataFrame, output_dir: os.PathLike, descript: 
         descript (str, optional): optioal description to add to the file name
     """
 
-    for name, group in cost_data.groupby("year"):
-        if descript:
-            name = f"{name}_{descript}"
-        export_p = os.path.join(output_dir, f"costs_remind_{name}.csv")
+    if descript:
+        output_dir += f"{descript}"
+    for year, group in cost_data.groupby("year"):
+        export_p = os.path.join(output_dir, f"costs_{year}.csv")
         group.to_csv(export_p, index=False)
