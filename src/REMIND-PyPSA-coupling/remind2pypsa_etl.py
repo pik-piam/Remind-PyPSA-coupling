@@ -21,6 +21,9 @@ from utils import (
     read_remind_regions_csv,
     read_remind_descriptions_csv,
     write_cost_data,
+    key_sort,
+    expand_years,
+    to_list,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,36 +63,6 @@ MAPPING_FUNCTIONS = [
 
 # pypsa costs column names
 OUTP_COLS = ["technology", "year", "parameter", "value", "unit", "source", "further description"]
-
-
-def _list(x: str):
-    """in case of csv input"""
-    if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
-        return x.replace("[", "").replace("]", "").split(", ")
-    return x
-
-
-def _key_sort(col):
-    # if col.name == "year":
-    #     return col.astype(int)
-    if col.name == "technology":
-        return col.str.lower()
-    else:
-        return col
-
-
-def _expand_years(df: pd.DataFrame, years: list) -> pd.DataFrame:
-    """expand the dataframe by the years
-
-    Args:
-        df (pd.DataFrame): time-indep data
-        years (list): the years
-
-    Returns:
-        pd.DataFrame: time-indep data with explicit years
-    """
-
-    return pd.concat([df.assign(year=yr) for yr in years])
 
 
 # TODO: soft-coe remind names
@@ -139,7 +112,7 @@ def make_pypsa_like_costs(
     # add years to table with time-indep data
     for label, frame in cost_frames.items():
         if "year" not in frame.columns:
-            cost_frames[label] = _expand_years(frame, capex.year.unique())
+            cost_frames[label] = expand_years(frame, capex.year.unique())
     # add missing techs for tech agnostic data
     for label, frame in cost_frames.items():
         if "technology" not in frame.columns:
@@ -152,7 +125,7 @@ def make_pypsa_like_costs(
     costs_remind = pd.concat(
         [frame[column_order] for frame in cost_frames.values()], axis=0
     ).reset_index(drop=True)
-    costs_remind.sort_values(by=["technology", "year", "parameter"], key=_key_sort, inplace=True)
+    costs_remind.sort_values(by=["technology", "year", "parameter"], key=key_sort, inplace=True)
 
     return costs_remind
 
@@ -313,7 +286,7 @@ def map_to_pypsa_tech(
 
     direct_input = mappings.query("mapper == 'set_value'").rename(columns={"reference": "value"})
     direct_input = direct_input.assign(source="direct_input from coupling mapping")
-    direct_input = _expand_years(direct_input, years)
+    direct_input = expand_years(direct_input, years)
 
     # pypsa values
     from_pypsa = _use_pypsa(mappings, pypsa_costs, years)
@@ -348,7 +321,7 @@ def map_to_pypsa_tech(
     output_frames = [direct_input, use_remind, from_pypsa, proxy_learning, weighed_basket]
     output = pd.concat([df[OUTP_COLS] for df in output_frames])
     output = output.assign(year=output.year.astype(int))
-    return output.sort_values(["year", "technology", "parameter"], key=_key_sort).reset_index(
+    return output.sort_values(["year", "technology", "parameter"], key=key_sort).reset_index(
         drop=True
     )
 
@@ -499,7 +472,7 @@ def _weigh_remind_by(
     if "weight" not in remind_costs_formatted.columns:
         weights = weights.merge(remind_costs_formatted, on=["technology", "year"], how="left")
 
-    to_weigh = _expand_years(to_weigh, years=remind_costs_formatted.year.unique()).reset_index(
+    to_weigh = expand_years(to_weigh, years=remind_costs_formatted.year.unique()).reset_index(
         drop=True
     )
     # explode list of weight techs (rows dim)
@@ -640,7 +613,7 @@ if __name__ == "__main__":
 
     # load the mapping
     mappings = pd.read_csv(root_dir + "/data/techmapping_remind2py.csv")
-    mappings.loc[:, "reference"] = mappings["reference"].apply(_list)
+    mappings.loc[:, "reference"] = mappings["reference"].apply(to_list)
 
     # check the data & mappings
     validate_mappings(mappings)
@@ -663,6 +636,7 @@ if __name__ == "__main__":
         weights=weights,
         years=years,
     )
+    mapped_costs.fillna("", inplace=True)
     logger.info(f"Writing mapped costs data to {os.path.join(root_dir, 'output')}")
     descript = f"test_remind_{remind_v}"
     if not os.path.exists(os.path.join(root_dir, "output")):

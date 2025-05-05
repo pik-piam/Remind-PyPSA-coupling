@@ -127,3 +127,36 @@ def write_cost_data(cost_data: pd.DataFrame, output_dir: os.PathLike, descript: 
     for year, group in cost_data.groupby("year"):
         export_p = os.path.join(output_dir, f"costs_{year}.csv")
         group.to_csv(export_p, index=False)
+
+
+def expand_years(df: pd.DataFrame, years: list) -> pd.DataFrame:
+    """expand the dataframe by the years
+
+    Args:
+        df (pd.DataFrame): time-indep data
+        years (list): the years
+
+    Returns:
+        pd.DataFrame: time-indep data with explicit years
+    """
+
+    return pd.concat([df.assign(year=yr) for yr in years])
+
+
+def to_list(x: str):
+    """in case of csv input. conver str to list
+
+    Args:
+        x (str): maybe list like string"""
+    if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
+        return x.replace("[", "").replace("]", "").split(", ")
+    return x
+
+
+def key_sort(col):
+    # if col.name == "year":
+    #     return col.astype(int)
+    if col.name == "technology":
+        return col.str.lower()
+    else:
+        return col
