@@ -5,11 +5,15 @@ import pandas as pd
 import country_converter as coco
 import functools
 
-# import gamspy
+try:
+    import gamspy
+except ImportError:
+    pass
 
 # translate to pypsa
 REMIND_NAME_MAP = {
     "ttot": "year",
+    "tall": "year",
     "all_regi": "region",
     "all_te": "technology",
     "tePy32": "technology",
@@ -29,6 +33,27 @@ def _fix_repeated_columns(cols) -> pd.DataFrame:
     return result
 
 
+# TODO Pypsa reader class?
+def read_hu_2013_projections(path: os.PathLike) -> pd.DataFrame:
+    """
+    Read the regional electricity demand projections by Hu, Tan & Xu. 2013.
+    'An Exploration into China’s Economic Development and Electricity Demand by the Year 2050.'
+    and return the projections by region normalised to the national total.
+    Args:
+        path (os.PathLike): Path to the Hu et al. (2013) projections file.
+    Returns:
+    """
+    df = pd.read_csv(path)
+    if "region" not in df.columns:
+        df.rename(columns={df.columns[0]: "region"}, inplace=True)
+    df.set_index("region", inplace=True)
+
+    scaled = df / df.sum(axis=0)
+
+    return scaled
+
+
+# TODO Remind reader class?
 def read_remind_csv(file_path: os.PathLike, **kwargs) -> pd.DataFrame:
     """read an exported csv from remind (a single table of the gam db)
 
@@ -75,7 +100,7 @@ def read_remind_descriptions_csv(file_path: os.PathLike) -> pd.DataFrame:
         pd.DataFrame: the descriptors per symbol, with units extracted
     """
 
-    descriptors = pd.read_csv("/home/ivanra/documents/gams_learning/pypsa_export/descriptions.csv")
+    descriptors = pd.read_csv(file_path)
     descriptors["unit"] = descriptors["text"].str.extract(r"\[(.*?)\]")
     return descriptors.rename(columns={"Unnamed: 0": "symbol"}).fillna("")
 
