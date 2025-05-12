@@ -159,8 +159,10 @@ def transform_co2_intensity(co2_intensity: pd.DataFrame, years: list | pd.Index)
     co2_intens = co2_intensity.rename(
         columns={
             "carrier": "from_carrier",
-            "carrier_1": "to_carrier",
-            "carrier_2": "emission_type",
+            "all_enty_1": "to_carrier",
+            "all_enty_2": "emission_type",
+            "all_enty.1": "to_carrier",
+            "all_enty.2": "emission_type",
         },
     )
     co2_intens = co2_intens.query("to_carrier == 'seel' & emission_type == 'co2' & year in @years")
@@ -296,7 +298,8 @@ def map_to_pypsa_tech(
     proxy_learning = _learn_investment_from_proxy(
         mappings, pypsa_costs, remind_costs_formatted, ref_year=years.min()
     )
-    proxy_learning.loc[:, "further description"] = "proxy learning from REMIND"
+    if not proxy_learning.empty:
+        proxy_learning.loc[:, "further description"] = "proxy learning from REMIND"
     # TODO check weighing is by right quantities
     # weighed by remind tech basket
     weighed_basket = _weigh_remind_by(remind_costs_formatted, weights, mappings)
@@ -319,7 +322,7 @@ def map_to_pypsa_tech(
     )
 
     output_frames = [direct_input, use_remind, from_pypsa, proxy_learning, weighed_basket]
-    output = pd.concat([df[OUTP_COLS] for df in output_frames])
+    output = pd.concat([df[OUTP_COLS] for df in output_frames if not df.empty], axis=0)
     output = output.assign(year=output.year.astype(int))
     return output.sort_values(["year", "technology", "parameter"], key=key_sort).reset_index(
         drop=True
@@ -369,7 +372,7 @@ def _learn_investment_from_proxy(
         scaling.set_index(["technology"])
         .groupby(level=[0])
         .apply(lambda x: x.value / x[x.year == x.year.min()].value)
-        .values
+        .T.values
     )
 
     # merge
@@ -488,8 +491,8 @@ def _weigh_remind_by(
     )
 
     # apply the weights (use the original row id as grouping)
-    to_weigh.loc[:, "value"] = weightings.groupby(["id_weight"]).apply(
-        lambda x: (x.value * x.weight).sum() / x.weight.sum()
+    to_weigh.loc[:, "value"] = weightings.groupby(["id_weight"])[["value", "weight"]].apply(
+        lambda x: (x.value * (x.weight + 1e-9)).sum() / (x.weight.sum() + 1e-9)
     )
 
     # validate that units matched (unique) # !! should check nans too
@@ -544,9 +547,8 @@ def validate_mappings(mappings: pd.DataFrame):
     # check uniqueness
     counts = mappings.groupby(["PyPSA_tech", "parameter"]).count()
     repeats = counts[counts.values > 1]
-    # TODO reactivate
-    # if len(repeats):
-    # raise ValueError(f"Mappings are not unique: n repeats:\n {repeats} ")
+    if len(repeats):
+        raise ValueError(f"Mappings are not unique: n repeats:\n {repeats} ")
     # should validate that remind references are actually in the remind export
 
 
@@ -572,13 +574,35 @@ def validate_remind_data(remind_data: pd.DataFrame, mappings: pd.DataFrame):
         )
 
 
+def validate_output(df_out: pd.DataFrame, costs_remind: pd.DataFrame):
+    """validate the output data
+    Args:
+        df_out (pd.DataFrame): DataFrame containing the output data
+        costs_remind (pd.DataFrame): DataFrame containing the formatted remind data
+    """
+
+    missing_vals = df_out.value.isna().any()
+    if missing_vals:
+        raise ValueError(f"Missing values or nans in output data: {df_out[df_out.value.isna()]}")
+
+    n_expected = costs_remind.technology.nunique() * costs_remind.year.nunique()
+    # check years
+
+    # check all fields
+
+    # check length vs mappings
+
+
 if __name__ == "__main__":
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     region = "CHA"  # China w Maccau, Taiwan
 
     # make paths
     # the remind export uses the name of the symbol as the file name
-    base_path = os.path.join(os.path.abspath(root_dir + "/.."), "gams_learning/pypsa_export/")
+    # base_path = os.path.join(os.path.abspath(root_dir + "/.."), "gams_learning/pypsa_export/")
+    base_path = os.path.expanduser(
+        "~/downloads/output_REMIND/SSP2-Budg1000-PyPSAxprt_2025-05-09/pypsa_export"
+    )
     paths = {
         key: os.path.join(base_path, value + ".csv") for key, value in REMIND_PARAM_MAP.items()
     }
@@ -597,7 +621,7 @@ if __name__ == "__main__":
         remind_v = f.read().split("\n")[1].replace(",", "").replace(" ", "")
 
     # make the stitched weight frames
-    weight_frames = [frames[k].assign(weightby=k) for k in frames if k.startswith("weights")]
+    weight_frames = [frames[k].assign(weight_type=k) for k in frames if k.startswith("weights")]
     weights = pd.concat(
         [df.rename(columns={"carrier": "technology", "value": "weight"}) for df in weight_frames]
     )
@@ -636,9 +660,10 @@ if __name__ == "__main__":
         weights=weights,
         years=years,
     )
-    mapped_costs.fillna("", inplace=True)
+    mapped_costs["value"].fillna(0, inplace=True)
+    mapped_costs.fillna(" ", inplace=True)
     logger.info(f"Writing mapped costs data to {os.path.join(root_dir, 'output')}")
-    descript = f"test_remind_{remind_v}"
+    descript = f"test_remind_{remind_v}_pk1000"
     if not os.path.exists(os.path.join(root_dir, "output")):
         os.mkdir(os.path.join(root_dir, "output"))
     if not os.path.exists(os.path.join(root_dir, "output", descript)):
