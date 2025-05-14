@@ -33,6 +33,31 @@ def _fix_repeated_columns(cols) -> pd.DataFrame:
     return result
 
 
+def build_tech_map(remind2pypsa_map: pd.DataFrame, map_param="investment") -> pd.DataFrame:
+    """
+    Build a mapping from REMIND to PyPSA technology names using the mapping DataFrame.
+    Adds groups in case mapping is not 1:1
+    Args:
+        remind2pypsa_map (pd.DataFrame): DataFrame with the (!!validated) mapping
+        map_param (Optional, str):  the parameter to use for tech name mapping. Defaults to 'investment'.
+    Returns:
+        pd.DataFrame: DataFrame with the mapping (remind_tech: PyPSA_tech, group)
+    """
+
+    tech_names_map = remind2pypsa_map.query(
+        "mapper.str.contains('remind') & not mapper.str.contains('learn') & parameter == @map_param"
+    )[["PyPSA_tech", "reference"]]
+    tech_names_map.rename(columns={"reference": "remind_tech"}, inplace=True)
+    tech_names_map.loc[:, "remind_tech"] = tech_names_map.remind_tech.apply(to_list)
+    tech_names_map = tech_names_map.explode("remind_tech")
+    tech_names_map.set_index("remind_tech", inplace=True)
+    tech_names_map["group"] = tech_names_map.groupby(level=0).PyPSA_tech.apply(
+        lambda x: " & ".join(x)
+    )
+
+    return tech_names_map
+
+
 # TODO Pypsa reader class?
 def read_hu_2013_projections(path: os.PathLike) -> pd.DataFrame:
     """
