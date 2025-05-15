@@ -5,7 +5,7 @@ The aim is to translate the REMIND pre-investment capacities into pypsa brownfie
 PyPSA workflows already come with their own bronwfield data (e.g. from powerplantmatching) assigned 
 to nodes/clusters. This capacity needs to be adjusted to the REMIND capacities.
 
-## Harmonisation fo REMIND and PypSA Capacities
+## Harmonisation of REMIND and PypSA Capacities
 In case the REMIND capacities are smaller than the pypsa brownfield capacities, the pypsa capacities are scaled down by tech.
 
 In case the REMIND capacities are larger, the pypsa brownfield capacities are kept and an additional paid-off component
@@ -14,6 +14,8 @@ pypsa determines the optimal location of the REMIND-built capacity.
 
 ## Workflow integration
 The constraints and data are exported as files made available to the pypsa workflow.
+
+## Reference Guide
 
 """
 

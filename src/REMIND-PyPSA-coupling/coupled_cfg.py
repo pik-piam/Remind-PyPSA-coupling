@@ -1,10 +1,13 @@
 """
 Script to generate a PyPSA config file for REMIND-PyPSA coupling.
 
-Usage:
-    python coupled_cfg.py # todo add argparse?
-    cd pypsa_folder
-    snakemake --configfile=remind.yaml
+Usage:\n
+    python coupled_cfg.py\n
+    cd pypsa_folder\n
+    snakemake --configfile=remind.yaml\n
+
+Missing:\n
+- arguments or config 
 """
 
 import os

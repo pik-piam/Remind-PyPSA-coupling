@@ -1,5 +1,5 @@
-""" 
-Load and transform REMIND AC year load data for pypsa
+"""
+Load and transform REMIND AC year load data for pypsa:\n
 - convert from TWa t MWh
 - disaggregate by sector (not implemented)
 - disaggregate spatially (one option implemented)
