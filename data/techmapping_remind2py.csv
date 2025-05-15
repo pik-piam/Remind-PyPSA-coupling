@@ -54,7 +54,7 @@ fuel cell,fuel,set_value,0,USD/MWh,Dummy value to avoid PyPSA-EUR throwing an er
 fuel cell,investment,use_remind,h2turb,,
 fuel cell,lifetime,use_remind,h2turb,,
 fuel cell,VOM,use_remind,h2turb,,
-gas,CO2 intensity,weigh_remind_by_gen,"[ngcc, ngccc, gaschp]",,TODO this is partially wrong and not correct emission factor from REMIND but PyPSA-Eur uses same emission factor for OCGT and CCGT
+gas,CO2 intensity,weigh_remind_by_gen,"[ngcc,ngccc,ngt,gaschp]",,TODO this is partially wrong and not correct emission factor from REMIND but PyPSA-Eur uses same emission factor for OCGT and CCGT
 gas,efficiency,set_value,1,p.u.,Dummy technology to avoid PyPSA-EUR throwing an error
 gas,FOM,set_value,0,%/year,Dummy technology to avoid PyPSA-EUR throwing an error
 gas,fuel,use_remind,pegas,,
@@ -65,28 +65,28 @@ HVAC overhead,CO2 intensity,set_value,0,tCO2/MWh_th,
 HVAC overhead,efficiency,set_value,1,p.u.,Process without direct losses
 HVAC overhead,FOM,use_pypsa,,%,
 HVAC overhead,fuel,set_value,0,USD/MWh,Dummy value to avoid PyPSA-EUR throwing an error
-HVAC overhead,investment,use_remind,windon,,
+HVAC overhead,investment,use_pypsa,,,
 HVAC overhead,lifetime,use_pypsa,,,
 HVAC overhead,VOM,set_value,0,USD/MWh,"No value originally in PyPSA-EUR databse, using default fill value"
 HVDC inverter pair,CO2 intensity,set_value,0,tCO2/MWh_th,
 HVDC inverter pair,efficiency,set_value,1,p.u.,Process without direct losses
 HVDC inverter pair,FOM,use_pypsa,,%,
 HVDC inverter pair,fuel,set_value,0,USD/MWh,Dummy value to avoid PyPSA-EUR throwing an error
-HVDC inverter pair,investment,use_remind,windon,,
+HVDC inverter pair,investment,use_pypsa,,,
 HVDC inverter pair,lifetime,use_pypsa,,,
 HVDC inverter pair,VOM,set_value,0,USD/MWh,"No value originally in PyPSA-EUR databse, using default fill value"
 HVDC overhead,CO2 intensity,set_value,0,tCO2/MWh_th,
 HVDC overhead,efficiency,set_value,1,p.u.,Process without direct losses
 HVDC overhead,FOM,use_pypsa,,%,
 HVDC overhead,fuel,set_value,0,USD/MWh,Dummy value to avoid PyPSA-EUR throwing an error
-HVDC overhead,investment,use_remind,windon,,
+HVDC overhead,investment,use_pypsa,,,
 HVDC overhead,lifetime,use_pypsa,,,
 HVDC overhead,VOM,set_value,0,USD/MWh,"No value originally in PyPSA-EUR databse, using default fill value"
 HVDC submarine,CO2 intensity,set_value,0,tCO2/MWh_th,
 HVDC submarine,efficiency,set_value,1,p.u.,Process without direct losses
 HVDC submarine,FOM,use_pypsa,,%,
 HVDC submarine,fuel,set_value,0,USD/MWh,Dummy value to avoid PyPSA-EUR throwing an error
-HVDC submarine,investment,use_remind,windon,,
+HVDC submarine,investment,use_pypsa,,,
 HVDC submarine,lifetime,use_pypsa,,,
 HVDC submarine,VOM,set_value,0,USD/MWh,"No value originally in PyPSA-EUR databse, using default fill value"
 hydro,CO2 intensity,set_value,0,tCO2/MWh_th,Process without direct emissions
@@ -221,17 +221,3 @@ solar,fuel,set_value,0,USD/MWh,Dummy value to avoid PyPSA-EUR throwing an error
 solar,investment,use_remind,spv,,
 solar,lifetime,use_remind,spv,,
 solar,VOM,set_value,0,USD/MWh,"No value originally in PyPSA-EUR databse, using default fill value"
-solar-rooftop,CO2 intensity,set_value,0,tCO2/MWh_th,Process without direct emissions
-solar-rooftop,efficiency,use_remind,spv,,
-solar-rooftop,FOM,use_remind,spv,,
-solar-rooftop,fuel,set_value,0,USD/MWh,Dummy value to avoid PyPSA-EUR throwing an error
-solar-rooftop,investment,use_remind,spv,,
-solar-rooftop,lifetime,use_remind,spv,,
-solar-rooftop,VOM,set_value,0,USD/MWh,"No value originally in PyPSA-EUR databse, using default fill value"
-solar-utility,CO2 intensity,set_value,0,tCO2/MWh_th,Process without direct emissions
-solar-utility,efficiency,use_remind,spv,,
-solar-utility,FOM,use_remind,spv,,
-solar-utility,fuel,set_value,0,USD/MWh,Dummy value to avoid PyPSA-EUR throwing an error
-solar-utility,lifetime,use_remind,spv,,
-solar-utility,VOM,set_value,0,USD/MWh,"No value originally in PyPSA-EUR databse, using default fill value"
-solar-utility,investment,use_remind,spv,,
