@@ -2,7 +2,7 @@
 site_name: REMIND-PyPSA Coupling Tools
 
 theme:
-  name: "readthedocs"
+  name: "material"
 docs_dir: "./docs"
 
 # Due to snakemake workflow, we need to include the 'scripts' directory in the python path
@@ -22,5 +22,6 @@ plugins:
 nav:
   - Home: index.md
   # - Tutorials: tutorials.md
+  - Objects & Data: objects.md
   - Reference: 
     - Reference.md
