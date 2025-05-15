@@ -79,7 +79,7 @@ def read_hu_2013_projections(path: os.PathLike) -> pd.DataFrame:
 
 
 # TODO Remind reader class?
-def read_remind_csv(file_path: os.PathLike, **kwargs) -> pd.DataFrame:
+def read_remind_csv(file_path: os.PathLike, **kwargs: dict) -> pd.DataFrame:
     """read an exported csv from remind (a single table of the gam db)
 
     Args:

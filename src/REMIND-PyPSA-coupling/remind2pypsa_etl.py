@@ -262,10 +262,11 @@ def map_to_pypsa_tech(
     map config
 
     Args:
-        cost_frames (pd.DataFrame): DataFrame containing REMIND cost data.
+        remind_costs_formatted (pd.DataFrame): DataFrame containing REMIND cost data.
         pypsa_costs (pd.DataFrame): DataFrame containing pypsa cost data.
         mappings (pd.DataFrame): DataFrame containing the mapping funcs and names from
             REMIND to pypsa technologies.
+        weights (pd.DataFrame): DataFrame containing the weights.
         years (Iterable, optional): years to be used. Defaults to None (use remidn dat)
     Returns:
         pd.DataFrame: DataFrame with mapped technology names.
