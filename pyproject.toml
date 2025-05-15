@@ -12,7 +12,12 @@ dev = [
 ]
 jupyter = ["ipykernel","ipython"]
 
+[project.urls]
+Homepage = "https://github.com/pik-piam/Remind-PyPSA-coupling/"
+Documentation = "https://pik-piam.github.io/Remind-PyPSA-coupling/"
+
 [tool.uv]
 managed = true
 [tool.uv.workspace]
 members = ["REMIND-PyPSA-coupling", "src/remind_pypsa_coupling"]
+
