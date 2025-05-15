@@ -5,7 +5,6 @@ This is a collection of tools to couple remind and pypsa for different regions.
 
 The tools are currently in development, with as test cases PyPSA-EUR for Germany and PyPSA-China-PIK for China.
 
-
 ### Coupling steps
 1. Export data from within REMIND (REMIND - pypsa forks)
 2. ETL (extract transform, load) & save data for PyPSA workflow execution according to config. (This repo)
@@ -24,6 +23,8 @@ We recommend using `uv`.
 This package is intended for use in combination with REMIND and PyPSA, as part of a snakemake workflow
 
 Examples: Coming at some point
+
+Activate the venv with `source activate .venv/bin/activate`
 
 # Mappings and ETL operations
 
