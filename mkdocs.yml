@@ -11,13 +11,16 @@ plugins:
 - gen-files:
     scripts:
     - docs/autogen_ref_pages.py
+- literate-nav:
+    nav_file: reference_nav.yml
 - mkdocstrings:
     default_handler: python
     handlers:
       python:
-        paths: ["./src"]
+        paths: ["./src/REMIND-PyPSA-coupling"]
 
 nav:
   - Home: index.md
-  - Tutorials: tutorials.md
-  - Reference: Reference.md
+  # - Tutorials: tutorials.md
+  - Reference: 
+    - Reference.md
