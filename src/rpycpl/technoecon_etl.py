@@ -1,7 +1,5 @@
 """
 Extract data from Remind, transform it for pypsa PyPSA and write it to files
-
-Note the dataframes 
 """
 
 # TODO add Cb/Cv
@@ -12,14 +10,11 @@ Note the dataframes
 
 import pandas as pd
 import os
-import country_converter as coco
 from collections.abc import Iterable
 import logging
 
-from utils import (
+from .utils import (
     read_remind_csv,
-    read_remind_regions_csv,
-    read_remind_descriptions_csv,
     write_cost_data,
     key_sort,
     expand_years,
@@ -443,8 +438,9 @@ def _use_pypsa(
 
     # Validate pypsa completeness
     if from_pypsa[from_pypsa.year.isna()].parameter.any():
+        missing = from_pypsa[from_pypsa.year.isna()][["PyPSA_tech", "parameter"]]
         raise ValueError(
-            f"Missing data in pypsa data for {from_pypsa[from_pypsa.year.isna()][["PyPSA_tech", "parameter"]]}"
+            f"Missing data in pypsa data for {missing}"
             " Check the mappings and the pypsa data"
         )
     # merge comments from mappings and pypsa

@@ -5,6 +5,7 @@ __pycache__/
 
 # project
 output/**
+data/dev/**
 # C extensions
 *.so
 

@@ -1,8 +1,8 @@
-import os
+
 import pandas as pd
 import pytest
 
-from utils import read_remind_regions
+from .utils import read_remind_regions
 
 
 @pytest.fixture

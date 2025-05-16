@@ -13,8 +13,8 @@ Load and transform REMIND AC year load data for pypsa:\n
 import os
 import logging
 
-from utils import read_hu_2013_projections, read_remind_csv
-from disagg import SpatialDisaggregator
+from .utils import read_hu_2013_projections, read_remind_csv
+from .disagg import SpatialDisaggregator
 
 logger = logging.getLogger(__name__)
 

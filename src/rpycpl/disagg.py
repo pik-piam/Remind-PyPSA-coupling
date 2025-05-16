@@ -1,4 +1,4 @@
-""" 
+"""
 Disaggregation tools for:\n
 - Spatial disaggregation
 - Temporal disaggregation

@@ -1,31 +1,36 @@
 [project]
 name = "REMIND-PyPSA-coupling"
-version = "0.0.0a"
+version = "0.0.0a3"
 description = "Tools to couple the REMIND IAM and PyPSA power models"
 readme = "README.md"
 requires-python = ">=3.12"
-
-dependencies = ["numpy>=2", "pandas>=2", "pyyaml", "country_converter"]
-[dependency-groups]
-dev = [
-    "pytest>=8.3.4",
-]
-jupyter = ["ipykernel","ipython"]
-
+dependencies = [
+    "numpy>1.9", 
+    "pandas>2", 
+    "pyyaml", 
+    "country_converter"]
 
 [project.urls]
 Homepage = "https://github.com/pik-piam/Remind-PyPSA-coupling/"
 Documentation = "https://pik-piam.github.io/Remind-PyPSA-coupling/"
 
-# uv
-[tool.uv]
-managed = true
+# eg `uv pip install -r pyproject.toml --extra release`
+[project.optional-dependencies]
+jupyter = ["ipykernel","ipython"]
+gdx = ["gamspy"]
 
-[tool.uv.workspace]
-members = ["REMIND-PyPSA-coupling", "src/remind_pypsa_coupling"]
+[tool.setuptools]
+package-dir = {"" = "src"}
 
-[[tool.uv.index]]
-name = "test-remind-coupl"
-url = "https://test.pypi.org/simple/"
-publish-url = "https://test.pypi.org/legacy/"
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = [    
+    "setuptools", "wheel", "numpy", "cython", "twine"
+]
+build-backend = "setuptools.build_meta"
+
+
+
 

@@ -1,5 +1,5 @@
 """
-Script to generate a PyPSA config file for REMIND-PyPSA coupling.
+Tools / Script to generate a PyPSA config file for REMIND-PyPSA coupling.
 
 Usage:\n
     python coupled_cfg.py\n
@@ -7,13 +7,12 @@ Usage:\n
     snakemake --configfile=remind.yaml\n
 
 Missing:\n
-- arguments or config 
+- arguments or config
 """
 
 import os
 import yaml
-from utils import read_remind_csv
-from utils import read_remind_regions_csv
+from .utils import read_remind_csv
 
 if __name__ == "__main__":
 

@@ -1,11 +1,12 @@
 """functions copied over from pypsa-china workflow to facilitate the development
 without full coupling"""
 
-import logging, os
-
-logger = logging.getLogger()
+import os
+import logging
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger()
 
 
 def assign_year_bins(df: pd.DataFrame, year_bins: list) -> pd.DataFrame:

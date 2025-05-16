@@ -1,16 +1,18 @@
-""" 
-# Extract, Transform, Load (ETL) operations for REMIND capacities
+"""
+# Extract, Transform, Load (ETL) operations for REMIND (pre-invetment) generation capacities
 
 The aim is to translate the REMIND pre-investment capacities into pypsa brownfield capacities.
 PyPSA workflows already come with their own bronwfield data (e.g. from powerplantmatching) assigned 
 to nodes/clusters. This capacity needs to be adjusted to the REMIND capacities.
 
 ## Harmonisation of REMIND and PypSA Capacities
-In case the REMIND capacities are smaller than the pypsa brownfield capacities, the pypsa capacities are scaled down by tech.
+In case the REMIND capacities are smaller than the pypsa brownfield capacities,
+     the pypsa capacities are scaled down by tech.
 
-In case the REMIND capacities are larger, the pypsa brownfield capacities are kept and an additional paid-off component
-is added to the pypsa model as a max (paid-off ie free) capacity constraint. The constraint is REMIND REGION wide so that 
-pypsa determines the optimal location of the REMIND-built capacity. 
+In case the REMIND capacities are larger, the pypsa brownfield capacities are kept and an 
+     additional paid-off component is added to the pypsa model as a max (paid-off ie free)
+     capacity constraint. The constraint is REMIND REGION wide so that pypsa 
+     determines the optimal location of the REMIND-built capacity. 
 
 ## Workflow integration
 The constraints and data are exported as files made available to the pypsa workflow.
@@ -21,10 +23,10 @@ The constraints and data are exported as files made available to the pypsa workf
 
 import os
 import pandas as pd
-import os
 import logging
 
-from utils import read_remind_csv, build_tech_map
+
+from .utils import read_remind_csv, build_tech_map
 
 logger = logging.getLogger()
 
