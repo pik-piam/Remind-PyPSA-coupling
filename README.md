@@ -24,7 +24,7 @@ This package is intended for use in combination with REMIND and PyPSA, as part o
 
 Examples: Coming at some point
 
-Activate the venv with `source activate .venv/bin/activate`
+Activate the venv with `source .venv/bin/activate`
 
 # Mappings and ETL operations
 
