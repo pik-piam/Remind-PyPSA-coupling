@@ -9,7 +9,7 @@ The REMIND-PyPSA mapping allows to build the the techno-economic data from the p
 |--------------------|---------------|------------|-----------|
 | PyPSA_tech | pypsa tech names | as expected by network creation | `OCGT` |
 | parameter  | the techno-economic field | `[CO2 itensity, efficiency, FOM, fuel, investment, lifetime, VOM] ` | - |
-| mapper    | func to make the pypsa parameter | `["set_value", "use_remind", use_pypsa", "weigh_remind_by_gen"]`| - |
+| mapper    | [func](transformations#techno-econmic-data) to determine the techno-econ parameter | `["set_value", "use_remind", use_pypsa", "weigh_remind_by_gen", "use_remind_with_learning_from"]`| - |
 | reference | the value to pass to the mapper | `set_value: 1.2, use_pysa:(ignored), use_remind: biochp (remind_name), weigh_remind_by_gen: "[biochp, bioigcc]"` |
 | unit     | the reference unit. Note pypsa load cost sometimes uses this! | str, missing | USD/Mwh, % (for FOM) |  
 | comment | additional comments that will be added to pypsa_cost csv entry | str | "Dummy value to avoid issues" |
