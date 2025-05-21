@@ -18,6 +18,7 @@ Documentation = "https://pik-piam.github.io/Remind-PyPSA-coupling/"
 [project.optional-dependencies]
 jupyter = ["ipykernel","ipython"]
 gdx = ["gamspy"]
+docu= ["mkdocs", "mkdocs_gen_files", "mkdocstrings[python]", "mkdocs-literate-nav", "mkdocs-material", "mkdocs-include-dir-to-nav"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

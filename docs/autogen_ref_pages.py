@@ -4,7 +4,7 @@ import mkdocs_gen_files
 # Set the root and scripts directory
 root = Path(__file__).parent.parent
 docu_dir = root / "docs"
-src_dir = root / "src" / "REMIND-PyPSA-coupling/"
+src_dir = root / "src" / "rpycpl/"
 
 # Loop through all Python files in the `src_dir` using rglob
 for path in sorted(src_dir.rglob("[!_]*.py")):
