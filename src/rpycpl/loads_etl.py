@@ -43,7 +43,7 @@ if __name__ == "__main__":
     )
     regional_reference = regional_reference[str(ref_year)]
 
-    logger.info("Disaggr" "egating load according to Hu et al. demand projections")
+    logger.info("Disaggregating load according to Hu et al. demand projections")
     disagg_load = SpatialDisaggregator().use_static_reference(
         electricity_demand, regional_reference
     )
