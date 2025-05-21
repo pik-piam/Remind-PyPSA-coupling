@@ -20,26 +20,29 @@ etl_steps:
 """
 
 
+# this could be function. The class is explicit and allows for more complex workflows later if needed
 class ETLRunner:
-    def __init__(self, step: Transformation):
-        self.step = step
-        self.loaded_frames: dict[str, Any] = {}
 
-    def load_frames(self, frames: dict):
-        """ use a loader for real data """
-        self.loaded_frames = frames
-
-    def run(self, **kwargs):
-        method = self.step.name if not self.step.method else self.step.method
+    @staticmethod
+    def run(step: Transformation, frames: dict[str, pd.DataFrame], **kwargs) -> pd.DataFrame:
+        """Run the ETL step with the given frames and parameters.
+        Args:
+            step (Transformation): The ETL step to run.
+            frames (dict): Dictionary of dataframes with loads
+            kwargs: Additional keyword arguments for the ETL method.
+        Returns:
+            pd.DataFrame: The transformed dataframe.
+        """
+        method = step.name if not step.method else step.method
  
         func = ETL_REGISTRY.get(method)
         if not func:
             raise ValueError(f"ETL method '{method}' not found in registry.")
-        # kwargs.update(self.step.kwargs)
         if kwargs:
-            return func(self.loaded_frames, **kwargs)
+            kwargs.update(step.kwargs)
+            return func(frames, **kwargs)
         else:
-            return func(self.loaded_frames)
+            return func(frames)
 
 
 if __name__ == "__main__":
@@ -77,13 +80,13 @@ if __name__ == "__main__":
     steps = config.get("etl_steps", [])
     for step_dict in steps:
         step = Transformation(**step_dict)
-        runner = ETLRunner(step)
-        runner.load_frames(frames)
-        # example extra argument
+        # convert load takes an extra arg
         if step.method == "convert_load":
-            outp = runner.run(region=region)
+            outp = ETLRunner.run(step, frames, region=region)
         else:
-            outp = runner.run()
+            outp = ETLRunner.run(step, frames)
+
         outputs[step.name] = outp
+
     # data in MWh
     print(outputs)

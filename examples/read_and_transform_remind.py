@@ -56,31 +56,28 @@ class RemindLoader:
 
 
 class ETLRunner:
-    def __init__(self, step: Transformation):
-        self.step = step
-        self.loaded_frames: dict[str, Any] = {}
-    
-    def load_frames_csv(self, remind_dir: PathLike,):
-        """ A more realistic example of a loader"""
-        loader = RemindLoader(remind_dir)
-        self.loaded_frames = loader.load_frames_csv(self.step.frames)
-        self.loaded_frames = loader.merge_split_frames(self.loaded_frames)
-        # is this any good? maybe itshould anyway be done at remind export
-        if self.step.filters:
-            self.loaded_frames.update({k: self.loaded_frames[k].query(v) for k, v in self.step.filters.items()})
-
-    def run(self, **kwargs):
-        method = self.step.name if not self.step.method else self.step.method
+    """Collection of methods to run ETL steps"""
+    @staticmethod
+    def run(step: Transformation, frames: dict[str, pd.DataFrame], **kwargs) -> pd.DataFrame:
+        """Run the ETL step with the given frames and parameters.
+        Args:
+            step (Transformation): The ETL step to run.
+            frames (dict): Dictionary of dataframes with loads
+            kwargs: Additional keyword arguments for the ETL method.
+        Returns:
+            pd.DataFrame: The transformed dataframe.
+        """
+        method = step.name if not step.method else step.method
  
         func = ETL_REGISTRY.get(method)
         if not func:
             raise ValueError(f"ETL method '{method}' not found in registry.")
-        # kwargs.update(self.step.kwargs)
         if kwargs:
-            return func(self.loaded_frames, **kwargs)
+            kwargs.update(step.kwargs)
+            return func(frames, **kwargs)
         else:
-            return func(self.loaded_frames)
-
+            return func(frames)
+        
 
 if __name__ == "__main__":
     # make the fake data for the example
@@ -91,21 +88,23 @@ if __name__ == "__main__":
     data_dir = os.path.abspath(".") # csvs were saved in the current directory
 
     region = "CHA"
+    extra = "foo"
     # transform remind data
     steps = config.get("etl_steps", [])
     outputs = {}
+    data_loader = RemindLoader(data_dir)
     for step_dict in steps:
         step = Transformation(**step_dict)
-        runner = ETLRunner(step)
-        runner.load_frames_csv(data_dir)
+        frames = data_loader.load_frames_csv(step.frames)
         # example extra argument
         if step.method == "convert_load":
-            outp = runner.run(region=region)
+            outp = ETLRunner.run(step, frames, region=region)
         elif step.method == "my_method":
             # custom kwargs
-            outp = runner.run(region=region)
+            outp = ETLRunner.run(step, frames,  my_param=extra)
         else:
-            outp = runner.run()
+            outp = ETLRunner.run(step, frames)
         outputs[step.name] = outp
+
     # data in MWh
     print(outputs)
