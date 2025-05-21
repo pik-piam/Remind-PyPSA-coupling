@@ -25,19 +25,20 @@ The pypsa <-> REMIND tech name map is derived from this table (using the investm
 
 ### REMIND Data
 
-The following data are needed from REMIND
-- techno-economic parameters `pm_data`
+The following data are needed from REMIND:
+
+- techno-economic parameters: `pm_data`
 - weights for technology baskets: e.g `p32_weightGen`,
-- CO2 prices `p_priceCO2`
+- CO2 prices: `p_priceCO2`
 - pre-investment capacities (several options)
-- AC load `p32_load`
-- capex `p32_capCost` (several options),
-- eta `pm_dataeta`, `pm_eta_conv`,
-- fuel_costs `p32_PEPriceAvg`,
-- discount_r `p32_discountRate`,
-- co2_intensity `pm_emifac`,
-- run name `c_expname`
-- version `c_modelversion`
+- AC load: `p32_load`
+- capex: `p32_capCost` (several options),
+- eta: `pm_dataeta`,: `pm_eta_conv`,
+- fuel_costs: `p32_PEPriceAvg`,
+- discount_r: `p32_discountRate`,
+- co2_intensity: `pm_emifac`,
+- run name: `c_expname`
+- version: `c_modelversion`
 
 These can either be exported in the gdx format or a series of csvs.
 Implicit in these are the years and regions.
@@ -69,7 +70,7 @@ The method name points to the ETL register. You can declare your own transformat
 
 ## data 
 
-Each of these data are represented as pandas `pd.Dataframe` or `pd.Series`. 
+Each of these data are represented as pandas: `pd.Dataframe` or: `pd.Series`. 
 
 Whilst there is validation - in particular of the mapping - the package expects column names as per powerplantmatching, pypsa and REMIND (GAMS sets in this case).
 
