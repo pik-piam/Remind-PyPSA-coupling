@@ -21,7 +21,8 @@ plugins:
 
 nav:
   - Home: index.md
-  # - Tutorials: tutorials.md
+  - Tutorials: tutorials.md
   - Objects & Data: objects.md
+  - Transformations: transformations.md
   - Reference: 
     - Reference.md
