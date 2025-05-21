@@ -47,6 +47,7 @@ class SpatialDisaggregator:
         self.validate_reference_data(reference_data)
         # outer/cartersian product to get (years, region) matrix
         return pd.DataFrame(
-            np.outer(data, reference_data), index=data.index, columns=reference_data.index
+            np.outer(data, reference_data),
+            index=data.index,
+            columns=reference_data.index,
         ).T
-    

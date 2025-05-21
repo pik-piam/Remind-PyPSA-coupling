@@ -5,6 +5,7 @@ import pandas as pd
 import country_converter as coco
 import functools
 import logging
+
 try:
     import gamspy
 except ImportError:
@@ -14,11 +15,14 @@ READERS_REGISTRY = {}
 
 # TODO write classes ro separate into files (readers/validators/etc)
 
+
 def register_reader(name):
     """decorator factory to register ETL functions"""
+
     def decorator(func):
         READERS_REGISTRY[name] = func
         return func
+
     return decorator
 
 
@@ -45,7 +49,9 @@ def _fix_repeated_columns(cols) -> pd.DataFrame:
     return result
 
 
-def build_tech_map(remind2pypsa_map: pd.DataFrame, map_param="investment") -> pd.DataFrame:
+def build_tech_map(
+    remind2pypsa_map: pd.DataFrame, map_param="investment"
+) -> pd.DataFrame:
     """
     Build a mapping from REMIND to PyPSA technology names using the mapping DataFrame.
     Adds groups in case mapping is not 1:1
@@ -69,6 +75,7 @@ def build_tech_map(remind2pypsa_map: pd.DataFrame, map_param="investment") -> pd
 
     return tech_names_map
 
+
 @register_reader("pypsa_costs")
 def read_pypsa_costs(cost_files, **kwargs: dict) -> pd.DataFrame:
     """Read & stitch the pypsa costs files
@@ -82,6 +89,7 @@ def read_pypsa_costs(cost_files, **kwargs: dict) -> pd.DataFrame:
     for f in cost_files:
         pypsa_costs = pd.concat([pypsa_costs, pd.read_csv(f)])
     return pypsa_costs
+
 
 @register_reader("remind_csv")
 def read_remind_csv(file_path: os.PathLike, **kwargs: dict) -> pd.DataFrame:
@@ -105,6 +113,7 @@ def read_remind_csv(file_path: os.PathLike, **kwargs: dict) -> pd.DataFrame:
 
     return df
 
+
 @register_reader("remind_regions")
 def read_remind_regions_csv(mapping_path: os.PathLike, separator=",") -> pd.DataFrame:
     """read the export from remind
@@ -120,6 +129,7 @@ def read_remind_regions_csv(mapping_path: os.PathLike, separator=",") -> pd.Data
     regions["iso2"] = coco.convert(regions["iso"], to="ISO2")
     return regions
 
+
 @register_reader("remind_descriptions")
 def read_remind_descriptions_csv(file_path: os.PathLike) -> pd.DataFrame:
     """read the exported description from remind
@@ -133,8 +143,11 @@ def read_remind_descriptions_csv(file_path: os.PathLike) -> pd.DataFrame:
     descriptors["unit"] = descriptors["text"].str.extract(r"\[(.*?)\]")
     return descriptors.rename(columns={"Unnamed: 0": "symbol"}).fillna("")
 
+
 @register_reader("remind_gdx")
-def read_gdx(file_path: os.PathLike, variable_name: str, rename_columns={}, error_on_empty=True)->pd.DataFrame:
+def read_gdx(
+    file_path: os.PathLike, variable_name: str, rename_columns={}, error_on_empty=True
+) -> pd.DataFrame:
     """
     Auxiliary function for standardised and cached reading of REMIND-EU data
     files to pandas.DataFrame.
@@ -191,7 +204,9 @@ def validate_file_list(file_list):
             raise FileNotFoundError(f"File {file} does not exist.")
 
 
-def write_cost_data(cost_data: pd.DataFrame, output_dir: os.PathLike, descript: str = None):
+def write_cost_data(
+    cost_data: pd.DataFrame, output_dir: os.PathLike, descript: str = None
+):
     """Write the cost data to a folder, with one CSV file per year.
 
     Args:
@@ -229,7 +244,7 @@ def to_list(x: str):
     if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
         split = x.replace("[", "").replace("]", "").split(", ")
         # in case no space in the text-list sep
-        if split[0].find(",") >=0:
+        if split[0].find(",") >= 0:
             return x.replace("[", "").replace("]", "").split(",")
         else:
             return split

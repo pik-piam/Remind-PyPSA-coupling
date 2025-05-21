@@ -31,7 +31,9 @@ from .utils import read_remind_csv, build_tech_map
 logger = logging.getLogger()
 
 
-def load_remind_capacities(f_path: os.PathLike, region: str, cutoff=500) -> pd.DataFrame:
+def load_remind_capacities(
+    f_path: os.PathLike, region: str, cutoff=500
+) -> pd.DataFrame:
     """Load capacities from a CSV file.
 
     Args:
@@ -75,7 +77,10 @@ def scale_down_pypsa_caps(
 
     pypsa_caps["tech_group"] = pypsa_caps.Tech.map(tech_groupings.group.to_dict())
     pypsa_caps = pypsa_caps.merge(
-        scalings[["tech_group", "fraction"]], how="left", on="tech_group", suffixes=("", "_scaling")
+        scalings[["tech_group", "fraction"]],
+        how="left",
+        on="tech_group",
+        suffixes=("", "_scaling"),
     )
     pypsa_caps.Capacity = pypsa_caps.Capacity * pypsa_caps.fraction
     return pypsa_caps
@@ -132,7 +137,9 @@ if __name__ == "__main__":
     tech_groups = tech_map.drop_duplicates(ignore_index=True).set_index("PyPSA_tech")
 
     # apply the mapping to the remind capacities
-    remind_caps.loc[:, "tech_group"] = remind_caps.technology.map(tech_map.group.to_dict())
+    remind_caps.loc[:, "tech_group"] = remind_caps.technology.map(
+        tech_map.group.to_dict()
+    )
     missing = remind_caps[remind_caps.tech_group.isna()]
     if not missing.empty:
         logger.warning(
@@ -141,7 +148,9 @@ if __name__ == "__main__":
     remind_caps.dropna(inplace=True)
 
     # apply the mapping to the pypsa capacities
-    pypsa_agg.loc[:, "tech_group"] = pypsa_agg.PyPSA_tech.map(tech_groups["group"].to_dict())
+    pypsa_agg.loc[:, "tech_group"] = pypsa_agg.PyPSA_tech.map(
+        tech_groups["group"].to_dict()
+    )
     pypsa_agg.dropna()
 
     # merge the remind and pypsa capacities

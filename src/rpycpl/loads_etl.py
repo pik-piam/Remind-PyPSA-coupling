@@ -39,7 +39,9 @@ if __name__ == "__main__":
 
     logger.info("Loading Hu et al. (2013) projections")
     regional_reference = read_hu_2013_projections(
-        os.path.expanduser("~/documents/Remind-PyPSA-coupling/data/xiaowei_pypsa_yearly_load.csv")
+        os.path.expanduser(
+            "~/documents/Remind-PyPSA-coupling/data/xiaowei_pypsa_yearly_load.csv"
+        )
     )
     regional_reference = regional_reference[str(ref_year)]
 
@@ -51,7 +53,8 @@ if __name__ == "__main__":
     # export to csv
     disagg_load.to_csv(
         os.path.join(
-            "/home/ivanra/documents/Remind-PyPSA-coupling/output", f"{region}_load_disagg.csv"
+            "/home/ivanra/documents/Remind-PyPSA-coupling/output",
+            f"{region}_load_disagg.csv",
         )
     )
 
