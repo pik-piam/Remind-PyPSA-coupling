@@ -4,11 +4,23 @@ import os
 import pandas as pd
 import country_converter as coco
 import functools
-
+import logging
 try:
     import gamspy
 except ImportError:
-    pass
+    logging.warning("Gamspy not installed - GDX reading not available.")
+
+READERS_REGISTRY = {}
+
+# TODO write classes ro separate into files (readers/validators/etc)
+
+def register_reader(name):
+    """decorator factory to register ETL functions"""
+    def decorator(func):
+        READERS_REGISTRY[name] = func
+        return func
+    return decorator
+
 
 # translate to pypsa
 REMIND_NAME_MAP = {
@@ -57,8 +69,102 @@ def build_tech_map(remind2pypsa_map: pd.DataFrame, map_param="investment") -> pd
 
     return tech_names_map
 
+@register_reader("pypsa_costs")
+def read_pypsa_costs(cost_files, **kwargs: dict) -> pd.DataFrame:
+    """Read & stitch the pypsa costs files
+    Args:
+        cost_files (list): list of paths to the pypsa costs files
+        **kwargs: additional arguments for pd.read_csv
+    Returns:
+        pd.DataFrame: the techno-economic data for all years.
+    """
+    pypsa_costs = pd.read_csv(cost_files.pop(), **kwargs)
+    for f in cost_files:
+        pypsa_costs = pd.concat([pypsa_costs, pd.read_csv(f)])
+    return pypsa_costs
 
-# TODO Pypsa reader class?
+@register_reader("remind_csv")
+def read_remind_csv(file_path: os.PathLike, **kwargs: dict) -> pd.DataFrame:
+    """read an exported csv from remind (a single table of the gam db)
+
+    Args:
+        file_path (os.PathLike): path to the csv file
+        **kwargs: additional arguments for pd.read_csv
+    Returns:
+        pd.DataFrame: the data.
+    """
+    df = pd.read_csv(file_path, **kwargs)
+    # in case the parameter depended on the same set, all columns are suffixed with _1, _2, etc.
+    df.columns = df.columns.str.replace(r"_\d$", "", regex=True)
+    df.rename(columns=REMIND_NAME_MAP, inplace=True)
+
+    df.columns = _fix_repeated_columns(df.columns)
+
+    if "value" in df.columns:
+        df.loc[:, "value"] = df.value.astype(float)
+
+    return df
+
+@register_reader("remind_regions")
+def read_remind_regions_csv(mapping_path: os.PathLike, separator=",") -> pd.DataFrame:
+    """read the export from remind
+
+    Args:
+        mapping_path (os.PathLike): the path to the remind mapping (csv export of regi2iso set via GamsConnect)
+        separator (str, optional): the separator in the csv. Defaults to ",".
+    Returns:
+        pd.DataFrame: the region mapping
+    """
+    regions = pd.read_csv(mapping_path)
+    regions.drop(columns="element_text", inplace=True)
+    regions["iso2"] = coco.convert(regions["iso"], to="ISO2")
+    return regions
+
+@register_reader("remind_descriptions")
+def read_remind_descriptions_csv(file_path: os.PathLike) -> pd.DataFrame:
+    """read the exported description from remind
+    Args:
+        file_path (os.PathLike): csv export from gamsconnect/embedded python
+    Returns:
+        pd.DataFrame: the descriptors per symbol, with units extracted
+    """
+
+    descriptors = pd.read_csv(file_path)
+    descriptors["unit"] = descriptors["text"].str.extract(r"\[(.*?)\]")
+    return descriptors.rename(columns={"Unnamed: 0": "symbol"}).fillna("")
+
+@register_reader("remind_gdx")
+def read_gdx(file_path: os.PathLike, variable_name: str, rename_columns={}, error_on_empty=True)->pd.DataFrame:
+    """
+    Auxiliary function for standardised and cached reading of REMIND-EU data
+    files to pandas.DataFrame.
+
+    Args:
+        file_path (os.PathLike): Path to the GDX file.
+        variable_name (str): Name of the symbol (param, var, scalar) to read from the GDX file.
+        rename_columns (dict, optional): Dictionary for renaming columns. Defaults to {}.
+        error_on_empty (bool, optional): Raise an error if the DataFrame is empty. Defaults to True.
+    Returns:
+        pd.DataFrame: the symbol table .
+    """
+
+    @functools.lru_cache
+    def _read_and_cache_remind_file(fp):
+        return gamspy.Container(load_from=fp)
+
+    data = _read_and_cache_remind_file(file_path)[variable_name]
+
+    df = data.records
+
+    if error_on_empty and (df is None or df.empty):
+        raise ValueError(f"{variable_name} is empty. In: {file_path}")
+
+    df = df.rename(columns=rename_columns, errors="raise")
+    df.metdata = data.description
+    return df
+
+
+@register_reader("hu2013_projections")
 def read_hu_2013_projections(path: os.PathLike) -> pd.DataFrame:
     """
     Read the regional electricity demand projections by Hu, Tan & Xu. 2013.
@@ -76,84 +182,6 @@ def read_hu_2013_projections(path: os.PathLike) -> pd.DataFrame:
     scaled = df / df.sum(axis=0)
 
     return scaled
-
-
-# TODO Remind reader class?
-def read_remind_csv(file_path: os.PathLike, **kwargs: dict) -> pd.DataFrame:
-    """read an exported csv from remind (a single table of the gam db)
-
-    Args:
-        file_path (os.PathLike): path to the csv file
-        **kwargs: additional arguments for pd.read_csv
-
-    Returns:
-        pd.DataFrame: the data.
-    """
-    df = pd.read_csv(file_path, **kwargs)
-    # in case the parameter depended on the same set, all columns are suffixed with _1, _2, etc.
-    df.columns = df.columns.str.replace(r"_\d$", "", regex=True)
-    df.rename(columns=REMIND_NAME_MAP, inplace=True)
-
-    df.columns = _fix_repeated_columns(df.columns)
-
-    if "value" in df.columns:
-        df.loc[:, "value"] = df.value.astype(float)
-
-    return df
-
-
-def read_remind_regions_csv(mapping_path: os.PathLike, separator=",") -> pd.DataFrame:
-    """read the export from remind
-
-    Args:
-        mapping_path (os.PathLike): the path to the remind mapping (csv export of regi2iso set via GamsConnect)
-
-    Returns:
-        pd.DataFrame: the region mapping
-    """
-    regions = pd.read_csv(mapping_path)
-    regions.drop(columns="element_text", inplace=True)
-    regions["iso2"] = coco.convert(regions["iso"], to="ISO2")
-    return regions
-
-
-def read_remind_descriptions_csv(file_path: os.PathLike) -> pd.DataFrame:
-    """read the exported description from remind
-    Args:
-        file_path (os.PathLike): csv export from gamsconnect/embedded python
-    Returns:
-        pd.DataFrame: the descriptors per symbol, with units extracted
-    """
-
-    descriptors = pd.read_csv(file_path)
-    descriptors["unit"] = descriptors["text"].str.extract(r"\[(.*?)\]")
-    return descriptors.rename(columns={"Unnamed: 0": "symbol"}).fillna("")
-
-
-def read_gdx(file_path: os.PathLike, variable_name: str, rename_columns={}, error_on_empty=True):
-    """
-    Auxiliary function for standardised and cached reading of REMIND-EU data
-    files to pandas.DataFrame.
-
-    Here all values read are considered variable, i.e. use
-    "variable_name" also for what is considered a "parameter" in the GDX
-    file.
-    """
-
-    @functools.lru_cache
-    def _read_and_cache_remind_file(fp):
-        return gamspy.Container(load_from=fp)
-
-    data = _read_and_cache_remind_file(file_path)[variable_name]
-
-    df = data.records
-
-    if error_on_empty and (df is None or df.empty):
-        raise ValueError(f"{variable_name} is empty. In: {file_path}")
-
-    df = df.rename(columns=rename_columns, errors="raise")
-    df.metdata = data.description
-    return df
 
 
 def validate_file_list(file_list):
@@ -199,7 +227,12 @@ def to_list(x: str):
     Args:
         x (str): maybe list like string"""
     if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
+        split = x.replace("[", "").replace("]", "").split(", ")
         # in case no space in the text-list sep
+        if split[0].find(",") >=0:
+            return x.replace("[", "").replace("]", "").split(",")
+        else:
+            return split
     return x
 
 
