@@ -2,7 +2,7 @@
 
 ## Techno-econmic data
 
-For each key pair, a [mapping method](objects#mapping-table) can be specified:
+For each key pair, a [mapping method](../objects#mapping-table) can be specified:
 
 - **set_value**: directly set the value to that specified in the "reference" column
 - **use_remind**: use the remind tech specified in the "reference column"
