@@ -71,9 +71,12 @@ def make_pypsa_like_costs(
         pd.DataFrame: DataFrame containing cost data for a region.
     """
 
+    # check single region or region already removed
     regions_filtered = not any(["region" in df.columns for df in frames.values()])
-    if not regions_filtered:
+    if not regions_filtered and any([df.region.nunique() > 1 for df in frames.values() if "region" in df.columns]):
         raise Warning("The dataframes are not region-filtered. Not supported.")
+    elif not regions_filtered:
+        frames.update({k: df.drop(columns=["region"]) for k, df in frames.items() if "region" in df.columns})
 
     years = frames["capex"].year.unique()
     capex = transform_capex(frames["capex"])
@@ -423,9 +426,9 @@ def _use_pypsa(
     # === Add missing years to the pypsa data using the last pypsa year ===
     missing_yrs = set(years).difference(from_pypsa.year.unique())
 
-    missing_yrs = [float(yr) for yr in missing_yrs]
-    if (list(missing_yrs) < from_pypsa.year.max()).any():
-        raise ValueError("The PyPSA data is missing years before its last year")
+    missing_yrs = [int(yr) for yr in missing_yrs]
+    if (pd.Series(missing_yrs) < from_pypsa.year.max()).any():
+        raise ValueError("The PyPSA data is missing years before its last year - cannot extrapolate")
 
     if not missing_yrs:
         pass
@@ -549,8 +552,9 @@ def validate_mappings(mappings: pd.DataFrame):
     # should validate that remind references are actually in the remind export
 
 
-def validate_remind_data(remind_data: pd.DataFrame, mappings: pd.DataFrame):
-    """validate the remind data
+# TODO rename
+def validate_remind_data(costs_remind: pd.DataFrame, mappings: pd.DataFrame):
+    """validate the remind cost data
     Args:
         remind_data (pd.DataFrame): DataFrame containing the remind data
     """
@@ -566,8 +570,9 @@ def validate_remind_data(remind_data: pd.DataFrame, mappings: pd.DataFrame):
     missing = data[(data.isna()).any(axis=1)]
     if not missing.empty:
         raise ValueError(
-            f"Missing data in REMIND for {missing.drop_duplicates()} "
-            f"Check the mappings and the remind data"
+            f"Missing data in REMIND for (first <10 rows)\n{missing.drop_duplicates().head(10)}"
+            "\nCheck the mappings and the remind data."
+            " Hint: are your reference lists consistently separated by ',' or ', '?"
         )
 
 
@@ -657,7 +662,7 @@ if __name__ == "__main__":
         weights=weights,
         years=years,
     )
-    mapped_costs["value"].fillna(0, inplace=True)
+    mapped_costs.fillna({"value": 0}, inplace=True)
     mapped_costs.fillna(" ", inplace=True)
     logger.info(f"Writing mapped costs data to {os.path.join(root_dir, 'output')}")
     descript = f"test_remind_{remind_v}_pk1000"

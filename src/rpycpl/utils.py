@@ -199,7 +199,7 @@ def to_list(x: str):
     Args:
         x (str): maybe list like string"""
     if isinstance(x, str) and x.startswith("[") and x.endswith("]"):
-        return x.replace("[", "").replace("]", "").split(", ")
+        # in case no space in the text-list sep
     return x
 
 
