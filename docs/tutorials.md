@@ -14,3 +14,7 @@ The examples are unfortunately untested.
 ## Direct scripts
 if you do not want to use abstracted logic, a one-off script example 
 - `one-offscript.py`: a script using the csv reader
+
+## Integration with snakemake
+
+Under construction

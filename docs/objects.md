@@ -4,7 +4,7 @@ This page introduces the objects and data expected by the coupling layer
 
 ### Mapping Table
 The REMIND-PyPSA mapping allows to build the the techno-economic data from the pypsa and remind techno-economic data 
-    
+
 | Variable | Description | Allowed values | example |
 |--------------------|---------------|------------|-----------|
 | PyPSA_tech | pypsa tech names | as expected by network creation | `OCGT` |
@@ -48,7 +48,29 @@ Implicit in these are the years and regions.
 
 ## Objects
 
-Each of these data are represented as pandas `pd.Dataframe` or `pd.Series`.
+## transformations (abstracted etl)
+
+Transformation steps are represented by the [Transformation dataclass](../docs/reference/etl).
+These can be specified in YAML
+```yaml
+steps:
+    name: example
+    method: run_example
+    frames: 
+        data1: pm_data1 # remind name
+        eta: p32_etaconversion
+    params: #extra params
+    filters:
+        eta: "region==@region" # pandas queries for the table
+    kwargs: null # extra args
+```
+
+The method name points to the ETL register. You can declare your own transformations with the `@register_etl` decorator from `rpycpl.etl` [example](tutorials#abstracted-logic)
+
+## data 
+
+Each of these data are represented as pandas `pd.Dataframe` or `pd.Series`. 
+
 Whilst there is validation - in particular of the mapping - the package expects column names as per powerplantmatching, pypsa and REMIND (GAMS sets in this case).
 
 The various routines also merge pypsa and remind data. Some processing functions will only worked with the merged data. The merged data should have `suffixes=("_remind", "_pypsa")`.

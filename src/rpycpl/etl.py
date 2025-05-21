@@ -1,4 +1,8 @@
-""" ETL TOOL BOX"""
+""" ETL TOOL BOX
+
+- Abstracted transformations (Transformation, register_etl)
+- ETL registry (list of named conversions)
+- pre-defined conversions (convert_loads, technoeconomic_data)"""
 
 import pandas as pd
 import logging
