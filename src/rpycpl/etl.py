@@ -66,6 +66,29 @@ def convert_loads(loads: dict[str, pd.DataFrame], region: str = None) -> pd.Data
     return outp.set_index("year")
 
 
+@register_etl("convert_capacities")
+def convert_remind_capacities(frames: dict[str, pd.DataFrame], cutoff = 0, region: str = None,) -> pd.DataFrame:
+    """conversion for capacities
+
+    Args:
+        frames (dict): dictionary of dataframes with capacities
+        region (str, Optional): region to filter the data by
+        cutoff (int, Optional): min capacity in MW
+    Returns:
+        pd.DataFrame: converted capacities (year: load type, value in Mwh)
+    """
+    TW2MW = 1e6
+    caps = frames["capacities"]
+    caps.loc[:, "value"] *= TW2MW
+    print(cutoff)
+    if ("region" in caps.columns) & (region is not None):
+        caps = caps.query("region == @region").drop(columns=["region"])
+
+    too_small = caps.query("value < @cutoff").index
+    caps.loc[too_small, "value"] = 0
+    return caps.rename(columns={"value": "capacity"}).set_index("year")
+
+
 @register_etl("technoeconomic_data")
 def technoeconomic_data(
     frames: Dict[str, pd.DataFrame], mappings: pd.DataFrame, pypsa_costs: pd.DataFrame
