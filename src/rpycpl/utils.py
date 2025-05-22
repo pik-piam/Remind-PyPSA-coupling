@@ -79,6 +79,7 @@ def build_tech_map(
 @register_reader("pypsa_costs")
 def read_pypsa_costs(cost_files, **kwargs: dict) -> pd.DataFrame:
     """Read & stitch the pypsa costs files
+
     Args:
         cost_files (list): list of paths to the pypsa costs files
         **kwargs: additional arguments for pd.read_csv
@@ -133,6 +134,7 @@ def read_remind_regions_csv(mapping_path: os.PathLike, separator=",") -> pd.Data
 @register_reader("remind_descriptions")
 def read_remind_descriptions_csv(file_path: os.PathLike) -> pd.DataFrame:
     """read the exported description from remind
+    
     Args:
         file_path (os.PathLike): csv export from gamsconnect/embedded python
     Returns:

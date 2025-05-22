@@ -73,6 +73,7 @@ def make_pypsa_like_costs(
     frames: dict[pd.DataFrame],
 ) -> pd.DataFrame:
     """translate the REMIND costs into pypsa format for a single region.
+
     Args:
         frames: dictionary with the REMIND data tables to be transformed. Region-filtered
     Returns:
@@ -148,6 +149,7 @@ def make_pypsa_like_costs(
 
 def transform_capex(capex: pd.DataFrame) -> pd.DataFrame:
     """Transform the CAPEX data from REMIND to pypsa.
+
     Args:
         capex (pd.DataFrame): DataFrame containing REMIND capex data.
     Returns:
@@ -232,6 +234,7 @@ def transform_efficiency(
 
 def transform_fom(fom: pd.DataFrame) -> pd.DataFrame:
     """Transform the Fixed Operational Maintenance data from REMIND to pypsa.
+    
     Args:
         vom (pd.DataFrame): DataFrame containing REMIND FOM data.
     Returns:

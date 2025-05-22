@@ -48,6 +48,7 @@ class Transformation:
 @register_etl("convert_load")
 def convert_loads(loads: dict[str, pd.DataFrame], region: str = None) -> pd.DataFrame:
     """conversion for loads
+
     Args:
         loads (dict): dictionary of dataframes with loads
         region (str, Optional): region to filter the data by
@@ -69,7 +70,15 @@ def convert_loads(loads: dict[str, pd.DataFrame], region: str = None) -> pd.Data
 def technoeconomic_data(
     frames: Dict[str, pd.DataFrame], mappings: pd.DataFrame, pypsa_costs: pd.DataFrame
 ) -> pd.DataFrame:
-    """Mapping adapted from Johannes Hemp, based on csv mapping table"""
+    """Mapping adapted from Johannes Hemp, based on csv mapping table
+    
+    Args:
+        frames (Dict[str, pd.DataFrame]): dictionary of remind frames
+        mappings (pd.DataFrame): the mapping dataframe
+        pypsa_costs (pd.DataFrame): pypsa costs dataframe
+    Returns:
+        pd.DataFrame: dataframe with the mapped techno-economic data
+    """
 
     # explode multiple references into rows
     mappings.loc[:, "reference"] = mappings["reference"].apply(to_list)
