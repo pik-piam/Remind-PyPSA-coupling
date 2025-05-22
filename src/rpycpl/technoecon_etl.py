@@ -234,9 +234,9 @@ def transform_efficiency(
 
 def transform_fom(fom: pd.DataFrame) -> pd.DataFrame:
     """Transform the Fixed Operational Maintenance data from REMIND to pypsa.
-    
+
     Args:
-        vom (pd.DataFrame): DataFrame containing REMIND FOM data.
+        fom (pd.DataFrame): DataFrame containing REMIND FOM data.
     Returns:
         pd.DataFrame: Transformed FOM data.
     """
