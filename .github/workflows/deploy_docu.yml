@@ -40,13 +40,15 @@ jobs:
       - name: Build Documentation
         run: |
           mkdocs build
-          
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
       - name: Deploy to GitHub Pages
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "github-actions@github.com"
-          # deploy to gh-pages branch
-          mkdocs gh-deploy --force --quiet
-        env:
-          # automatically provide the required token for GH Pages
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: deployment
+        uses: actions/deploy-pages@v4
