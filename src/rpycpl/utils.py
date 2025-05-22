@@ -177,26 +177,6 @@ def read_gdx(
     return df
 
 
-@register_reader("hu2013_projections")
-def read_hu_2013_projections(path: os.PathLike) -> pd.DataFrame:
-    """
-    Read the regional electricity demand projections by Hu, Tan & Xu. 2013.
-    'An Exploration into China’s Economic Development and Electricity Demand by the Year 2050.'
-    and return the projections by region normalised to the national total.
-    Args:
-        path (os.PathLike): Path to the Hu et al. (2013) projections file.
-    Returns:
-    """
-    df = pd.read_csv(path)
-    if "region" not in df.columns:
-        df.rename(columns={df.columns[0]: "region"}, inplace=True)
-    df.set_index("region", inplace=True)
-
-    scaled = df / df.sum(axis=0)
-
-    return scaled
-
-
 def validate_file_list(file_list):
     """Validate the file list to ensure all files exist."""
     for file in file_list:
