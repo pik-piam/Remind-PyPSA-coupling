@@ -31,7 +31,7 @@ def register_etl(name):
 
     return decorator
 
-
+# TODO cleanup fields
 @dataclass
 class Transformation:
     """Data class representing the YAML config for the ETL target"""
@@ -42,6 +42,7 @@ class Transformation:
     params: Dict[str, Any] = field(default_factory=dict)
     filters: Dict[str, Any] = field(default_factory=dict)
     kwargs: Dict[str, Any] = field(default_factory=dict)
+    dependencies: Dict[str, Any] = field(default_factory=dict)
 
 
 @register_etl("convert_load")
