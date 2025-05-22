@@ -37,6 +37,10 @@ jobs:
           pip install mkdocs-material
           pip install mkdocs-include-dir-to-nav
 
+      - name: Build Documentation
+        run: |
+          mkdocs build
+          
       - name: Deploy to GitHub Pages
         run: |
           git config --global user.name "GitHub Actions"
