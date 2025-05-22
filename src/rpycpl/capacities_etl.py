@@ -27,31 +27,10 @@ import logging
 
 
 from .utils import read_remind_csv, build_tech_map
+from .etl import register_etl, convert_remind_capacities
 
 logger = logging.getLogger()
 
-
-def load_remind_capacities(
-    f_path: os.PathLike, region: str, cutoff=500
-) -> pd.DataFrame:
-    """Load capacities from a CSV file.
-
-    Args:
-        f_path (os.PathLike): Path to the CSV file.
-        region (str): Remind region to filter the data by.
-        cutoff (Optional, int): min capacity in MW
-
-    Returns:
-        pd.DataFrame: DataFrame containing the capacities data.
-    """
-    caps = read_remind_csv(f_path).query("region==@region").drop(columns=["region"])
-
-    TW2MW = 1e6
-    caps.loc[:, "value"] *= TW2MW
-
-    small = caps.query("value < @cutoff").index
-    caps.loc[small, "value"] = 0
-    return caps.rename(columns={"value": "capacity"})
 
 
 def scale_down_pypsa_caps(
@@ -103,6 +82,7 @@ def calc_paidoff_capacity(merged: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+
     par_name = "p32_cap"
     baseyear = 2045
     region = "CHA"
@@ -119,10 +99,11 @@ if __name__ == "__main__":
     outp_paid_off = os.path.abspath("../../data") + "/paid_off_capacities.csv"
 
     # Read the remind data, filter for relevant region and year and group by tech
-    remind_caps = load_remind_capacities(caps_rempind_p, region, cutoff=500)
+    remind_caps = read_remind_csv(caps_rempind_p).query("region==@region").drop(columns=["region"])
+    remind_caps = convert_remind_capacities({"capacities": remind_caps}, cutoff=500, region=region)
+
     remind_caps = remind_caps[remind_caps.value > 0].query("year == @baseyear")
     remind_caps = remind_caps.groupby("technology").capacity.sum().reset_index()
-    remind_caps.head(2)
 
     # read the base year capacities according to pypsa
     # NB: these should be fixed already (fitlered for naturally retired etc)
