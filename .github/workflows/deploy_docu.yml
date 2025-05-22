@@ -1,55 +1,42 @@
-name: Deploy MkDocs Documentation
+name: Deploy docu
 
 on:
   push:
     branches:
       - main  # for the default branch -> later need to think about release branches
+      - main
     paths:
       - 'docs/**'  # Only trigger when files in the 'docs' folder are changed
       - 'mkdocs.yml'  # or if the mkdocs.yml configuration file is changed
-      - 'src/REMIND-PyPSA-coupling/**'  # or if the snmk scripts changed
+      - 'src/rpycpl/**'  # or if the snmk scripts changed
       - '.github/workflows/deploy_docu.yml'
-
+permissions:
+  contents: write
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Add permissions needed for GitHub Pages
-    permissions:
-      contents: write
-      id-token: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'  # or 3.x
-
-      - name: Install MkDocs and dependencies
+      - uses: actions/checkout@v4
+      - name: Configure Git Credentials
         run: |
-          python -m pip install --upgrade pip
-          pip install mkdocs
-          pip install mkdocs_gen_files
-          pip install "mkdocstrings[python]"
-          pip install mkdocs-literate-nav
-          pip install mkdocs-material
-          pip install mkdocs-include-dir-to-nav
-
-      - name: Build Documentation
-        run: |
-          mkdocs build
-
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v3
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - uses: actions/setup-python@v5
         with:
-          path: site
+          python-version: 3.x
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV 
+      - uses: actions/cache@v4
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: .cache 
+          restore-keys: |
+            mkdocs-material-
+      - run: 
+            pip install mkdocs-material 
+            pip install mkdocs
+            pip install mkdocs_gen_files
+            pip install "mkdocstrings[python]"
+            pip install mkdocs-literate-nav
+            pip install mkdocs-include-dir-to-nav
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - run: mkdocs gh-deploy --force
