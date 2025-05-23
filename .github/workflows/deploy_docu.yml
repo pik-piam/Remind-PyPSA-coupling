@@ -1,0 +1,43 @@
+name: Deploy docu
+
+on:
+  push:
+    branches:
+      - main  # for the default branch -> later need to think about release branches
+      
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Configure Git Credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'  # or 3.x
+
+      - name: Install mkdocs and company
+        run: |
+          python -m pip install --upgrade pip
+          pip install mkdocs
+          pip install mkdocs_gen_files
+          pip install "mkdocstrings[python]"
+          pip install mkdocs-literate-nav
+          pip install mkdocs-material
+          pip install mkdocs-include-dir-to-nav
+
+      - name: Deploy to GitHub Pages
+        run: |
+          # deploy to gh-pages branch
+          mkdocs gh-deploy --force --quiet
+        env:
+          # automatically provide the required token for GH Pages
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
