@@ -61,7 +61,12 @@ def build_tech_map(
     Returns:
         pd.DataFrame: DataFrame with the mapping (remind_tech: PyPSA_tech, group)
     """
-
+    
+    if map_param not in remind2pypsa_map.parameter.unique():
+        raise ValueError(
+            f"Parameter {map_param} not found in the mapping file. "
+            "Please check the mapping file and the parameter name."
+        )
     tech_names_map = remind2pypsa_map.query(
         "mapper.str.contains('remind') & not mapper.str.contains('learn') & parameter == @map_param"
     )[["PyPSA_tech", "reference"]]

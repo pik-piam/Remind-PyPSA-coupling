@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional
 
+from .utils import build_tech_map
 from .technoecon_etl import (
     validate_mappings,
     validate_remind_data,
@@ -17,10 +18,8 @@ from .technoecon_etl import (
     make_pypsa_like_costs,
 )
 
-
 logger = logging.getLogger(__name__)
 ETL_REGISTRY = {}
-
 
 def register_etl(name):
     """decorator factory to register ETL functions"""
@@ -45,6 +44,12 @@ class Transformation:
     dependencies: Dict[str, Any] = field(default_factory=dict)
 
 
+@register_etl("build_tech_map")
+def build_tech_groups(frames, map_param="investment") -> pd.DataFrame:
+    """ Wrapper for the utils.build_tech_map function"""
+    return build_tech_map(frames["tech_mapping"], map_param)
+
+
 @register_etl("convert_load")
 def convert_loads(loads: dict[str, pd.DataFrame], region: str = None) -> pd.DataFrame:
     """conversion for loads
@@ -67,7 +72,7 @@ def convert_loads(loads: dict[str, pd.DataFrame], region: str = None) -> pd.Data
 
 
 @register_etl("convert_capacities")
-def convert_remind_capacities(frames: dict[str, pd.DataFrame], cutoff = 0, region: str = None,) -> pd.DataFrame:
+def convert_remind_capacities(frames: dict[str, pd.DataFrame], cutoff=0, region: str = None) -> pd.DataFrame:
     """conversion for capacities
 
     Args:
@@ -80,12 +85,17 @@ def convert_remind_capacities(frames: dict[str, pd.DataFrame], cutoff = 0, regio
     TW2MW = 1e6
     caps = frames["capacities"]
     caps.loc[:, "value"] *= TW2MW
-    print(cutoff)
+
     if ("region" in caps.columns) & (region is not None):
         caps = caps.query("region == @region").drop(columns=["region"])
 
     too_small = caps.query("value < @cutoff").index
     caps.loc[too_small, "value"] = 0
+
+    if "tech_groups" in frames:
+        tech_map = frames["tech_groups"]
+        caps.loc[:, "tech_group"] = caps.technology.map(tech_map.group.to_dict())
+
     return caps.rename(columns={"value": "capacity"}).set_index("year")
 
 
@@ -141,3 +151,4 @@ def technoeconomic_data(
     mapped_costs.fillna(" ", inplace=True)
 
     return mapped_costs
+
