@@ -32,6 +32,55 @@ from .etl import register_etl, convert_remind_capacities
 logger = logging.getLogger()
 
 
+@register_etl("scale_caps_to_remind")
+def scale_down_capacities(
+    to_scale: pd.DataFrame, reference: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Scale down the target (existing pypsa) capacities to not exceed the refernce (remind)
+        capacities by tech group. The target capacities can have a higher spatial resolution.
+        This function can be used to harmonize the capacities between REMIND and PyPSA. 
+        Scaling is done by groups of techs, which allows n:1 mapping of remind to pypsa techs.
+
+    Args:
+        to_scale (pd.DataFrame): DataFrame with the target (pypsa) capacities.
+        merged_caps (pd.DataFrame): DataFrame with the merged remind and pypsa capacities by tech group.
+        tech_groupings (pd.DataFrame): DataFrame with the  pypsa tech group names.
+    Returns:
+        pd.DataFrame: DataFrame with capacities for each tech group clipped to the reference.
+    Example:
+        remind_caps = pd.DataFrame({"technology": ["wind", "hydro"], "capacity": [300, 200]})
+        data = {'hydro': {('Capacity', 'node1'): 240, ('Capacity', 'node2'): 360},
+                'wind': {('Capacity', 'node1'): 20, ('Capacity', 'node2'): 120}})
+        pypsa_caps = pd.DataFrame.from_dict(d, orient="index") # poweplantmatching
+        scaled_caps = scale_down_capacities(pypsa_caps, remind_caps, tech_groupings = {"hydro": "hydro", "wind": "wind"})
+        >> {'hydro': {('Capacity', 'node1'): 120, ('Capacity', 'node2'): 180}, # scaled down to remind
+                'wind': {('Capacity', 'node1'): 20, ('Capacity', 'node2'): 120}}) # untouched
+    """
+    grouped = to_scale.rename(columns={"Capacity": "capacity"}).groupby("tech_group").capacity.sum()
+    merged_caps = pd.merge(
+        reference.groupby("tech_group").capacity.sum().reset_index(),
+        grouped.reset_index(),
+        how="left",
+        on="tech_group",
+        suffixes=("_ref", "_target"),
+    )
+
+    merged_caps["fraction"] = merged_caps.capacity_ref / merged_caps.capacity_target
+    scalings = merged_caps.copy()
+    # do not touch cases where remind capacity is larger than pypsa capacity
+    scalings["fraction"] = scalings["fraction"].clip(upper=1)
+    scalings.dropna(subset=["fraction"], inplace=True)
+
+    to_scale = to_scale.merge(
+        scalings[["tech_group", "fraction"]],
+        how="left",
+        on="tech_group",
+        suffixes=("", "_scaling"),
+    )
+    to_scale.Capacity = to_scale.Capacity * to_scale.fraction
+    return to_scale
+
 
 def scale_down_pypsa_caps(
     merged_caps: pd.DataFrame, pypsa_caps: pd.DataFrame, tech_groupings: pd.DataFrame
@@ -113,7 +162,7 @@ if __name__ == "__main__":
 
     # map remind tech names to pypsa tech names
     # use groups in case it's not a 1:1 mapping.
-    mappings = pd.read_csv()
+    mappings = pd.read_csv(mapping_p)
     tech_map = build_tech_map(mappings, map_param="investment")
     tech_groups = tech_map.drop_duplicates(ignore_index=True).set_index("PyPSA_tech")
 
