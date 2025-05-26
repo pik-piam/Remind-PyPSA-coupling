@@ -49,19 +49,18 @@ def _fix_repeated_columns(cols) -> pd.DataFrame:
     return result
 
 
-def build_tech_map(
-    remind2pypsa_map: pd.DataFrame, map_param="investment"
-) -> pd.DataFrame:
+def build_tech_map(remind2pypsa_map: pd.DataFrame, map_param="investment") -> pd.DataFrame:
     """
     Build a mapping from REMIND to PyPSA technology names using the mapping DataFrame.
     Adds groups in case mapping is not 1:1
     Args:
         remind2pypsa_map (pd.DataFrame): DataFrame with the (!!validated) mapping
-        map_param (Optional, str):  the parameter to use for tech name mapping. Defaults to 'investment'.
+        map_param (Optional, str):  the parameter to use for tech name mapping. 
+            Defaults to 'investment'.
     Returns:
         pd.DataFrame: DataFrame with the mapping (remind_tech: PyPSA_tech, group)
     """
-    
+
     if map_param not in remind2pypsa_map.parameter.unique():
         raise ValueError(
             f"Parameter {map_param} not found in the mapping file. "
@@ -125,7 +124,8 @@ def read_remind_regions_csv(mapping_path: os.PathLike, separator=",") -> pd.Data
     """read the export from remind
 
     Args:
-        mapping_path (os.PathLike): the path to the remind mapping (csv export of regi2iso set via GamsConnect)
+        mapping_path (os.PathLike): the path to the remind mapping 
+            (csv export of regi2iso set via GamsConnect)
         separator (str, optional): the separator in the csv. Defaults to ",".
     Returns:
         pd.DataFrame: the region mapping
@@ -139,7 +139,7 @@ def read_remind_regions_csv(mapping_path: os.PathLike, separator=",") -> pd.Data
 @register_reader("remind_descriptions")
 def read_remind_descriptions_csv(file_path: os.PathLike) -> pd.DataFrame:
     """read the exported description from remind
-    
+
     Args:
         file_path (os.PathLike): csv export from gamsconnect/embedded python
     Returns:
@@ -191,9 +191,7 @@ def validate_file_list(file_list):
             raise FileNotFoundError(f"File {file} does not exist.")
 
 
-def write_cost_data(
-    cost_data: pd.DataFrame, output_dir: os.PathLike, descript: str = None
-):
+def write_cost_data(cost_data: pd.DataFrame, output_dir: os.PathLike, descript: str = None):
     """Write the cost data to a folder, with one CSV file per year.
 
     Args:
