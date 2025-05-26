@@ -17,9 +17,11 @@ from .technoecon_etl import (
     to_list,
     make_pypsa_like_costs,
 )
+from .capacities_etl import scale_down_capacities, calc_paidoff_capacity
 
 logger = logging.getLogger(__name__)
 ETL_REGISTRY = {}
+
 
 def register_etl(name):
     """decorator factory to register ETL functions"""
@@ -29,6 +31,7 @@ def register_etl(name):
         return func
 
     return decorator
+
 
 # TODO cleanup fields
 @dataclass
@@ -46,7 +49,7 @@ class Transformation:
 
 @register_etl("build_tech_map")
 def build_tech_groups(frames, map_param="investment") -> pd.DataFrame:
-    """ Wrapper for the utils.build_tech_map function"""
+    """Wrapper for the utils.build_tech_map function"""
     return build_tech_map(frames["tech_mapping"], map_param)
 
 
@@ -72,7 +75,9 @@ def convert_loads(loads: dict[str, pd.DataFrame], region: str = None) -> pd.Data
 
 
 @register_etl("convert_capacities")
-def convert_remind_capacities(frames: dict[str, pd.DataFrame], cutoff=0, region: str = None) -> pd.DataFrame:
+def convert_remind_capacities(
+    frames: dict[str, pd.DataFrame], cutoff=0, region: str = None
+) -> pd.DataFrame:
     """conversion for capacities
 
     Args:
@@ -104,7 +109,7 @@ def technoeconomic_data(
     frames: Dict[str, pd.DataFrame], mappings: pd.DataFrame, pypsa_costs: pd.DataFrame
 ) -> pd.DataFrame:
     """Mapping adapted from Johannes Hemp, based on csv mapping table
-    
+
     Args:
         frames (Dict[str, pd.DataFrame]): dictionary of remind frames
         mappings (pd.DataFrame): the mapping dataframe
@@ -122,14 +127,9 @@ def technoeconomic_data(
     # maybe do something nicer but should be ok if remind export is correct
     years = frames["capex"].year.unique()
 
-    weight_frames = [
-        frames[k].assign(weight_type=k) for k in frames if k.startswith("weights")
-    ]
+    weight_frames = [frames[k].assign(weight_type=k) for k in frames if k.startswith("weights")]
     weights = pd.concat(
-        [
-            df.rename(columns={"carrier": "technology", "value": "weight"})
-            for df in weight_frames
-        ]
+        [df.rename(columns={"carrier": "technology", "value": "weight"}) for df in weight_frames]
     )
 
     costs_remind = make_pypsa_like_costs(frames)
@@ -152,3 +152,51 @@ def technoeconomic_data(
 
     return mapped_costs
 
+
+@register_etl("harmonize_capacities")
+def harmonize_capacities(
+    pypsa_capacities: dict[str, pd.DataFrame], remind_capacities: pd.DataFrame
+) -> dict[str, pd.DataFrame]:
+    """Harmonize the REMIND and PyPSA capacities
+        - scale down the pypsa capacities to not exceed the remind capacities
+        - where REMIND exceeds the pypsa capacities, calculate a paid-off capacity
+          which will be added to the pypsa model as zero-capex techs. The model
+           can allocate it where it sees fit but the total is constrained
+
+    Args:
+        pypsa_capacities (dict[str, pd.DataFrame]): Dictionary with the pypsa capacities
+            {year: powerplantmatching_capacities}.
+        remind_capacities (pd.DataFrame): DataFrame with the remind capacities for all years
+    Returns:
+        dict[str, pd.DataFrame]: Dictionary with the harmonized capacities
+            {year: harmonized_capacities}.
+    """
+
+    harmonized = {}
+    for year, pypsa_caps in pypsa_capacities.items():
+        logger.debug(f"Harmonizing capacities for year {year}")
+        scaled_down_caps = scale_down_capacities(pypsa_caps, remind_capacities.query("year == @year"))
+        harmonized[year] = scaled_down_caps
+
+    return harmonized
+
+
+@register_etl("calc_paid_off_capacity")
+def paidoff_capacities(
+    remind_capacities: pd.DataFrame, harmonized_pypsa_caps: dict[str, pd.DataFrame]
+) -> pd.DataFrame:
+    """Wrapper for the capacities_etl.calc_paid_off_capacity function.
+
+    Calculate the additional paid-off capacity available to PyPSA from REMIND investment decisions.
+       The paid-off capacity is the difference between the REMIND capacities and the harmonized
+       PyPSA capacities. The paid-off capacity is available to PyPSA as a zero-capex tech.
+
+    Args:
+        remind_capacities (pd.DataFrame): DataFrame with REMIND capacities in MW.
+        harmonized_pypsa_caps (dict[str, pd.DataFrame]): Dictionary with harmonized
+            PyPSA capacities by year (capped to REMIND cap)
+    Returns:
+        pd.DataFrame: DataFrame with the available paid-off capacity by tech group.
+    """
+
+    return calc_paidoff_capacity(remind_capacities, harmonized_pypsa_caps)

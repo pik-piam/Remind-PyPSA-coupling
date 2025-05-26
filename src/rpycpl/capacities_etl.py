@@ -2,8 +2,8 @@
 # Extract, Transform, Load (ETL) operations for REMIND (pre-invetment) generation capacities
 
 The aim is to translate the REMIND pre-investment capacities into pypsa brownfield capacities.
-PyPSA workflows already come with their own bronwfield data (e.g. from powerplantmatching) assigned 
-to nodes/clusters. This capacity needs to be adjusted to the REMIND capacities.
+PyPSA workflows already come with their own bronwfield data (e.g. from powerplantmatching) assigned
+ to nodes/clusters. This capacity needs to be adjusted to the REMIND capacities.
 
 ## Harmonisation of REMIND and PypSA Capacities
 In case the REMIND capacities are smaller than the pypsa brownfield capacities,
@@ -16,35 +16,34 @@ In case the REMIND capacities are larger, the pypsa brownfield capacities are ke
 
 ## Workflow integration
 The constraints and data are exported as files made available to the pypsa workflow.
-
-## Reference Guide
-
+- use the ETL transformations `convert_remind_capacities` to prpeare the data
+- use `build_tech_map` to creat tech_groups from the technoeconomic `mapping.csv`
+- merge the pypsa capacities data with the tech_groups
+- idem for the converted remind capacities data
+- use the `harmonize_capacities` ETL to harmonize the capacities
+- finally use the `calc_paidoff_capacity` ETL to calculate the paid-off capacities
 """
 
-import os
 import pandas as pd
 import logging
 
-
-from .utils import read_remind_csv, build_tech_map
-from .etl import register_etl, convert_remind_capacities
+# from warnings import deprecated
 
 logger = logging.getLogger()
+pd.set_option('display.max_columns', 5)
+pd.set_option('display.precision', 2)
 
-
-@register_etl("scale_caps_to_remind")
-def scale_down_capacities(
-    to_scale: pd.DataFrame, reference: pd.DataFrame
-) -> pd.DataFrame:
+def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
     """
     Scale down the target (existing pypsa) capacities to not exceed the refernce (remind)
         capacities by tech group. The target capacities can have a higher spatial resolution.
-        This function can be used to harmonize the capacities between REMIND and PyPSA. 
+        This function can be used to harmonize the capacities between REMIND and PyPSA.
         Scaling is done by groups of techs, which allows n:1 mapping of remind to pypsa techs.
 
     Args:
-        to_scale (pd.DataFrame): DataFrame with the target (pypsa) capacities.
-        merged_caps (pd.DataFrame): DataFrame with the merged remind and pypsa capacities by tech group.
+        to_scale (pd.DataFrame): DataFrame with the target (pypsa) capacities for a single year.
+        merged_caps (pd.DataFrame): DataFrame with the merged remind and pypsa capacities 
+            by tech group.
         tech_groupings (pd.DataFrame): DataFrame with the  pypsa tech group names.
     Returns:
         pd.DataFrame: DataFrame with capacities for each tech group clipped to the reference.
@@ -53,35 +52,74 @@ def scale_down_capacities(
         data = {'hydro': {('Capacity', 'node1'): 240, ('Capacity', 'node2'): 360},
                 'wind': {('Capacity', 'node1'): 20, ('Capacity', 'node2'): 120}})
         pypsa_caps = pd.DataFrame.from_dict(d, orient="index") # poweplantmatching
-        scaled_caps = scale_down_capacities(pypsa_caps, remind_caps, tech_groupings = {"hydro": "hydro", "wind": "wind"})
-        >> {'hydro': {('Capacity', 'node1'): 120, ('Capacity', 'node2'): 180}, # scaled down to remind
+        scaled_caps = scale_down_capacities(pypsa_caps, remind_caps,
+                            tech_groupings = {"hydro": "hydro", "wind": "wind"})
+        >> {'hydro': {('Capacity', 'node1'): 120, ('Capacity', 'node2'): 180}, # scaled down
                 'wind': {('Capacity', 'node1'): 20, ('Capacity', 'node2'): 120}}) # untouched
     """
-    grouped = to_scale.rename(columns={"Capacity": "capacity"}).groupby("tech_group").capacity.sum()
-    merged_caps = pd.merge(
-        reference.groupby("tech_group").capacity.sum().reset_index(),
-        grouped.reset_index(),
-        how="left",
-        on="tech_group",
-        suffixes=("_ref", "_target"),
-    )
+    if reference.year.nunique() > 1:
+        raise ValueError("The reference capacities should be for a single year")
+    # group the target & ref capacities by tech group
+    group_totals_ref = reference.groupby(["tech_group"]).capacity.sum()
+    to_scale.loc[:, "group_fraction"] = to_scale.groupby("tech_group").Capacity.transform(lambda x: x/x.sum()).values
+    
+    missing = to_scale.query("tech_group == ''")[["Fueltype", "Tech"]].drop_duplicates()
+    if not missing.empty:
+        logger.warning(
+            "Some technologies are not assigned to a tech group. "
+            f"Missing from tech groups: {missing}")
+        to_scale = to_scale.query("tech_group != ''")
 
-    merged_caps["fraction"] = merged_caps.capacity_ref / merged_caps.capacity_target
-    scalings = merged_caps.copy()
-    # do not touch cases where remind capacity is larger than pypsa capacity
-    scalings["fraction"] = scalings["fraction"].clip(upper=1)
-    scalings.dropna(subset=["fraction"], inplace=True)
+    to_scale.rename(columns={"Capacity": "original_capacity"}, inplace=True)
+    # perform the scaling (normalised target capacities * ref capacities)
+    to_scale.loc[:, "Capacity"] = to_scale.groupby("tech_group").group_fraction.transform(lambda x: x*group_totals_ref[x.name])
 
-    to_scale = to_scale.merge(
-        scalings[["tech_group", "fraction"]],
-        how="left",
-        on="tech_group",
-        suffixes=("", "_scaling"),
-    )
-    to_scale.Capacity = to_scale.Capacity * to_scale.fraction
     return to_scale
 
 
+def calc_paidoff_capacity(
+    remind_capacities: pd.DataFrame, harmonized_pypsa_caps: dict[str, pd.DataFrame]
+) -> pd.DataFrame:
+    """
+    Calculate the aditional paid off capacity available to pypsa from REMIND investment decisions.
+    The paid off capacity is the difference between the REMIND capacities and the harmonized
+    pypsa capacities. The paid off capacity is available to pypsa as a zero-capex tech.
+
+    Args:
+        remind_capacities (pd.DataFrame): DataFrame with remind capacities in MW.
+        harmonized_pypsa_caps (dict[str, pd.DataFrame]): Dictionary with harmonized
+            pypsa capacities by year (capped to REMIND cap)
+    Returns:
+        pd.DataFrame: DataFrame with the available paid off capacity by tech group.
+    """
+
+    # merge all years of harmonized capacities into a single DataFrame
+    def grp(df, yr):
+        return df.groupby("tech_group").apply(lambda x: pd.Series({"capacity": x.Capacity.sum(), "year": yr}))
+    pypsa_caps = pd.concat(
+        [grp(df, yr) for yr, df in harmonized_pypsa_caps.items() if not df.empty]
+    )
+    remind_caps = remind_capacities.groupby(["tech_group", "year"]).capacity.sum().reset_index()
+
+    merged = pd.merge(
+        remind_caps,
+        pypsa_caps,
+        how="left",
+        on=["year", "tech_group"],
+        suffixes=("_remind", "_pypsa"),
+    ).fillna(0)
+    # TODO check for nans and raise warnings
+    merged["paid_off"] = merged.capacity_remind - merged.capacity_pypsa
+    if (merged.paid_off < -1e-6).any():
+        raise ValueError(
+            "Found negative Paid off capacities. This indicates that the harmonized PyPSA capacities "
+            "exceed the REMIND capacities. Please check the harmonization step."
+        )
+    
+    return merged.groupby("tech_group").paid_off.sum().clip(lower=0).reset_index().rename(columns={"paid_off": "Capacity"})
+
+
+# @deprecated("Use scale_down_capacities instead.")
 def scale_down_pypsa_caps(
     merged_caps: pd.DataFrame, pypsa_caps: pd.DataFrame, tech_groupings: pd.DataFrame
 ) -> pd.DataFrame:
@@ -92,7 +130,8 @@ def scale_down_pypsa_caps(
     Scaling is done by groups of techs, which allows n:1 mapping of remind to pypsa techs.
 
     Args:
-        merged_caps (pd.DataFrame): DataFrame with the merged remind and pypsa capacities by tech group.
+        merged_caps (pd.DataFrame): DataFrame with the merged remind and pypsa capacities
+             by tech group.
         pypsa_caps (pd.DataFrame): DataFrame with the pypsa capacities.
         tech_groupings (pd.DataFrame): DataFrame with the  pypsa tech group names.
     """
@@ -112,92 +151,3 @@ def scale_down_pypsa_caps(
     )
     pypsa_caps.Capacity = pypsa_caps.Capacity * pypsa_caps.fraction
     return pypsa_caps
-
-
-def calc_paidoff_capacity(merged: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculate the aditional paid off capacity available to pypsa from REMIND investment decisions.
-    This capacity is not geographically allocated within the remind region network.
-
-    Args:
-        merged (pd.DataFrame): DataFrame with the merged remind and pypsa capacities by tech group.
-    Returns:
-        pd.DataFrame: DataFrame with the available paid off capacity by tech group.
-    """
-    merged.fillna(0, inplace=True)
-    merged["paid_off"] = merged.capacity_remind - merged.capacity_pypsa
-    merged.paid_off = merged.paid_off.fillna(0).clip(lower=0)
-    return merged.groupby("tech_group").paid_off.sum()
-
-
-if __name__ == "__main__":
-
-    par_name = "p32_cap"
-    baseyear = 2045
-    region = "CHA"
-
-    # Define the path to the CSV file
-    caps_rempind_p = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "data",
-        f"{par_name}.csv",
-    )
-    pypsa_caps_p = ""
-    mapping_p = os.path.abspath("../../data") + "/techmapping_remind2py.csv"
-    outp_existing_pypsa = os.path.abspath("../../data") + "/existing_capacities.csv"
-    outp_paid_off = os.path.abspath("../../data") + "/paid_off_capacities.csv"
-
-    # Read the remind data, filter for relevant region and year and group by tech
-    remind_caps = read_remind_csv(caps_rempind_p).query("region==@region").drop(columns=["region"])
-    remind_caps = convert_remind_capacities({"capacities": remind_caps}, cutoff=500, region=region)
-
-    remind_caps = remind_caps[remind_caps.value > 0].query("year == @baseyear")
-    remind_caps = remind_caps.groupby("technology").capacity.sum().reset_index()
-
-    # read the base year capacities according to pypsa
-    # NB: these should be fixed already (fitlered for naturally retired etc)
-    pypsa_caps = pd.read_csv(pypsa_caps_p)
-    # agg over the region by tech in order to compare to remind region-level data
-    pypsa_agg = pypsa_caps.groupby("Tech").Capacity.sum().reset_index()
-
-    # map remind tech names to pypsa tech names
-    # use groups in case it's not a 1:1 mapping.
-    mappings = pd.read_csv(mapping_p)
-    tech_map = build_tech_map(mappings, map_param="investment")
-    tech_groups = tech_map.drop_duplicates(ignore_index=True).set_index("PyPSA_tech")
-
-    # apply the mapping to the remind capacities
-    remind_caps.loc[:, "tech_group"] = remind_caps.technology.map(
-        tech_map.group.to_dict()
-    )
-    missing = remind_caps[remind_caps.tech_group.isna()]
-    if not missing.empty:
-        logger.warning(
-            f"The following remind techs could not be mapped onto pypsa and were skipped \n{missing}"
-        )
-    remind_caps.dropna(inplace=True)
-
-    # apply the mapping to the pypsa capacities
-    pypsa_agg.loc[:, "tech_group"] = pypsa_agg.PyPSA_tech.map(
-        tech_groups["group"].to_dict()
-    )
-    pypsa_agg.dropna()
-
-    # merge the remind and pypsa capacities
-    merged = pd.merge(
-        remind_caps.groupby("tech_group").capacity.sum().reset_index(),
-        pypsa_agg.groupby("tech_group").capacity.sum().reset_index(),
-        how="left",
-        on="tech_group",
-        suffixes=("_remind", "_pypsa"),
-    )
-
-    # correct the pypsa capacities so they do not exceed the remind capacities
-    pypsa_existing_base_year = scale_down_pypsa_caps(merged, pypsa_caps, tech_groups)
-
-    # calculate the capacity pypsa can install at no cost
-    avail_cap = calc_paidoff_capacity(merged)
-
-    # write the data to csv
-    pypsa_existing_base_year.to_csv(outp_existing_pypsa, index=False)
-    avail_cap.to_csv(outp_paid_off, index=False)
