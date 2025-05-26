@@ -75,7 +75,7 @@ if __name__ == "__main__":
     for name in ETL_REGISTRY.keys():
         print(f" - {name}")
 
-    # Actual code: transform remind data
+    # ==== Actual code: transform remind data ====
     outputs = {}
     steps = config.get("etl_steps", [])
     for step_dict in steps:

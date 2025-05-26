@@ -37,7 +37,7 @@ class SpatialDisaggregator:
     def use_static_reference(self, data: pd.Series, reference_data: pd.Series):
         """
         Use a reference year to disaggregate the quantity spatially
-        
+
         Args:
             data (pd.Series): The data to be disaggregated. Dims: (year,).
             reference_data (pd.Series): The reference data for disaggregation.

@@ -123,7 +123,6 @@ def make_pypsa_like_costs(
     }
 
     # TODO Can do more efficient operations with join
-
     # add years to table with time-indep data
     for label, frame in cost_frames.items():
         if "year" not in frame.columns:
