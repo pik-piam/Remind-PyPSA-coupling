@@ -33,6 +33,7 @@ logger = logging.getLogger()
 pd.set_option('display.max_columns', 5)
 pd.set_option('display.precision', 2)
 
+
 def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
     """
     Scale down the target (existing pypsa) capacities to not exceed the refernce (remind)
@@ -42,11 +43,9 @@ def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd
 
     Args:
         to_scale (pd.DataFrame): DataFrame with the target (pypsa) capacities for a single year.
-        merged_caps (pd.DataFrame): DataFrame with the merged remind and pypsa capacities 
-            by tech group.
-        tech_groupings (pd.DataFrame): DataFrame with the  pypsa tech group names.
+        reference (pd.DataFrame): DataFrame with the ref (remind) capacities by tech group.
     Returns:
-        pd.DataFrame: DataFrame with capacities for each tech group clipped to the reference.
+        pd.DataFrame: DataFrame with capacities clipped to the reference for each tech group.
     Example:
         remind_caps = pd.DataFrame({"technology": ["wind", "hydro"], "capacity": [300, 200]})
         data = {'hydro': {('Capacity', 'node1'): 240, ('Capacity', 'node2'): 360},
@@ -72,7 +71,8 @@ def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd
 
     to_scale.rename(columns={"Capacity": "original_capacity"}, inplace=True)
     # perform the scaling (normalised target capacities * ref capacities)
-    to_scale.loc[:, "Capacity"] = to_scale.groupby("tech_group").group_fraction.transform(lambda x: x*group_totals_ref[x.name])
+    logger.info("applying scaling to capacities")
+    to_scale.loc[:, "Capacity"] = to_scale.groupby("tech_group").group_fraction.transform(lambda x: x * group_totals_ref[x.name])
 
     return to_scale
 
@@ -95,7 +95,7 @@ def calc_paidoff_capacity(
 
     # merge all years of harmonized capacities into a single DataFrame
     def grp(df, yr):
-        return df.groupby("tech_group").apply(lambda x: pd.Series({"capacity": x.Capacity.sum(), "year": yr}))
+        return df.groupby("tech_group").apply(lambda x: pd.Series({"capacity": x.Capacity.sum(), "year": yr, "techs": ",".join(x.Tech)}))
     pypsa_caps = pd.concat(
         [grp(df, yr) for yr, df in harmonized_pypsa_caps.items() if not df.empty]
     )
@@ -115,8 +115,8 @@ def calc_paidoff_capacity(
             "Found negative Paid off capacities. This indicates that the harmonized PyPSA capacities "
             "exceed the REMIND capacities. Please check the harmonization step."
         )
-    
-    return merged.groupby("tech_group").paid_off.sum().clip(lower=0).reset_index().rename(columns={"paid_off": "Capacity"})
+
+    return merged.groupby(["tech_group", "year"]).paid_off.sum().clip(lower=0).reset_index().rename(columns={"paid_off": "Capacity"})
 
 
 # @deprecated("Use scale_down_capacities instead.")
