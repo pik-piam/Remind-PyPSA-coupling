@@ -175,7 +175,8 @@ def harmonize_capacities(
     harmonized = {}
     for year, pypsa_caps in pypsa_capacities.items():
         logger.debug(f"Harmonizing capacities for year {year}")
-        scaled_down_caps = scale_down_capacities(pypsa_caps, remind_capacities.query("year == @year"))
+        yr = int(year)
+        scaled_down_caps = scale_down_capacities(pypsa_caps, remind_capacities.query("year == @yr"))
         harmonized[year] = scaled_down_caps
 
     return harmonized
