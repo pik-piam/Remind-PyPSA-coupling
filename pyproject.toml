@@ -1,6 +1,6 @@
 [project]
 name = "REMIND-PyPSA-coupling"
-version = "0.0.0a3"
+version = "0.0.0a5"
 description = "Tools to couple the REMIND IAM and PyPSA power models"
 readme = "README.md"
 requires-python = ">=3.12"
