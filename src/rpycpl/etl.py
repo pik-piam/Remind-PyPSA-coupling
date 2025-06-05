@@ -106,7 +106,10 @@ def convert_remind_capacities(
 
 @register_etl("technoeconomic_data")
 def technoeconomic_data(
-    frames: Dict[str, pd.DataFrame], mappings: pd.DataFrame, pypsa_costs: pd.DataFrame
+    frames: Dict[str, pd.DataFrame],
+    mappings: pd.DataFrame,
+    pypsa_costs: pd.DataFrame,
+    currency_conversion: 1,
 ) -> pd.DataFrame:
     """Mapping adapted from Johannes Hemp, based on csv mapping table
 
@@ -114,6 +117,7 @@ def technoeconomic_data(
         frames (Dict[str, pd.DataFrame]): dictionary of remind frames
         mappings (pd.DataFrame): the mapping dataframe
         pypsa_costs (pd.DataFrame): pypsa costs dataframe
+        currency_conversion (float): conversion factor for the currency
     Returns:
         pd.DataFrame: dataframe with the mapped techno-economic data
     """
@@ -146,6 +150,7 @@ def technoeconomic_data(
         mappings=mappings,
         weights=weights,
         years=years,
+        currency_conversion=currency_conversion,
     )
     mapped_costs["value"].fillna(0, inplace=True)
     mapped_costs.fillna(" ", inplace=True)

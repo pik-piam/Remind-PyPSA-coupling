@@ -13,7 +13,7 @@ import os
 from collections.abc import Iterable
 import logging
 
-from .utils import (
+from utils import (
     read_remind_csv,
     write_cost_data,
     key_sort,
@@ -30,6 +30,7 @@ UNIT_CONVERSION = {
     "VOM": 1e6 / 8760,  # TUSD/TWa to USD/MWh
     "FOM": 100,  # p.u to percent
     "co2_intensity": 1e9 * (MW_CO2 / MW_C) / 8760 / 1e6,  # Gt_C/TWa to t_CO2/MWh
+    "currency": 1,  # pypsa to remind
 }
 
 STOR_TECHS = ["h2stor", "btstor", "phs"]
@@ -271,6 +272,7 @@ def map_to_pypsa_tech(
     mappings: pd.DataFrame,
     weights: pd.DataFrame,
     years: list | Iterable = None,
+    currency_conversion: float = 1,
 ) -> pd.DataFrame:
     """Map the REMIND technology names to pypsa technoloies using the conversions specified in the
     map config
@@ -282,6 +284,7 @@ def map_to_pypsa_tech(
             REMIND to pypsa technologies.
         weights (pd.DataFrame): DataFrame containing the weights.
         years (Iterable, optional): years to be used. Defaults to None (use remidn dat)
+        currency_conversion (float, optional): conversion factor for currency (PyPSA to REMIND).
     Returns:
         pd.DataFrame: DataFrame with mapped technology names.
     """
@@ -306,7 +309,7 @@ def map_to_pypsa_tech(
     direct_input = expand_years(direct_input, years)
 
     # pypsa values
-    from_pypsa = _use_pypsa(mappings, pypsa_costs, years)
+    from_pypsa = _use_pypsa(mappings, pypsa_costs, years, "constant", currency_conversion)
     from_pypsa.drop(columns=["technology"], inplace=True)
 
     # techs with proxy learnign
@@ -425,6 +428,7 @@ def _use_pypsa(
     pypsa_costs: pd.DataFrame,
     years: Iterable,
     extrapolation="constant",
+    currency_conversion=1,
 ) -> pd.DataFrame:
     """Use the pypsa costs for requested technologies (e.g. are not in REMIND)
 
@@ -434,6 +438,7 @@ def _use_pypsa(
         years (Iterable): data years to be used
         extrpolation (str, Optional): how to handle missing years.
             Defaults to "constant_extrapolation" (last data yr used for missing)
+        currency_conversion (float, optional): conversion factor for currency (PyPSA to REMIND).
 
     Returns:
         pd.DataFrame: DataFrame with mapped technology data.
@@ -478,6 +483,17 @@ def _use_pypsa(
         from_pypsa.comment + " pypsa:" + from_pypsa["further description"]
     )
     from_pypsa.drop(columns=["comment"], inplace=True)
+
+    # convert currency
+    idx = from_pypsa.query("parameter in ['investment','vom']").index
+    currencies = from_pypsa.loc[idx, "unit"].str.split("/", expand=True)[0].unique()
+    if len(currencies) > 1:
+        raise ValueError(
+            f"Multiple currencies found in the pypsa data: {currencies}"
+            "In correct Currency Conversion"
+        )
+    from_pypsa.loc[idx, "value"] *= currency_conversion
+
     return from_pypsa.query("year in @years")
 
 
@@ -638,7 +654,7 @@ if __name__ == "__main__":
     # the remind export uses the name of the symbol as the file name
     # base_path = os.path.join(os.path.abspath(root_dir + "/.."), "gams_learning/pypsa_export/")
     base_path = os.path.expanduser(
-        "~/downloads/output_REMIND/SSP2-Budg1000-PyPSAxprt_2025-05-09/pypsa_export"
+        "/p/tmp/ivanra/REMIND/output/SSP2-PkBudg1000-PyPSAxprt_2025-05-09_19.01.34/pypsa_export"
     )
     paths = {
         key: os.path.join(base_path, value + ".csv") for key, value in REMIND_PARAM_MAP.items()
@@ -683,7 +699,9 @@ if __name__ == "__main__":
     pypsa_costs_dir = os.path.join(
         os.path.abspath(root_dir + "/.."), "PyPSA-China-PIK/resources/data/costs"
     )
-    pypsa_cost_files = [os.path.join(pypsa_costs_dir, f) for f in os.listdir(pypsa_costs_dir)]
+    pypsa_cost_files = [
+        os.path.join(pypsa_costs_dir, f) for f in os.listdir(pypsa_costs_dir) if f.endswith(".csv")
+    ]
     pypsa_costs = pd.read_csv(pypsa_cost_files.pop())
     for f in pypsa_cost_files:
         pypsa_costs = pd.concat([pypsa_costs, pd.read_csv(f)])
