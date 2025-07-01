@@ -13,7 +13,7 @@ import os
 from collections.abc import Iterable
 import logging
 
-from utils import (
+from .utils import (
     read_remind_csv,
     write_cost_data,
     key_sort,
@@ -138,7 +138,7 @@ def make_pypsa_like_costs(
     ).reset_index(drop=True)
     costs_remind.sort_values(by=["technology", "year", "parameter"], key=key_sort, inplace=True)
 
-    return costs_remind
+    return costs_remind.query("year in @years")
 
 
 def transform_capex(capex: pd.DataFrame) -> pd.DataFrame:
@@ -290,6 +290,8 @@ def map_to_pypsa_tech(
     """
     if years is None:
         years = remind_costs_formatted.year.unique()
+    else:
+        years = pd.Index(years, dtype=int)
 
     # direct mapping of remind
     use_remind = (
@@ -484,16 +486,13 @@ def _use_pypsa(
     )
     from_pypsa.drop(columns=["comment"], inplace=True)
 
+    # TODO improve
     # convert currency
-    idx = from_pypsa.query("parameter in ['investment','vom']").index
-    currencies = from_pypsa.loc[idx, "unit"].str.split("/", expand=True)[0].unique()
-    if len(currencies) > 1:
-        raise ValueError(
-            f"Multiple currencies found in the pypsa data: {currencies}"
-            "In correct Currency Conversion"
-        )
-    from_pypsa.loc[idx, "value"] *= currency_conversion
-
+    euros = from_pypsa.query("unit.str.find('EUR')>=0").index
+    from_pypsa.loc[euros, "value"] *= currency_conversion
+    from_pypsa.loc[
+        euros, "further description"
+    ] += f" (converted to USD using {currency_conversion})"
     return from_pypsa.query("year in @years")
 
 
@@ -535,8 +534,10 @@ def _weigh_remind_by(
 
     # apply the weights (use the original row id as grouping)
     to_weigh.loc[:, "value"] = weightings.groupby(["id_weight"])[["value", "weight"]].apply(
-        lambda x: (x.value * (x.weight + 1e-9)).sum() / (x.weight.sum() + 1e-9)
+        lambda x: (x.value * (x.weight + 1e-12)).sum() / (x.weight.sum() + 1e-12)
     )
+    # validate the years (check no years are full nans)
+    # TODO
 
     # validate that units matched (unique) # !! should check nans too
     units_ok = weightings.groupby("id_weight").unit.apply(pd.Series.nunique) == 1
@@ -546,7 +547,6 @@ def _weigh_remind_by(
             "Units not do not match for weights:",
             named_unit_check[~named_unit_check["unit"]],
         )
-
     to_weigh.loc[:, "source"] = to_weigh.mapper + " " + to_weigh.reference.astype(str)
     return to_weigh
 
@@ -601,6 +601,9 @@ def validate_mappings(mappings: pd.DataFrame):
     if len(repeats):
         raise ValueError(f"Mappings are not unique: n repeats:\n {repeats} ")
     # should validate that remind references are actually in the remind export
+
+    if "value" in mappings.columns:
+        raise ValueError("Mapping has an unexpected 'value' column")
 
 
 # TODO rename
@@ -696,9 +699,11 @@ if __name__ == "__main__":
     validate_remind_data(costs_remind, mappings)
 
     # load pypsa costs
+
     pypsa_costs_dir = os.path.join(
         os.path.abspath(root_dir + "/.."), "PyPSA-China-PIK/resources/data/costs"
     )
+    logger.info(f"Loading pypsa costs from {pypsa_costs_dir}")
     pypsa_cost_files = [
         os.path.join(pypsa_costs_dir, f) for f in os.listdir(pypsa_costs_dir) if f.endswith(".csv")
     ]

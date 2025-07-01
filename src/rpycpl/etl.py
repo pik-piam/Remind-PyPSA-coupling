@@ -1,4 +1,4 @@
-""" ETL TOOL BOX
+"""ETL TOOL BOX
 
 - Abstracted transformations (Transformation, register_etl)
 - ETL registry (list of named conversions)
@@ -110,6 +110,7 @@ def technoeconomic_data(
     mappings: pd.DataFrame,
     pypsa_costs: pd.DataFrame,
     currency_conversion: 1,
+    years: Optional[list] = None,
 ) -> pd.DataFrame:
     """Mapping adapted from Johannes Hemp, based on csv mapping table
 
@@ -118,6 +119,7 @@ def technoeconomic_data(
         mappings (pd.DataFrame): the mapping dataframe
         pypsa_costs (pd.DataFrame): pypsa costs dataframe
         currency_conversion (float): conversion factor for the currency
+        years (Optional[list]): years to consider, if None REMIND capex years is used
     Returns:
         pd.DataFrame: dataframe with the mapped techno-economic data
     """
@@ -128,8 +130,8 @@ def technoeconomic_data(
     # check the data & mappings
     validate_mappings(mappings)
 
-    # maybe do something nicer but should be ok if remind export is correct
-    years = frames["capex"].year.unique()
+    if years is None:
+        years = frames["capex"].year.unique()
 
     weight_frames = [frames[k].assign(weight_type=k) for k in frames if k.startswith("weights")]
     weights = pd.concat(
