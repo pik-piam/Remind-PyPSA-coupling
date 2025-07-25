@@ -177,6 +177,11 @@ def transform_co2_intensity(co2_intensity: pd.DataFrame, years: list | pd.Index)
             "all_enty.2": "emission_type",
         },
     )
+    if "to_carrier" not in co2_intens.columns:
+        raise ValueError(
+            "GAMS export had suffixes _digits in column names for pm_emifac. Please remove"
+        )
+
     co2_intens = co2_intens.query("to_carrier == 'seel' & emission_type == 'co2' & year in @years")
     co2_intens = co2_intens.assign(
         parameter="CO2 intensity",
@@ -272,7 +277,7 @@ def map_to_pypsa_tech(
     mappings: pd.DataFrame,
     weights: pd.DataFrame,
     years: list | Iterable = None,
-    currency_conversion: float = 1,
+    currency_conversion: float = 0.90,
 ) -> pd.DataFrame:
     """Map the REMIND technology names to pypsa technoloies using the conversions specified in the
     map config
@@ -284,7 +289,7 @@ def map_to_pypsa_tech(
             REMIND to pypsa technologies.
         weights (pd.DataFrame): DataFrame containing the weights.
         years (Iterable, optional): years to be used. Defaults to None (use remidn dat)
-        currency_conversion (float, optional): conversion factor for currency (PyPSA to REMIND).
+        currency_conversion (float, optional): conversion factor for currency (REMIND to PyPSA).
     Returns:
         pd.DataFrame: DataFrame with mapped technology names.
     """
@@ -305,13 +310,19 @@ def map_to_pypsa_tech(
         )
     )
     use_remind.drop(columns=["technology"], inplace=True)
+    # convert currency to pypsa eur. Fix units or pypsa will convert again
+    mask = use_remind.query("unit.str.lower().str.contains('usd')").index
+    use_remind.loc[mask, "value"] *= currency_conversion
+    use_remind.loc[mask, "unit"] = (
+        use_remind.loc[mask, "unit"].str.lower().str.replace("usd", "EUR")
+    )
 
     direct_input = mappings.query("mapper == 'set_value'").rename(columns={"reference": "value"})
     direct_input = direct_input.assign(source="direct_input from coupling mapping")
     direct_input = expand_years(direct_input, years)
 
-    # pypsa values
-    from_pypsa = _use_pypsa(mappings, pypsa_costs, years, "constant", currency_conversion)
+    # pypsa values - do not convert currency, already in EUR2015
+    from_pypsa = _use_pypsa(mappings, pypsa_costs, years, "constant", currency_conversion=1)
     from_pypsa.drop(columns=["technology"], inplace=True)
 
     # techs with proxy learnign
@@ -354,6 +365,7 @@ def map_to_pypsa_tech(
     ]
     output = pd.concat([df[OUTP_COLS] for df in output_frames if not df.empty], axis=0)
     output = output.assign(year=output.year.astype(int))
+
     return output.sort_values(["year", "technology", "parameter"], key=key_sort).reset_index(
         drop=True
     )
@@ -719,6 +731,7 @@ if __name__ == "__main__":
         weights=weights,
         years=years,
     )
+    # TODO fix investment of electrolysis, remind per h2 instead of per el
     mapped_costs.fillna({"value": 0}, inplace=True)
     mapped_costs.fillna(" ", inplace=True)
     logger.info(f"Writing mapped costs data to {os.path.join(root_dir, 'output')}")

@@ -109,7 +109,7 @@ def technoeconomic_data(
     frames: Dict[str, pd.DataFrame],
     mappings: pd.DataFrame,
     pypsa_costs: pd.DataFrame,
-    currency_conversion: 1,
+    currency_conversion: 1.11,
     years: Optional[list] = None,
 ) -> pd.DataFrame:
     """Mapping adapted from Johannes Hemp, based on csv mapping table
@@ -118,7 +118,7 @@ def technoeconomic_data(
         frames (Dict[str, pd.DataFrame]): dictionary of remind frames
         mappings (pd.DataFrame): the mapping dataframe
         pypsa_costs (pd.DataFrame): pypsa costs dataframe
-        currency_conversion (float): conversion factor for the currency
+        currency_conversion (float): conversion factor for the currency (PyPSA to REMIND)
         years (Optional[list]): years to consider, if None REMIND capex years is used
     Returns:
         pd.DataFrame: dataframe with the mapped techno-economic data
@@ -191,7 +191,9 @@ def harmonize_capacities(
 
 @register_etl("calc_paid_off_capacity")
 def paidoff_capacities(
-    remind_capacities: pd.DataFrame, harmonized_pypsa_caps: dict[str, pd.DataFrame]
+    remind_capacities: pd.DataFrame,
+    harmonized_pypsa_caps: dict[str, pd.DataFrame],
+    scale: float = 1.0,
 ) -> pd.DataFrame:
     """Wrapper for the capacities_etl.calc_paid_off_capacity function.
 
@@ -203,8 +205,11 @@ def paidoff_capacities(
         remind_capacities (pd.DataFrame): DataFrame with REMIND capacities in MW.
         harmonized_pypsa_caps (dict[str, pd.DataFrame]): Dictionary with harmonized
             PyPSA capacities by year (capped to REMIND cap)
+        scale (float): Scaling factor for the paid-off capacity. Defaults to 1.0.
     Returns:
         pd.DataFrame: DataFrame with the available paid-off capacity by tech group.
     """
-
-    return calc_paidoff_capacity(remind_capacities, harmonized_pypsa_caps)
+    logger.info(f"Calculating paid-off capacities with scale factor: {scale}")
+    paid_off = calc_paidoff_capacity(remind_capacities, harmonized_pypsa_caps)
+    paid_off.loc[:, "Capacity"] *= scale
+    return paid_off

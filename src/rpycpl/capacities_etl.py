@@ -77,7 +77,11 @@ def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd
     if not_in_ref:
         group_totals_ref = pd.concat([group_totals_ref, pd.Series(0, index=not_in_ref)])
 
+    # clip the capacities so they don't exceed the existing (excess will be added as paid-off)
     to_scale.rename(columns={"Capacity": "original_capacity"}, inplace=True)
+    allocated_caps = to_scale.groupby("tech_group")["original_capacity"].sum()
+    group_totals_ref = group_totals_ref.clip(upper=allocated_caps).fillna(group_totals_ref)
+
     # perform the scaling (normalised target capacities * ref capacities)
     logger.info("applying scaling to capacities")
     to_scale.loc[:, "Capacity"] = to_scale.groupby("tech_group").group_fraction.transform(
