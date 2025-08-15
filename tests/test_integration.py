@@ -45,13 +45,13 @@ class TestWorkflowIntegration:
 
     def test_technoeconomic_data_workflow(self):
         """Test complete technoeconomic data transformation workflow."""
-        # 1. Create comprehensive tech mapping with different mappers
+        # 1. tech mapping with different mappers
         mapping_data = pd.DataFrame({
             'PyPSA_tech': ['onwind', 'offwind', 'solar', 'OCGT', 'nuclear'],
             'parameter': ['investment', 'investment', 'investment', 'investment', 'investment'],
             'mapper': ['use_remind', 'use_remind', 'use_remind',
                        'weigh_remind_by_gen', 'set_value'],
-            'reference': ['windon', 'windoff', 'spv', ['gaschp', 'gascc'], '5000'],
+            'reference': ['windon', 'windoff', 'spv', ['gaschp', 'gascc'], 5000],
             'unit': ['USD/MW', 'USD/MW', 'USD/MW', 'USD/MW', 'USD/MW'],
             'comment': ['', '', '', 'Weighted by generation', 'Fixed cost']
         })
@@ -80,8 +80,10 @@ class TestWorkflowIntegration:
             # CO2 intensity
             'co2_intensity': pd.DataFrame({
                 'technology': ['windon', 'spv', 'gaschp', 'gascc'],
+                "to_carrier": ['seel', 'seel', 'seel', 'seel'],
                 'year': [2030, 2030, 2030, 2030],
-                'value': [0.0, 0.0, 0.4, 0.35]  # Gt_C/TWa
+                'value': [0.0, 0.0, 0.4, 0.35],  # Gt_C/TWa
+                "emission_type": ['CO2', 'CO2', 'CO2', 'CO2']
             }),
             
             # Efficiency
@@ -108,24 +110,51 @@ class TestWorkflowIntegration:
             'weights_gen': pd.DataFrame({
                 'technology': ['gaschp', 'gascc'],
                 'year': [2030, 2030],
-                'carrier': ['seel', 'seel'],
                 'value': [0.3, 0.7]  # gaschp gets 30%, gascc gets 70%
             })
         }
         
         # 3. Create PyPSA costs data
-        pypsa_costs = pd.DataFrame({
-            'technology': ['onwind', 'offwind', 'solar', 'OCGT', 'nuclear'],
-            'year': [2030, 2030, 2030, 2030, 2030],
-            'parameter': ['investment', 'investment', 'investment', 'investment', 'investment'],
-            'value': [1200, 1800, 600, 800, 4500],  # USD/MW
-            'unit': ['USD/MW', 'USD/MW', 'USD/MW', 'USD/MW', 'USD/MW'],
-            'source': ['pypsa', 'pypsa', 'pypsa', 'pypsa', 'pypsa'],
-            'further description': ['', '', '', '', '']
-        })
+        pypsa_costs = pd.DataFrame([
+            # Investment costs
+            {'technology': 'onwind', 'year': 2030, 'parameter': 'investment', 'value': 1200, 'unit': 'USD/MW', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'offwind', 'year': 2030, 'parameter': 'investment', 'value': 1800, 'unit': 'USD/MW', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'solar', 'year': 2030, 'parameter': 'investment', 'value': 600, 'unit': 'USD/MW', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'OCGT', 'year': 2030, 'parameter': 'investment', 'value': 800, 'unit': 'USD/MW', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'nuclear', 'year': 2030, 'parameter': 'investment', 'value': 4500, 'unit': 'USD/MW', 'source': 'pypsa', 'further description': ''},
+            # VOM (Variable O&M)
+            {'technology': 'onwind', 'year': 2030, 'parameter': 'VOM', 'value': 10, 'unit': 'USD/MWh', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'offwind', 'year': 2030, 'parameter': 'VOM', 'value': 12, 'unit': 'USD/MWh', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'solar', 'year': 2030, 'parameter': 'VOM', 'value': 5, 'unit': 'USD/MWh', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'OCGT', 'year': 2030, 'parameter': 'VOM', 'value': 15, 'unit': 'USD/MWh', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'nuclear', 'year': 2030, 'parameter': 'VOM', 'value': 8, 'unit': 'USD/MWh', 'source': 'pypsa', 'further description': ''},
+            # FOM (Fixed O&M)
+            {'technology': 'onwind', 'year': 2030, 'parameter': 'FOM', 'value': 30, 'unit': 'USD/kW/a', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'offwind', 'year': 2030, 'parameter': 'FOM', 'value': 35, 'unit': 'USD/kW/a', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'solar', 'year': 2030, 'parameter': 'FOM', 'value': 20, 'unit': 'USD/kW/a', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'OCGT', 'year': 2030, 'parameter': 'FOM', 'value': 25, 'unit': 'USD/kW/a', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'nuclear', 'year': 2030, 'parameter': 'FOM', 'value': 50, 'unit': 'USD/kW/a', 'source': 'pypsa', 'further description': ''},
+            # Lifetime
+            {'technology': 'onwind', 'year': 2030, 'parameter': 'lifetime', 'value': 25, 'unit': 'a', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'offwind', 'year': 2030, 'parameter': 'lifetime', 'value': 25, 'unit': 'a', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'solar', 'year': 2030, 'parameter': 'lifetime', 'value': 30, 'unit': 'a', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'OCGT', 'year': 2030, 'parameter': 'lifetime', 'value': 35, 'unit': 'a', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'nuclear', 'year': 2030, 'parameter': 'lifetime', 'value': 40, 'unit': 'a', 'source': 'pypsa', 'further description': ''},
+            # CO2 intensity
+            {'technology': 'onwind', 'year': 2030, 'parameter': 'CO2 intensity', 'value': 0.0, 'unit': 'tCO2/MWh', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'offwind', 'year': 2030, 'parameter': 'CO2 intensity', 'value': 0.0, 'unit': 'tCO2/MWh', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'solar', 'year': 2030, 'parameter': 'CO2 intensity', 'value': 0.0, 'unit': 'tCO2/MWh', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'OCGT', 'year': 2030, 'parameter': 'CO2 intensity', 'value': 0.4, 'unit': 'tCO2/MWh', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'nuclear', 'year': 2030, 'parameter': 'CO2 intensity', 'value': 0.0, 'unit': 'tCO2/MWh', 'source': 'pypsa', 'further description': ''},
+            # Efficiency
+            {'technology': 'onwind', 'year': 2030, 'parameter': 'efficiency', 'value': 1.0, 'unit': '', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'offwind', 'year': 2030, 'parameter': 'efficiency', 'value': 1.0, 'unit': '', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'solar', 'year': 2030, 'parameter': 'efficiency', 'value': 1.0, 'unit': '', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'OCGT', 'year': 2030, 'parameter': 'efficiency', 'value': 0.4, 'unit': '', 'source': 'pypsa', 'further description': ''},
+            {'technology': 'nuclear', 'year': 2030, 'parameter': 'efficiency', 'value': 0.33, 'unit': '', 'source': 'pypsa', 'further description': ''},
+        ])
         
         # 4. Run the technoeconomic_data ETL function
-        from rpycpl.etl import ETL_REGISTRY
         techno_etl = ETL_REGISTRY['technoeconomic_data']
         
         result = techno_etl(
@@ -149,10 +178,9 @@ class TestWorkflowIntegration:
         
         # Verify specific mapping behaviors:
         # 1. use_remind: onwind should get REMIND windon investment cost (converted)
-        onwind_investment = result[
-            (result['technology'] == 'onwind') &
-            (result['parameter'] == 'investment')
-        ]['value'].iloc[0]
+        onwind_investment = result.query(
+            "technology == 'onwind' and parameter == 'investment'"
+        )['value'].iloc[0]
         expected_onwind = 1.2 * 1e6 * 1.11  # TUSD/TW -> USD/MW * currency conversion
         assert abs(onwind_investment - expected_onwind) < 1e-3
         
@@ -161,7 +189,7 @@ class TestWorkflowIntegration:
             (result['technology'] == 'nuclear') &
             (result['parameter'] == 'investment')
         ]['value'].iloc[0]
-        assert nuclear_investment == 5000.0
+        assert nuclear_investment == 5000 # set_value overrides
         
         # 3. weigh_remind_by_gen: OCGT should get weighted average of gaschp/gascc
         ocgt_investment = result[
