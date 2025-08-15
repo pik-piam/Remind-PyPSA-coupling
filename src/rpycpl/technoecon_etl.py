@@ -177,9 +177,11 @@ def transform_co2_intensity(co2_intensity: pd.DataFrame, years: list | pd.Index)
             "all_enty.2": "emission_type",
         },
     )
-    if "to_carrier" not in co2_intens.columns:
+    expected = ["emission_type", "to_carrier", "year"]
+    if not all(col in co2_intens.columns for col in expected):
         raise ValueError(
-            "GAMS export had suffixes _digits in column names for pm_emifac. Please remove"
+            f"Expected columns {expected} in CO2 intensity data, found {co2_intens.columns.tolist()}"
+            + " Possible issue: GAMS export had suffixes _digits in column names for pm_emifac. Please remove"
         )
 
     co2_intens = co2_intens.query("to_carrier == 'seel' & emission_type == 'co2' & year in @years")
@@ -354,6 +356,11 @@ def map_to_pypsa_tech(
     weighed_basket.rename(
         columns={"PyPSA_tech": "technology", "comment": "further description"},
         inplace=True,
+    )
+    mask = weighed_basket.query("unit.str.lower().str.contains('usd')").index
+    weighed_basket.loc[mask, "value"] *= currency_conversion
+    weighed_basket.loc[mask, "unit"] = (
+        weighed_basket.loc[mask, "unit"].str.lower().str.replace("usd", "EUR")
     )
 
     output_frames = [
