@@ -624,6 +624,12 @@ def validate_remind_data(costs_remind: pd.DataFrame, mappings: pd.DataFrame):
     Args:
         remind_data (pd.DataFrame): DataFrame containing the remind data
     """
+    if not {"technology", "parameter", "year", "value"} <= set(costs_remind.columns):
+        raise ValueError(
+            "Remind data does not have the expected columns: "
+            "technology, parameter, year, value. "
+            f"Found columns: {costs_remind.columns}"
+        )
     requested_data = mappings.query("mapper.str.contains('remind')")[
         ["PyPSA_tech", "parameter", "reference"]
     ].explode("reference")
