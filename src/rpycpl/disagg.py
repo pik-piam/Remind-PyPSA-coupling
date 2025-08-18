@@ -31,7 +31,7 @@ class SpatialDisaggregator:
                 raise ValueError(
                     f"Reference data index {reference_data.index} does not match target nodes {self._target_nodes}"
                 )
-        if not np.approxequal(reference_data.sum(), 1.0, tolerance=1e-12):
+        if not np.isclose(reference_data.sum(), 1.0, rtol=1e-12):
             raise ValueError("Reference data is not normalised to 1")
 
     def use_static_reference(self, data: pd.Series, reference_data: pd.Series):
