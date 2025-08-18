@@ -20,9 +20,10 @@ We recommend using `uv`.
 4. option a) In the project folder run `uv pip install -e .` Then use as a package
 4. option b) In the project workspace update the venv with `uv sync` to have all the package requirements. You can then use the src files as standalone.
 
-> [!NOTE]: `uv` sometimes causes issues at steps 4. In this case 
-- run `uv pip install pip` after step 3
-- run `pip install -e .` in the project worspace
+> [!NOTE]
+> `uv` sometimes causes issues at steps 4. In this case 
+> - run `uv pip install pip` after step 3
+> - run `pip install -e .` in the project worspace
 
 # Usage
 This package is intended for use in combination with REMIND and PyPSA, as part of a snakemake workflow
