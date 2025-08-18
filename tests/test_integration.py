@@ -46,15 +46,32 @@ class TestWorkflowIntegration:
     def test_technoeconomic_data_workflow(self):
         """Test complete technoeconomic data transformation workflow."""
         # 1. tech mapping with different mappers
-        mapping_data = pd.DataFrame({
-            'PyPSA_tech': ['onwind', 'offwind', 'solar', 'OCGT', 'nuclear'],
-            'parameter': ['investment', 'investment', 'investment', 'investment', 'investment'],
-            'mapper': ['use_remind', 'use_remind', 'use_remind',
-                       'weigh_remind_by_gen', 'set_value'],
-            'reference': ['windon', 'windoff', 'spv', ['gaschp', 'gascc'], 5000],
-            'unit': ['USD/MW', 'USD/MW', 'USD/MW', 'USD/MW', 'USD/MW'],
-            'comment': ['', '', '', 'Weighted by generation', 'Fixed cost']
-        })
+        # Map all relevant parameters (investment, VOM, FOM, lifetime, CO2 intensity, efficiency)
+        mapping_data = pd.DataFrame([
+            # Investment cost mappings
+            {'PyPSA_tech': 'onwind', 'parameter': 'investment', 'mapper': 'use_remind', 'reference': 'windon', 'unit': 'USD/MW', 'comment': ''},
+            {'PyPSA_tech': 'offwind', 'parameter': 'investment', 'mapper': 'use_remind', 'reference': 'windoff', 'unit': 'USD/MW', 'comment': ''},
+            {'PyPSA_tech': 'solar', 'parameter': 'investment', 'mapper': 'use_remind', 'reference': 'spv', 'unit': 'USD/MW', 'comment': ''},
+            {'PyPSA_tech': 'OCGT', 'parameter': 'investment', 'mapper': 'weigh_remind_by_gen', 'reference': ['gaschp', 'gascc'], 'unit': 'USD/MW', 'comment': 'Weighted by generation'},
+            {'PyPSA_tech': 'nuclear', 'parameter': 'investment', 'mapper': 'set_value', 'reference': 5000, 'unit': 'USD/MW', 'comment': 'Fixed cost'},
+            # VOM mappings
+            {'PyPSA_tech': 'onwind', 'parameter': 'VOM', 'mapper': 'use_remind', 'reference': 'windon', 'unit': 'USD/MWh', 'comment': ''},
+            {'PyPSA_tech': 'solar', 'parameter': 'VOM', 'mapper': 'use_remind', 'reference': 'spv', 'unit': 'USD/MWh', 'comment': ''},
+            # FOM mappings
+            {'PyPSA_tech': 'onwind', 'parameter': 'FOM', 'mapper': 'use_remind', 'reference': 'windon', 'unit': 'USD/kW/a', 'comment': ''},
+            {'PyPSA_tech': 'solar', 'parameter': 'FOM', 'mapper': 'use_remind', 'reference': 'spv', 'unit': 'USD/kW/a', 'comment': ''},
+            # Lifetime mappings
+            {'PyPSA_tech': 'onwind', 'parameter': 'lifetime', 'mapper': 'use_remind', 'reference': 'windon', 'unit': 'a', 'comment': ''},
+            {'PyPSA_tech': 'solar', 'parameter': 'lifetime', 'mapper': 'use_remind', 'reference': 'spv', 'unit': 'a', 'comment': ''},
+            # CO2 intensity mappings
+            {'PyPSA_tech': 'onwind', 'parameter': 'CO2 intensity', 'mapper': 'set_value', 'reference': 0, 'unit': 'tCO2/MWh', 'comment': ''},
+            {'PyPSA_tech': 'offwind', 'parameter': 'CO2 intensity', 'mapper': 'set_value', 'reference': 0, 'unit': 'tCO2/MWh', 'comment': ''},
+            {'PyPSA_tech': 'solar', 'parameter': 'CO2 intensity', 'mapper': 'set_value', 'reference': 0, 'unit': 'tCO2/MWh', 'comment': ''},
+            # Efficiency mappings
+            {'PyPSA_tech': 'onwind', 'parameter': 'efficiency', 'mapper': 'use_remind', 'reference': 'windon', 'unit': '', 'comment': ''},
+            {'PyPSA_tech': 'solar', 'parameter': 'efficiency', 'mapper': 'use_remind', 'reference': 'spv', 'unit': '', 'comment': ''},
+            {'PyPSA_tech': 'OCGT', 'parameter': 'efficiency', 'mapper': 'weigh_remind_by_gen', 'reference': ['gaschp', 'gascc'], 'unit': '', 'comment': 'Weighted by generation'},
+        ])
         
         # 2. Create REMIND cost frames (what make_pypsa_like_costs expects)
         remind_frames = {
