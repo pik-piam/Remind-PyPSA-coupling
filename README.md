@@ -6,8 +6,8 @@ This is a collection of tools to couple remind and pypsa for different regions.
 The tools are currently in development, with as test cases PyPSA-EUR for Germany and PyPSA-China-PIK for China.
 
 ## quick start
-1. install from test.pypi` pip --index-url=https://test.pypi.org/simple --extra-index-url=https://pypi.org/simple --no-isolation`
-2. import with `import rempycpl`
+1. install from pypi `pip install remind-pypsa-coupling`
+2. import with `import rpycpl`
 
 ## Documentation
 https://pik-piam.github.io/Remind-PyPSA-coupling/
