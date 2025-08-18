@@ -31,6 +31,5 @@ Examples: Coming at some point
 
 Activate the venv with `source .venv/bin/activate`
 
-# Documentation
 
 
