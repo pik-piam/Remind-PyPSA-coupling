@@ -10,6 +10,7 @@ The tools are currently in development, with as test cases PyPSA-EUR for Germany
 2. import with `import rempycpl`
 
 ## Documentation
+https://pik-piam.github.io/Remind-PyPSA-coupling/
 
 # Installation (development)
 We recommend using `uv`. 
