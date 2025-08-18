@@ -1,6 +1,6 @@
 [project]
 name = "REMIND-PyPSA-coupling"
-version = "0.0.0a6"
+version = "0.0.1"
 description = "Tools to couple the REMIND IAM and PyPSA power models"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -8,7 +8,8 @@ dependencies = [
     "numpy>1.9", 
     "pandas>2", 
     "pyyaml", 
-    "country_converter"]
+    "country_converter",
+    "pytest"]
 
 [project.urls]
 Homepage = "https://github.com/pik-piam/Remind-PyPSA-coupling/"
