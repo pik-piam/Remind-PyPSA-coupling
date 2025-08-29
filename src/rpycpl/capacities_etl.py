@@ -51,8 +51,7 @@ def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd
         data = {'hydro': {('Capacity', 'node1'): 240, ('Capacity', 'node2'): 360},
                 'wind': {('Capacity', 'node1'): 20, ('Capacity', 'node2'): 120}})
         pypsa_caps = pd.DataFrame.from_dict(d, orient="index") # poweplantmatching
-        scaled_caps = scale_down_capacities(pypsa_caps, remind_caps,
-                            tech_groupings = {"hydro": "hydro", "wind": "wind"})
+        scaled_caps = scale_down_capacities(pypsa_caps, remind_caps)
         >> {'hydro': {('Capacity', 'node1'): 120, ('Capacity', 'node2'): 180}, # scaled down
                 'wind': {('Capacity', 'node1'): 20, ('Capacity', 'node2'): 120}}) # untouched
     """
@@ -160,7 +159,9 @@ def calc_paidoff_capacity_multiyear(
     Returns:
         pd.DataFrame: DataFrame with the available paid off capacity by tech group.
     """
-
+    if harmonized_pypsa_caps == {}:
+        raise ValueError("Harmonized PyPSA capacities must be provided.")
+    
     # merge all years of harmonized capacities into a single DataFrame
     def grp(df, yr):
         return df.groupby("tech_group").apply(
@@ -169,9 +170,11 @@ def calc_paidoff_capacity_multiyear(
             )
         )
 
-    pypsa_caps = pd.concat(
-        [grp(df, yr) for yr, df in harmonized_pypsa_caps.items() if not df.empty]
-    )
+    grouped_by_tech = [grp(df, yr) for yr, df in harmonized_pypsa_caps.items() if not df.empty]
+    if not grouped_by_tech:
+        raise ValueError("No harmonized capacities provided for any year.")
+    
+    pypsa_caps = pd.concat(grouped_by_tech)
     pypsa_caps.year = pypsa_caps.year.astype(int)
     remind_caps = remind_capacities.groupby(["tech_group", "year"]).capacity.sum().reset_index()
     merged = pd.merge(
@@ -196,37 +199,3 @@ def calc_paidoff_capacity_multiyear(
         .reset_index()
         .rename(columns={"paid_off": "Capacity"})
     )
-
-
-# @deprecated("Use scale_down_capacities instead.")
-def scale_down_pypsa_caps(
-    merged_caps: pd.DataFrame, pypsa_caps: pd.DataFrame, tech_groupings: pd.DataFrame
-) -> pd.DataFrame:
-    """
-    Scale down the pypsa capacities to match the remind capacities by tech group.
-    Does not scale up the pypsa capacities.
-
-    Scaling is done by groups of techs, which allows n:1 mapping of remind to pypsa techs.
-
-    Args:
-        merged_caps (pd.DataFrame): DataFrame with the merged remind and pypsa capacities
-             by tech group.
-        pypsa_caps (pd.DataFrame): DataFrame with the pypsa capacities.
-        tech_groupings (pd.DataFrame): DataFrame with the  pypsa tech group names.
-    """
-    merged_caps["fraction"] = merged_caps.capacity_remind / merged_caps.capacity_pypsa
-
-    scalings = merged_caps.copy()
-    # do not touch cases where remind capacity is larger than pypsa capacity
-    scalings["fraction"] = scalings["fraction"].clip(upper=1)
-    scalings.dropna(subset=["fraction"], inplace=True)
-
-    pypsa_caps["tech_group"] = pypsa_caps.Tech.map(tech_groupings.group.to_dict())
-    pypsa_caps = pypsa_caps.merge(
-        scalings[["tech_group", "fraction"]],
-        how="left",
-        on="tech_group",
-        suffixes=("", "_scaling"),
-    )
-    pypsa_caps.Capacity = pypsa_caps.Capacity * pypsa_caps.fraction
-    return pypsa_caps

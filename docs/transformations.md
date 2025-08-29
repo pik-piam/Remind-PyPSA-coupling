@@ -12,6 +12,13 @@ This builds the coupled techno-economic data for the PyPSA model from REMIND par
 
 ## Loads data
 - conversion to MWh
+- TODO: subtraction of different sectors from seel
+
+## Capacities
+- conversion to MW
+- grouping to match PyPSA techs (n:1 or n:m mapping later)
+- harmonization with pypsa capacities (use spatial info from pypsa `powerplantmatching` pipeline)
+- definition of paid-off capacities pypsa can install for free at any node
 
 ## Spatial Disaggregation
 - pre-defined reference data

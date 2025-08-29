@@ -221,7 +221,7 @@ def expand_years(df: pd.DataFrame, years: list) -> pd.DataFrame:
     return pd.concat([df.assign(year=yr) for yr in years])
 
 
-def to_list(x: str):
+def to_list(x: str) -> list | str:
     """in case of csv input. conver str to list
 
     Args:
