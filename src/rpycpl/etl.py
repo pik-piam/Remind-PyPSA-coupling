@@ -161,7 +161,37 @@ def technoeconomic_data(
 
 
 @register_etl("harmonize_capacities")
-def harmonize_capacities(
+def harmonize_capacities_all_years(
+    pypsa_capacities: pd.DataFrame, remind_capacities: pd.DataFrame
+) -> dict[str, pd.DataFrame]:
+    """Harmonize the REMIND and PyPSA capacities
+        - scale down the pypsa capacities to not exceed the remind capacities
+        - where REMIND exceeds the pypsa capacities, calculate a paid-off capacity
+          which will be added to the pypsa model as zero-capex techs. The model
+           can allocate it where it sees fit but the total is constrained
+
+    Args:
+        pypsa_capacities (pd.DataFrame): DataFrame with the pypsa capacities
+        remind_capacities (pd.DataFrame): DataFrame with the remind capacities for all years
+    Returns:
+        dict[str, pd.DataFrame]: Dictionary with the harmonized capacities
+            {year: harmonized_capacities}.
+    """
+    years = remind_capacities.year.unique()
+    harmonized = pd.DataFrame()
+    for yr in years:
+        logger.debug(f"Harmonizing capacities for year {yr}")
+        pypsa_caps = pypsa_capacities.query("DateIn <= @yr & DateOut > @yr")
+
+        scaled_down_caps = scale_down_capacities(pypsa_caps, remind_capacities.query("year == @yr"))
+        scaled_down_caps["PLAN_YEAR"] = yr
+
+        harmonized = pd.concat([harmonized, scaled_down_caps], axis=0)
+
+    return harmonized.reset_index(drop=True)
+
+
+def harmonize_capacities_multi_year(
     pypsa_capacities: dict[str, pd.DataFrame], remind_capacities: pd.DataFrame
 ) -> dict[str, pd.DataFrame]:
     """Harmonize the REMIND and PyPSA capacities

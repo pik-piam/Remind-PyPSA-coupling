@@ -92,6 +92,60 @@ def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd
 
 
 def calc_paidoff_capacity(
+    remind_capacities: pd.DataFrame, harmonized_pypsa_caps: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Calculate the aditional paid off capacity available to pypsa from REMIND investment decisions.
+    The paid off capacity is the difference between the REMIND capacities and the harmonized
+    pypsa capacities. The paid off capacity is available to pypsa as a zero-capex tech.
+
+    Args:
+        remind_capacities (pd.DataFrame): DataFrame with remind capacities in MW.
+        harmonized_pypsa_caps (pd.DataFrame): harmonized pypsa capacities by year (capped to REMIND cap)
+    Returns:
+        pd.DataFrame: DataFrame with the available paid off capacity by tech group.
+    """
+
+    harmonized_pypsa_caps.rename(columns={"PLAN_YEAR": "year"}, inplace=True)
+    pypsa_caps = (
+        harmonized_pypsa_caps.groupby(["year", "tech_group"])
+        .apply(
+            lambda x: pd.Series(
+                {
+                    "capacity": x.Capacity.sum(),
+                    "techs": ",".join(x.Tech.unique()),
+                }
+            )
+        )
+        .reset_index()
+    )
+    pypsa_caps.year = pypsa_caps.year.astype(int)
+    remind_caps = remind_capacities.groupby(["tech_group", "year"]).capacity.sum().reset_index()
+    merged = pd.merge(
+        remind_caps,
+        pypsa_caps,
+        how="left",
+        on=["year", "tech_group"],
+        suffixes=("_remind", "_pypsa"),
+    ).fillna(0)
+    # TODO check for nans and raise warnings
+    merged["paid_off"] = merged.capacity_remind - merged.capacity_pypsa
+    if (merged.paid_off < -1e-6).any():
+        raise ValueError(
+            "Found negative Paid off capacities. This indicates that the harmonized PyPSA capacities "
+            "exceed the REMIND capacities. Please check the harmonization step."
+        )
+
+    return (
+        merged.groupby(["tech_group", "year"])
+        .paid_off.sum()
+        .clip(lower=0)
+        .reset_index()
+        .rename(columns={"paid_off": "Capacity"})
+    )
+
+
+def calc_paidoff_capacity_multiyear(
     remind_capacities: pd.DataFrame, harmonized_pypsa_caps: dict[str, pd.DataFrame]
 ) -> pd.DataFrame:
     """
