@@ -357,7 +357,8 @@ def map_to_pypsa_tech(
         columns={"PyPSA_tech": "technology", "comment": "further description"},
         inplace=True,
     )
-    mask = weighed_basket.query("unit.str.lower().str.contains('usd')").index
+    weighed_basket.unit = weighed_basket.unit.fillna("")
+    mask = weighed_basket.query("unit.str.contains('usd', case = False)").index
     weighed_basket.loc[mask, "value"] *= currency_conversion
     weighed_basket.loc[mask, "unit"] = (
         weighed_basket.loc[mask, "unit"].str.lower().str.replace("usd", "EUR")
