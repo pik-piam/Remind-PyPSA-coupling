@@ -117,7 +117,7 @@ def calc_paidoff_capacity(
         )
         .reset_index()
     )
-    pypsa_caps.year = pypsa_caps.year.astype(int)
+    pypsa_caps["year"] = pypsa_caps.remind_year.astype(int)
     remind_caps = remind_capacities.groupby(["tech_group", "year"]).capacity.sum().reset_index()
     merged = pd.merge(
         remind_caps,
@@ -160,7 +160,7 @@ def calc_paidoff_capacity_multiyear(
     """
     if harmonized_pypsa_caps == {}:
         raise ValueError("Harmonized PyPSA capacities must be provided.")
-    
+
     # merge all years of harmonized capacities into a single DataFrame
     def grp(df, yr):
         return df.groupby("tech_group").apply(
@@ -172,7 +172,7 @@ def calc_paidoff_capacity_multiyear(
     grouped_by_tech = [grp(df, yr) for yr, df in harmonized_pypsa_caps.items() if not df.empty]
     if not grouped_by_tech:
         raise ValueError("No harmonized capacities provided for any year.")
-    
+
     pypsa_caps = pd.concat(grouped_by_tech)
     pypsa_caps.year = pypsa_caps.year.astype(int)
     remind_caps = remind_capacities.groupby(["tech_group", "year"]).capacity.sum().reset_index()
