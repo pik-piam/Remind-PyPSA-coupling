@@ -81,11 +81,11 @@ def convert_remind_capacities(
     """conversion for capacities
 
     Args:
-        frames (dict): dictionary of dataframes with capacities
+        frames (dict): dictionary of dataframes with capacities (name, data)
         region (str, Optional): region to filter the data by
         cutoff (int, Optional): min capacity in MW
     Returns:
-        pd.DataFrame: converted capacities (year: load type, value in Mwh)
+        pd.DataFrame: converted capacities (year: load type, value in MW)
     """
     TW2MW = 1e6
     caps = frames["capacities"]
@@ -184,7 +184,7 @@ def harmonize_capacities_all_years(
         pypsa_caps = pypsa_capacities.query("DateIn <= @yr & DateOut > @yr")
 
         scaled_down_caps = scale_down_capacities(pypsa_caps, remind_capacities.query("year == @yr"))
-        scaled_down_caps["PLAN_YEAR"] = yr
+        scaled_down_caps["remind_year"] = yr
 
         harmonized = pd.concat([harmonized, scaled_down_caps], axis=0)
 
@@ -212,7 +212,7 @@ def harmonize_capacities_multi_year(
     harmonized = {}
     for year, pypsa_caps in pypsa_capacities.items():
         logger.debug(f"Harmonizing capacities for year {year}")
-        yr = int(year)
+        yr = int(year) # noqa
         scaled_down_caps = scale_down_capacities(pypsa_caps, remind_capacities.query("year == @yr"))
         harmonized[year] = scaled_down_caps
 

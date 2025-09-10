@@ -105,9 +105,8 @@ def calc_paidoff_capacity(
         pd.DataFrame: DataFrame with the available paid off capacity by tech group.
     """
 
-    harmonized_pypsa_caps.rename(columns={"PLAN_YEAR": "year"}, inplace=True)
     pypsa_caps = (
-        harmonized_pypsa_caps.groupby(["year", "tech_group"])
+        harmonized_pypsa_caps.groupby(["remind_year", "tech_group"])
         .apply(
             lambda x: pd.Series(
                 {
@@ -131,8 +130,8 @@ def calc_paidoff_capacity(
     merged["paid_off"] = merged.capacity_remind - merged.capacity_pypsa
     if (merged.paid_off < -1e-6).any():
         raise ValueError(
-            "Found negative Paid off capacities. This indicates that the harmonized PyPSA capacities "
-            "exceed the REMIND capacities. Please check the harmonization step."
+            "Found negative Paid off capacities. This indicates that harmonized PyPSA capacities"
+            " exceed the REMIND capacities. Please check the harmonization step."
         )
 
     return (
