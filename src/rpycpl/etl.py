@@ -122,6 +122,12 @@ def technoeconomic_data(
         years (Optional[list]): years to consider, if None REMIND capex years is used
     Returns:
         pd.DataFrame: dataframe with the mapped techno-economic data
+    Raises:
+        ValueError: if mappers not allowed
+        ValueError: if columns not expected
+        ValueError: if proxy learning (use_remind_with_learning_from) is used
+            for something other than invest
+
     """
 
     # explode multiple references into rows
@@ -177,16 +183,23 @@ def harmonize_capacities_all_years(
         dict[str, pd.DataFrame]: Dictionary with the harmonized capacities
             {year: harmonized_capacities}.
     """
+    start_date_candidates = ["DateIn", "Start year"]
+    end_date_candidates = ["DateOut", "Retired year"]
+    start_col = [c for c in start_date_candidates if c in pypsa_capacities][0]
+    end_col = [c for c in end_date_candidates if c in pypsa_capacities][0]
+    pypsa_capacities.fillna({end_col:1e9}, inplace=True)
+
     years = remind_capacities.year.unique()
     harmonized = pd.DataFrame()
     for yr in years:
         logger.debug(f"Harmonizing capacities for year {yr}")
-        pypsa_caps = pypsa_capacities.query("DateIn <= @yr & DateOut > @yr")
+        pypsa_caps = pypsa_capacities.query(f"`{start_col}` <= @yr & `{end_col}` > @yr")
 
         scaled_down_caps = scale_down_capacities(pypsa_caps, remind_capacities.query("year == @yr"))
-        scaled_down_caps["remind_year"] = yr
-
-        harmonized = pd.concat([harmonized, scaled_down_caps], axis=0)
+        # re-add missing tech groups, remind year
+        harmed = pd.concat([scaled_down_caps, pypsa_caps.query("tech_group in [None, '']")], axis=0)
+        harmed["remind_year"] = yr
+        harmonized = pd.concat([harmonized, harmed], axis=0)
 
     return harmonized.reset_index(drop=True)
 
@@ -239,7 +252,10 @@ def paidoff_capacities(
     Returns:
         pd.DataFrame: DataFrame with the available paid-off capacity by tech group.
     """
+    capacity_col_candidates = ["Capacity", "capacity", "Capacity (MW)"]
+    capacity_col = [c for c in capacity_col_candidates if c in harmonized_pypsa_caps][0]
+
     logger.info(f"Calculating paid-off capacities with scale factor: {scale}")
-    paid_off = calc_paidoff_capacity(remind_capacities, harmonized_pypsa_caps)
-    paid_off.loc[:, "Capacity"] *= scale
+    paid_off = calc_paidoff_capacity(remind_capacities, harmonized_pypsa_caps, capacity_col=capacity_col)
+    paid_off.loc[:, capacity_col] *= scale
     return paid_off

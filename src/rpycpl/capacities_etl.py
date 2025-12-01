@@ -55,15 +55,20 @@ def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd
         >> {'hydro': {('Capacity', 'node1'): 120, ('Capacity', 'node2'): 180}, # scaled down
                 'wind': {('Capacity', 'node1'): 20, ('Capacity', 'node2'): 120}}) # untouched
     """
+    capacity_col_candidates = ["Capacity", "capacity", "Capacity (MW)"]
+    capacity_col = [c for c in capacity_col_candidates if c in to_scale][0]
+
+    # to_scale = to_scale.rename(columns={capacity_col: "Capacity"})
     if reference.year.nunique() > 1:
         raise ValueError("The reference capacities should be for a single year")
+
     # group the target & ref capacities by tech group
     group_totals_ref = reference.groupby(["tech_group"]).capacity.sum()
     to_scale.loc[:, "group_fraction"] = (
-        to_scale.groupby("tech_group").Capacity.transform(lambda x: x / x.sum()).values
+        to_scale.groupby("tech_group")[capacity_col].transform(lambda x: x / x.sum()).values
     )
 
-    missing = to_scale.query("tech_group == ''")[["Fueltype", "Tech"]].drop_duplicates()
+    missing = to_scale.query("tech_group == ''")[["Type"]].drop_duplicates()
     if not missing.empty:
         logger.warning(
             "Some technologies are not assigned to a tech group. "
@@ -77,13 +82,13 @@ def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd
         group_totals_ref = pd.concat([group_totals_ref, pd.Series(0, index=not_in_ref)])
 
     # clip the capacities so they don't exceed the existing (excess will be added as paid-off)
-    to_scale.rename(columns={"Capacity": "original_capacity"}, inplace=True)
+    to_scale.rename(columns={capacity_col: "original_capacity"}, inplace=True)
     allocated_caps = to_scale.groupby("tech_group")["original_capacity"].sum()
     group_totals_ref = group_totals_ref.clip(upper=allocated_caps).fillna(group_totals_ref)
 
     # perform the scaling (normalised target capacities * ref capacities)
     logger.info("applying scaling to capacities")
-    to_scale.loc[:, "Capacity"] = to_scale.groupby("tech_group").group_fraction.transform(
+    to_scale.loc[:, capacity_col] = to_scale.groupby("tech_group").group_fraction.transform(
         lambda x: x * group_totals_ref[x.name]
     )
 
@@ -91,7 +96,9 @@ def scale_down_capacities(to_scale: pd.DataFrame, reference: pd.DataFrame) -> pd
 
 
 def calc_paidoff_capacity(
-    remind_capacities: pd.DataFrame, harmonized_pypsa_caps: pd.DataFrame
+    remind_capacities: pd.DataFrame,
+    harmonized_pypsa_caps: pd.DataFrame,
+    capacity_col: str = "Capacity",
 ) -> pd.DataFrame:
     """
     Calculate the aditional paid off capacity available to pypsa from REMIND investment decisions.
@@ -101,6 +108,7 @@ def calc_paidoff_capacity(
     Args:
         remind_capacities (pd.DataFrame): DataFrame with remind capacities in MW.
         harmonized_pypsa_caps (pd.DataFrame): harmonized pypsa capacities by year (capped to REMIND cap)
+        capacity_col (str): Name of the capacity column in harmonized_pypsa_caps. Defaults to "Capacity".
     Returns:
         pd.DataFrame: DataFrame with the available paid off capacity by tech group.
     """
@@ -110,8 +118,8 @@ def calc_paidoff_capacity(
         .apply(
             lambda x: pd.Series(
                 {
-                    "capacity": x.Capacity.sum(),
-                    "techs": ",".join(x.Tech.unique()),
+                    "capacity": x[capacity_col].sum(),
+                    "techs": ",".join(x.Type.unique()),
                 }
             )
         )
@@ -139,7 +147,7 @@ def calc_paidoff_capacity(
         .paid_off.sum()
         .clip(lower=0)
         .reset_index()
-        .rename(columns={"paid_off": "Capacity"})
+        .rename(columns={"paid_off": capacity_col})
     )
 
 
