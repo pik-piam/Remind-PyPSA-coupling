@@ -50,6 +50,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
+    environment:
+      name: pypi
+      url: https://pypi.org/p/REMIND-PyPSA-coupling
     permissions:
       id-token: write  # Required for trusted publishing
     steps:
