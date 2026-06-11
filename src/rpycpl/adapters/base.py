@@ -97,16 +97,29 @@ class CouplingAdapter(ABC):
             prices, currency_factor=self.config.get("currency_factor", 1.0), carbon_to_co2=False
         )
 
-    def downscale_country_demand(self) -> pd.DataFrame:
+    def build_regional_demand(self) -> pd.DataFrame:
+        """Read REMIND regional sectoral demand as tidy ``[year, region, sector, value]`` (MWh/yr).
+
+        Stage 1 of the demand pipeline: read the load-sector symbol (TWa→MWh applied by
+        ``load_frame``) and restrict to the configured REMIND regions. All available years are
+        returned; the year restriction to the planning horizons happens in
+        ``downscale_country_demand`` (Stage 2). Workflows that keep the regional load as a
+        separate artefact (e.g. PyPSA-Eur's two-rule pipeline) call this directly.
+        """
+        raw = load_frame(self.loader, self.symbols["load_sector"])
+        raw["year"] = raw["year"].astype(int)
+        return convert_loads(raw, regions=self.remind_regions, unit_factor=1.0)
+
+    def downscale_country_demand(self, regional: pd.DataFrame | None = None) -> pd.DataFrame:
         """Downscale REMIND regional demand to per-country annual demand by sector and year.
 
-        Reads regional REMIND demand, restricts to the planning horizons, then splits each
-        REMIND region across its countries via the SSP population/GDP proxy
-        (``disaggregate_demand_to_country``). Single-country regions pass through unchanged.
+        Stage 2: restrict to the planning horizons, then split each REMIND region across its
+        countries via the SSP population/GDP proxy (``disaggregate_demand_to_country``).
+        Single-country regions pass through unchanged. ``regional`` lets a workflow pass in the
+        Stage-1 frame it already produced (``build_regional_demand``); when omitted it is built
+        from the GDX, so a single call still does the whole pipeline.
         """
-        raw = load_frame(self.loader, self.symbols["load_sector"])  # TWa→MWh applied here
-        raw["year"] = raw["year"].astype(int)
-        loads = convert_loads(raw, regions=self.remind_regions, unit_factor=1.0)
+        loads = self.build_regional_demand() if regional is None else regional
         if self.config.get("planning_horizons"):
             years = {int(y) for y in self.config["planning_horizons"]}
             loads = loads[loads["year"].isin(years)]
@@ -118,6 +131,20 @@ class CouplingAdapter(ABC):
             self.config["sector_weights"],
             set(self.config["countries"]),
         )
+
+    def discount_rates(self, year: int) -> pd.Series:
+        """Return the REMIND discount rate per region for ``year``, indexed by region.
+
+        Reads the ``discount_rate`` symbol (REMIND ``p_r``) through the loader + central symbol
+        config and filters to the configured REMIND regions. Raises if any configured region is
+        missing a rate for the year.
+        """
+        p_r = load_frame(self.loader, self.symbols["discount_rate"])
+        p_r = p_r[(p_r["year"].astype(str) == str(year)) & (p_r["region"].isin(self.remind_regions))]
+        missing = set(self.remind_regions) - set(p_r["region"])
+        if missing:
+            raise ValueError(f"No REMIND discount rate for year {year}, regions: {sorted(missing)}")
+        return p_r.set_index("region")["value"]
 
     def determine_must_build_capacity(self, tech_map: pd.DataFrame) -> pd.DataFrame:
         """Determine the per-(year, region, carrier) REMIND capacity floors (``p_nom_min``).
