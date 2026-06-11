@@ -57,7 +57,7 @@ def make_yaml_nav():
         full_doc_path = doc_path  # Fix to remove 'reference' prefix
         nav[parts] = full_doc_path
 
-        return nav
+    return nav
 
 
 nav = make_yaml_nav()

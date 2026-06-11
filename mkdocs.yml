@@ -5,6 +5,15 @@ theme:
   name: "material"
 docs_dir: "./docs"
 
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
 # Due to snakemake workflow, we need to include the 'scripts' directory in the python path
 plugins:
 - search
@@ -21,8 +30,7 @@ plugins:
 
 nav:
   - Home: index.md
-  - Tutorials: tutorials.md
-  - Objects & Data: objects.md
-  - Transformations: transformations.md
-  - Reference: 
+  - Architecture: architecture.md
+  - Plugging into a PyPSA workflow: workflow.md
+  - Reference:
     - Reference.md
