@@ -1,0 +1,113 @@
+# Central REMIND symbol map — one place for all GDX/.mif variable names AND their units.
+#
+# A logical name is one of two shapes:
+#
+# (1) Single-quantity symbol — maps a name (or candidate list) to one quantity:
+#       symbol:  a source-symbol name OR an ordered candidate list (first present wins —
+#                absorbs run/version renames, e.g. v32_* with p32_* fallback). Backend-neutral:
+#                the same key addresses a GDX symbol or an IAMC `.mif` variable.
+#       rename:  source domain column -> canonical column ({year, region, technology, ...})
+#       unit / units / to_unit:  OPTIONAL unit conversion (see below). Resolved via the central
+#                (from_unit, to_unit) -> factor table in rpycpl.units. Applied by `load_frame`.
+#         - unit:    a single source unit for the whole entry, OR
+#         - units:   a list parallel to the `symbol:` candidates (unit of whichever resolves) —
+#                    use when a fallback symbol reports in a different unit than the primary.
+#         - to_unit: the PyPSA target unit. Conversion is applied only when both are present;
+#                    identical units (or no `to_unit`) leave values untouched.
+#       unit_factor: OPTIONAL legacy scalar multiplier (kept for simple ad-hoc conversions).
+#
+# (2) Mixed-unit set symbol — ONE symbol whose `index` column selects several quantities with
+#     different units (e.g. pm_data indexed by `char` -> lifetime/FOM/VOM). Loaded by `load_set`:
+#       index:   the (renamed) column whose value selects the quantity
+#       schema:  index-value -> {parameter, unit, to_unit}; each row is converted independently.
+#
+# Schema: a single `default` section plus per-REMIND-region `overrides`.
+#   overrides: keyed by REMIND region name; each region lists ONLY the logical names whose spec
+#              DIFFERS from `default` (everything else, including units/schema, is inherited).
+# rpycpl ships these as defaults; a model may overlay its own YAML via load_symbol_specs(path=...)
+# or the RPYCPL_SYMBOLS env var (deep-merged on top).
+
+default:
+  co2_price:
+    symbol: [v32_taxCO2eq, p_priceCO2]
+    rename: {tall: year, all_regi: region}
+    units: [$/tC, $/tC]      # both REMIND vintages report carbon price per tonne C
+    to_unit: $/tCO2          # -> factor 12/44 from the central table
+  load_sector:
+    symbol: [v32_load_sector, p32_load_sector]
+    rename: {ttot: year, all_regi: region, loadPy32: sector, level: value}
+    unit: TWa
+    to_unit: MWh             # year-average power -> annual energy (1e6 * 8760)
+  capacity:
+    symbol: p32_capAvg
+    rename: {ttot: year, all_regi: region, all_te: technology}
+    unit: TW
+    to_unit: MW              # 1e6
+  cost_investment:
+    symbol: p32_capCost
+    rename: {ttot: year, all_regi: region, all_te: technology}
+    unit: T$/TW
+    to_unit: $/MW            # 1e6 (storage techs share the factor; relabelled $/MWh in the adapter)
+  efficiency_conv:
+    symbol: pm_eta_conv
+    rename: {tall: year, all_regi: region, all_te: technology}
+    unit: p.u.               # p.u. -> p.u. (identity); per-tech quirks handled in the adapter
+  efficiency_data:
+    symbol: pm_dataeta
+    rename: {tall: year, all_regi: region, all_te: technology}
+    unit: p.u.
+  tech_data:                 # pm_data — mixed-unit set, indexed by `char`
+    symbol: pm_data
+    rename: {all_regi: region, all_te: technology}
+    index: char
+    schema:
+      lifetime: {parameter: lifetime, unit: yr,     to_unit: yr}        # factor 1
+      omf:      {parameter: FOM,      unit: p.u.,   to_unit: "%/yr"}    # x100
+      omv:      {parameter: VOM,      unit: T$/TWa, to_unit: $/MWh}     # x1e6/8760
+  emission_factor:
+    symbol: pm_emifac
+    rename:
+      tall_0: year
+      all_regi_1: region
+      all_enty_2: from_carrier
+      all_enty_3: to_carrier
+      all_te_4: technology
+      all_enty_5: emission_type
+    unit: Gt_C/TWa
+    to_unit: t_CO2/MWh       # filtered to seel/co2 in the adapter; factor is uniform
+  fuel_price:
+    symbol: p32_PEPriceAvg
+    rename: {ttot: year, all_regi: region, all_enty: technology}
+    unit: T$/TWa             # converted in the adapter (the `peur` fuel is a per-tech exception)
+  discount_rate:
+    symbol: p_r
+    rename: {ttot: year, all_regi: region}
+  coupled_years:
+    symbol: t
+    rename: {ttot: year}
+
+overrides:
+  # Keyed by REMIND region name. Each region lists only the logical names that differ from
+  # `default`; units and the tech_data schema are inherited unless re-stated here.
+  CHA:
+    # PyPSA-China couples REMIND region CHA from a RAW REMIND fulldata GDX, so a few names are the
+    # native REMIND symbols (not the curated p32_* coupling exports the EUR interface uses).
+    co2_price:
+      symbol: [pm_taxCO2eq]
+      rename: {ttot: year, all_regi: region}
+      units: [$/tC]
+      to_unit: $/tCO2
+    capacity:                       # variable -> 'level'; summed over rlf grades downstream
+      symbol: vm_cap
+      rename: {tall: year, all_regi: region, all_te: technology, level: value}
+      unit: TW
+      to_unit: MW
+    model_version:
+      symbol: c_model_version
+    run_name:
+      symbol: c_expname
+    # NOTE: tech_data / efficiency_* / emission_factor / discount_rate are identical to `default`
+    # for CHA, so they are inherited (including the tech_data schema and all units) — not repeated.
+    # TODO(china): the raw fulldata GDX has no p32_load_sector / p32_capCost coupling exports.
+    #   load_sector and cost_investment must be derived from native FE-demand symbols
+    #   (pm_fedemand / cesIO) and a China cost symbol — pending the China export convention.

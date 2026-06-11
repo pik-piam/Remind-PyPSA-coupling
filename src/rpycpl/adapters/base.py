@@ -1,0 +1,239 @@
+"""The IAM→PyPSA coupling adapter interface.
+
+A concrete adapter lives in each PyPSA model's repo and subclasses this. The Stage-1
+(country-level) builders are concrete here — they compose the shared loader + transforms +
+downscaler, driven by a resolved ``symbols`` map (from ``rpycpl.io.remind_symbols.load_symbol_specs``)
+and a ``config`` dict.
+
+Design: the base is a *convenience baseline, not a straitjacket* — every ``build_*`` /
+``prepare_*`` method is overridable, and only ``build_config_overrides`` is abstract (the PyPSA
+config-key structure genuinely differs per workflow). Everything else (REMIND I/O, unit
+factors, downscaling) is REMIND-side and model-agnostic, so it is inherited.
+
+config keys used: ``currency_factor``, ``sector_weights``, ``countries``,
+``planning_horizons``, optional ``link_techs`` (capacity output→input adjustment).
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Any
+
+import pandas as pd
+
+from rpycpl.downscale.demand import disaggregate_demand_to_country
+from rpycpl.io.remind_symbols import load_frame, load_set
+from rpycpl.transforms.capacities import (
+    adjust_link_capacities_to_input,
+    aggregate_capacities_to_carriers,
+    convert_capacities,
+)
+from rpycpl.transforms.co2_prices import convert_co2_prices, extract_co2_prices
+from rpycpl.transforms.costs import (
+    build_cost_overrides,
+    convert_investment_to_input_capacity_basis,
+    merge_cost_overrides_into_baseline,
+)
+from rpycpl.transforms.loads import convert_loads
+from rpycpl.units import HOURS_PER_YEAR, unit_factor
+
+
+class CouplingAdapter(ABC):
+    """Standardize how a concrete model exposes REMIND-derived inputs to PyPSA."""
+
+    def __init__(
+        self,
+        loader,
+        symbols: dict[str, Any],
+        region_map: dict[str, list[str]],
+        config: dict[str, Any],
+        *,
+        remind_regions: list[str] | None = None,
+        # Named reference/proxy distributions, e.g. {"population": df, "gdp": df}. Open-ended on
+        # purpose: any builder can look up what it needs by key, so new reference data (a new
+        # downscaling proxy, a calibration series) is added without changing this signature.
+        # Optional — only needed when a model has multi-country REMIND regions to split; a
+        # single-country coupling (e.g. CHA → CN) may pass nothing.
+        reference_data: dict[str, pd.DataFrame] | None = None,
+        # Convenience aliases for the two SSP proxies; folded into reference_data below.
+        ssp_population: pd.DataFrame | None = None,
+        ssp_gdp: pd.DataFrame | None = None,
+    ) -> None:
+        """Bind the loader, resolved symbol map, region map, config, and reference data."""
+        self.loader = loader
+        self.symbols = symbols
+        self.region_map = region_map
+        self.config = config
+        self.remind_regions = remind_regions or list(region_map)
+        self.reference_data: dict[str, pd.DataFrame] = dict(reference_data or {})
+        if ssp_population is not None:
+            self.reference_data.setdefault("population", ssp_population)
+        if ssp_gdp is not None:
+            self.reference_data.setdefault("gdp", ssp_gdp)
+
+    @property
+    def ssp_population(self) -> pd.DataFrame | None:
+        """The SSP population proxy from ``reference_data`` (``None`` if unset)."""
+        return self.reference_data.get("population")
+
+    @property
+    def ssp_gdp(self) -> pd.DataFrame | None:
+        """The SSP GDP proxy from ``reference_data`` (``None`` if unset)."""
+        return self.reference_data.get("gdp")
+
+    # -- generic Stage-1 builders (all overridable) ---------------------------------
+
+    def build_co2_prices(self) -> pd.DataFrame:
+        """Build the per-(region, year) CO2 price pathway.
+
+        The tC→tCO2 conversion is declared in the symbol config and applied by ``load_frame``,
+        so here only the (runtime, config-driven) currency factor is applied.
+        """
+        raw = load_frame(self.loader, self.symbols["co2_price"])
+        prices = extract_co2_prices(
+            raw, regions=self.remind_regions, years=self.config.get("planning_horizons")
+        )
+        return convert_co2_prices(
+            prices, currency_factor=self.config.get("currency_factor", 1.0), carbon_to_co2=False
+        )
+
+    def downscale_country_demand(self) -> pd.DataFrame:
+        """Downscale REMIND regional demand to per-country annual demand by sector and year.
+
+        Reads regional REMIND demand, restricts to the planning horizons, then splits each
+        REMIND region across its countries via the SSP population/GDP proxy
+        (``disaggregate_demand_to_country``). Single-country regions pass through unchanged.
+        """
+        raw = load_frame(self.loader, self.symbols["load_sector"])  # TWa→MWh applied here
+        raw["year"] = raw["year"].astype(int)
+        loads = convert_loads(raw, regions=self.remind_regions, unit_factor=1.0)
+        if self.config.get("planning_horizons"):
+            years = {int(y) for y in self.config["planning_horizons"]}
+            loads = loads[loads["year"].isin(years)]
+        return disaggregate_demand_to_country(
+            loads,
+            self.region_map,
+            self.ssp_population,
+            self.ssp_gdp,
+            self.config["sector_weights"],
+            set(self.config["countries"]),
+        )
+
+    def determine_must_build_capacity(self, tech_map: pd.DataFrame) -> pd.DataFrame:
+        """Determine the per-(year, region, carrier) REMIND capacity floors (``p_nom_min``).
+
+        Returns the REMIND capacity *level* (TW→MW, output→input basis for link techs, mapped to
+        PyPSA carriers) as a lower bound the model must build to. This is the floor, **not** the
+        must-build delta vs. brownfield (``max(0, REMIND − existing)``) — that subtraction needs
+        the model's own existing fleet and is done in-model at network-build time.
+        """
+        raw = load_frame(self.loader, self.symbols["capacity"])  # TW→MW applied here
+        caps = convert_capacities(raw, unit_factor=1.0)
+        caps = self.prepare_capacities(caps)
+        link_techs = set(self.config.get("link_techs", []))
+        if link_techs and "efficiency_conv" in self.symbols:
+            eff = load_frame(self.loader, self.symbols["efficiency_conv"]).rename(
+                columns={"value": "efficiency"}
+            )
+            caps = adjust_link_capacities_to_input(caps, eff, link_techs)
+        return aggregate_capacities_to_carriers(caps, tech_map)
+
+    def prepare_capacities(self, caps: pd.DataFrame) -> pd.DataFrame:
+        """Hook for REMIND-tech-specific capacity prep (e.g. VRE-variant merge, battery scaling).
+
+        Default is identity (no prep). Override in a concrete adapter where the model needs it
+        (PyPSA-Eur does; PyPSA-China does not). Operates on ``[year, region, technology, value]``.
+        """
+        return caps
+
+    def adjust_cost_efficiencies(self, eff: pd.DataFrame) -> pd.DataFrame:
+        """Hook for model-specific efficiency tweaks during cost extraction (default: none).
+
+        The generic REMIND fuel-efficiency conversions (``fnrs``/``tnrs``) are applied in
+        ``extract_cost_parameters`` before this hook. Model-specific per-tech quirks belong here —
+        e.g. PyPSA-Eur squares the ``btin`` (battery inverter) round-trip efficiency. Operates on
+        the long efficiency frame ``[region, technology, value, parameter, unit]``.
+        """
+        return eff
+
+    def extract_cost_parameters(self, year: int) -> pd.DataFrame:
+        """Extract REMIND cost parameters as long ``[region, reference, parameter, value, unit]``.
+
+        Unit conversions are config-declared: ``load_frame``/``load_set`` apply the symbol's
+        ``unit``/``to_unit`` (or per-row ``schema``) via the central ``rpycpl.units`` table. What
+        remains here is REMIND *semantics* — which symbol holds what, the carrier filter, and the
+        handful of genuine per-technology exceptions (``fnrs``/``tnrs``/``btin`` efficiencies,
+        ``peur`` fuel, the storage cost label) that are tech facts, not unit math. Override only
+        if a model's REMIND interface genuinely diverges.
+        """
+        y = str(year)
+        load = lambda name: load_frame(self.loader, self.symbols[name])  # noqa: E731
+
+        # investment: T$/TW→$/MW applied in load_frame; storage techs share the factor, only the
+        # label differs ($/MWh vs $/MW).
+        costs = load("cost_investment").query("year == @y").copy()
+        costs["parameter"] = "investment"
+        costs["unit"] = "USD/MW"
+        costs.loc[costs["technology"].isin(["h2stor", "btstor"]), "unit"] = "USD/MWh"
+
+        # tech_data: mixed-unit set (lifetime/FOM/VOM) — split + converted per the YAML schema.
+        techd = load_set(self.loader, self.symbols["tech_data"])
+
+        # CO2 intensity: Gt_C/TWa→t_CO2/MWh applied in load_frame; here just the carrier filter.
+        co2i = load("emission_factor").query(
+            "to_carrier == 'seel' & emission_type == 'co2' & year == @y"
+        ).copy()
+        co2i = co2i.assign(parameter="CO2 intensity", unit="t_CO2/MWh_th")
+
+        # efficiency: p.u. (identity); the per-tech exceptions below are REMIND tech facts.
+        eta = load("efficiency_conv").query("year == @y")
+        dataeta = load("efficiency_data").query("year == @y")
+        keys = set(zip(eta["region"], eta["technology"]))
+        fallback = dataeta[
+            ~pd.MultiIndex.from_arrays([dataeta["region"], dataeta["technology"]]).isin(keys)
+        ]
+        eff = pd.concat([eta, fallback]).assign(parameter="efficiency", unit="p.u.")
+        eff.loc[eff["technology"].isin(["fnrs", "tnrs"]), "value"] *= HOURS_PER_YEAR / 1e6
+        eff.loc[eff["technology"].isin(["fnrs", "tnrs"]), "unit"] = "MWh/g_U"
+        eff = self.adjust_cost_efficiencies(eff)
+
+        # fuel: T$/TWa→$/MWh for all but the per-tech exception `peur` (already $/g_U).
+        fuel = load("fuel_price").query("year == @y").copy()
+        fuel["parameter"] = "fuel"
+        fuel.loc[fuel["technology"] != "peur", "value"] *= unit_factor("T$/TWa", "$/MWh")
+        fuel["unit"] = "USD/MWh_th"
+        fuel.loc[fuel["technology"] == "peur", "unit"] = "USD/g_U"
+
+        df = pd.concat([costs, techd, co2i, eff, fuel])[
+            ["region", "technology", "parameter", "value", "unit"]
+        ].rename(columns={"technology": "reference"})
+        return df[df["region"].isin(self.remind_regions)]
+
+    def build_costs(
+        self, year: int, tech_map: pd.DataFrame, baseline: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Assemble REMIND cost overrides onto the PyPSA baseline (shared mechanics).
+
+        Extraction is delegated to ``extract_cost_parameters``; this maps to carriers, converts
+        investment to input-capacity basis, and merges onto the baseline. Per-workflow
+        annualisation (``capital_cost``) is done model-side (it depends on PyPSA's ``prepare_costs``).
+        """
+        remind_long = self.extract_cost_parameters(year)
+        overrides = build_cost_overrides(tech_map, remind_long)
+        overrides = convert_investment_to_input_capacity_basis(overrides)
+        return merge_cost_overrides_into_baseline(baseline, overrides)
+
+    # -- model-specific (abstract) --------------------------------------------------
+
+    @abstractmethod
+    def build_config_overrides(self) -> dict[str, Any]:
+        """Return a nested dict of PyPSA config keys whose values come from REMIND, not the user.
+
+        Used by each model's ``build_co2_prices``-style rule to patch the run config before the
+        network is built — e.g. ``{"co2_price": [...], "planning_horizons": [...],
+        "run": {"name": ..., "version": ...}}``. It is the only abstract method because this
+        key *structure* genuinely differs per workflow (PyPSA-Eur and PyPSA-China nest it
+        differently); every other builder is REMIND-side and inherited. Keys not derived from
+        REMIND stay in the workflow's own config and are not returned here.
+        """
+        ...
