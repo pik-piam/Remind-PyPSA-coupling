@@ -12,15 +12,18 @@ Research's [Energy Transition Lab](https://www.pik-potsdam.de/en/institute/labs/
 
 The interface to the PSM models' snakemake workflow is exposed via a thin `CouplingAdapter`. Each snakemake workflow subclasses this into a custom **adapter** with any required tweaks. 
 
-> **REMIND-side logic lives in the package. PyPSA-side logic lives in the model.**
-
-> The adapter is the seam where the two meet.
+!!! tip "Split"
+    REMIND-side logic lives in the package. PyPSA-side logic lives in the model.
+    The adapter interface is the seam where the two meet.
 
 ## Start here
 
-- **[Architecture & usage](architecture.md)** — how the components fit together, what
-  belongs in the package versus the local adapter, a worked PyPSA-Eur example, and how to
-  add a new model such as PyPSA-Earth.
+- **[Architecture](architecture.md)** — how the components fit together, what belongs in the
+  package versus the local adapter, the `CouplingAdapter` interface, and the symbol/unit
+  config.
+- **[Plugging into a PyPSA workflow](workflow.md)** — the hands-on guide: write an adapter,
+  wire the thin Snakemake rules, a worked PyPSA-Eur example, and how to add a new model such
+  as PyPSA-Earth.
 - **Reference** (in the nav) — the auto-generated API reference for every module.
 
 ## What the package provides
@@ -28,7 +31,7 @@ The interface to the PSM models' snakemake workflow is exposed via a thin `Coupl
 | Operations | Module(s) |
 |---|---|
 | Read REMIND output (GDX / IAMC) | `rpycpl.io` — `RemindLoader`, `remind_symbols` |
-| Logical-name → symbol map + units | `data/remind_symbols.yaml`, `rpycpl.units` |
+| Coupling-name → REMIND symbol map + units | `data/remind_symbols.yaml`, `rpycpl.units` |
 | Tidy-frame transforms (CO₂, loads, capacities, costs, mapping) | `rpycpl.transforms` |
 | Region → country downscaling (SSP proxies) | `rpycpl.downscale`, `rpycpl.io.ssp` |
 | The coupling adapter interface | `rpycpl.adapters.CouplingAdapter` |

@@ -127,7 +127,7 @@ from rpycpl.io.remind_symbols import load_frame
 from rpycpl.transforms.co2_prices import extract_co2_prices, convert_co2_prices
 
 loader  = RemindLoader("REMIND2PyPSA.gdx")        # 1. open source (backend auto-detected)
-symbols = load_symbol_specs(region=None)          # 2. resolve logical names (+ overrides)
+symbols = load_symbol_specs(region=None)          # 2. resolve coupling names → symbols (+ overrides)
 raw     = load_frame(loader, symbols["co2_price"]) # 3. load + unit-convert (tC→tCO2 here)
 prices  = convert_co2_prices(                      # 4. transform (no double conversion)
     extract_co2_prices(raw, regions=regions, years=years),
