@@ -1,33 +1,26 @@
 """The IAM→PyPSA coupling adapter interface.
 
-A concrete adapter lives in each PyPSA model's repo and subclasses this. The Stage-1
-(country-level) builders are concrete here — they compose the shared loader + transforms +
-downscaler, driven by a resolved ``symbols`` map (from ``rpycpl.io.remind_symbols.load_symbol_specs``)
-and a ``config`` dict.
+The builders are concrete here — they compose the shared loader + transforms + downscaler,
+driven by a resolved ``symbols`` map (from ``rpycpl.io.remind_symbols.load_symbol_specs``) and a
+``config`` dict. The class is **directly instantiable**: it is used as-is wherever a coupling
+needs several REMIND reads through one loader (e.g. cost extraction). Model-specific tweaks can
+still be added by subclassing and overriding a builder, but no override is required.
 
-Design: the base is a *convenience baseline, not a straitjacket* — every ``build_*`` /
-``prepare_*`` method is overridable, and only ``build_config_overrides`` is abstract (the PyPSA
-config-key structure genuinely differs per workflow). Everything else (REMIND I/O, unit
-factors, downscaling) is REMIND-side and model-agnostic, so it is inherited.
+REMIND-GDX-interface specifics (capacity consolidation: VRE merge, battery scaling, link techs)
+live in the symbol config (``capacity.consolidation``), not here, so they are strictly scoped to
+the REMIND input and an IAMC/.mif config can omit them.
 
-config keys used: ``currency_factor``, ``sector_weights``, ``countries``,
-``planning_horizons``, optional ``link_techs`` (capacity output→input adjustment).
+config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``planning_horizons``.
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import Any
 
 import pandas as pd
 
 from rpycpl.downscale.demand import disaggregate_demand_to_country
 from rpycpl.io.remind_symbols import load_frame, load_set
-from rpycpl.transforms.capacities import (
-    adjust_link_capacities_to_input,
-    aggregate_capacities_to_carriers,
-    convert_capacities,
-)
 from rpycpl.transforms.co2_prices import convert_co2_prices, extract_co2_prices
 from rpycpl.transforms.costs import (
     build_cost_overrides,
@@ -38,8 +31,8 @@ from rpycpl.transforms.loads import convert_loads
 from rpycpl.units import HOURS_PER_YEAR, unit_factor
 
 
-class CouplingAdapter(ABC):
-    """Standardize how a concrete model exposes REMIND-derived inputs to PyPSA."""
+class CouplingAdapter:
+    """Standardize how a model exposes REMIND-derived inputs to PyPSA (directly instantiable)."""
 
     def __init__(
         self,
@@ -146,52 +139,15 @@ class CouplingAdapter(ABC):
             raise ValueError(f"No REMIND discount rate for year {year}, regions: {sorted(missing)}")
         return p_r.set_index("region")["value"]
 
-    def determine_must_build_capacity(self, tech_map: pd.DataFrame) -> pd.DataFrame:
-        """Determine the per-(year, region, carrier) REMIND capacity floors (``p_nom_min``).
-
-        Returns the REMIND capacity *level* (TW→MW, output→input basis for link techs, mapped to
-        PyPSA carriers) as a lower bound the model must build to. This is the floor, **not** the
-        must-build delta vs. brownfield (``max(0, REMIND − existing)``) — that subtraction needs
-        the model's own existing fleet and is done in-model at network-build time.
-        """
-        raw = load_frame(self.loader, self.symbols["capacity"])  # TW→MW applied here
-        caps = convert_capacities(raw, unit_factor=1.0)
-        caps = self.prepare_capacities(caps)
-        link_techs = set(self.config.get("link_techs", []))
-        if link_techs and "efficiency_conv" in self.symbols:
-            eff = load_frame(self.loader, self.symbols["efficiency_conv"]).rename(
-                columns={"value": "efficiency"}
-            )
-            caps = adjust_link_capacities_to_input(caps, eff, link_techs)
-        return aggregate_capacities_to_carriers(caps, tech_map)
-
-    def prepare_capacities(self, caps: pd.DataFrame) -> pd.DataFrame:
-        """Hook for REMIND-tech-specific capacity prep (e.g. VRE-variant merge, battery scaling).
-
-        Default is identity (no prep). Override in a concrete adapter where the model needs it
-        (PyPSA-Eur does; PyPSA-China does not). Operates on ``[year, region, technology, value]``.
-        """
-        return caps
-
-    def adjust_cost_efficiencies(self, eff: pd.DataFrame) -> pd.DataFrame:
-        """Hook for model-specific efficiency tweaks during cost extraction (default: none).
-
-        The generic REMIND fuel-efficiency conversions (``fnrs``/``tnrs``) are applied in
-        ``extract_cost_parameters`` before this hook. Model-specific per-tech quirks belong here —
-        e.g. PyPSA-Eur squares the ``btin`` (battery inverter) round-trip efficiency. Operates on
-        the long efficiency frame ``[region, technology, value, parameter, unit]``.
-        """
-        return eff
-
     def extract_cost_parameters(self, year: int) -> pd.DataFrame:
         """Extract REMIND cost parameters as long ``[region, reference, parameter, value, unit]``.
 
         Unit conversions are config-declared: ``load_frame``/``load_set`` apply the symbol's
         ``unit``/``to_unit`` (or per-row ``schema``) via the central ``rpycpl.units`` table. What
         remains here is REMIND *semantics* — which symbol holds what, the carrier filter, and the
-        handful of genuine per-technology exceptions (``fnrs``/``tnrs``/``btin`` efficiencies,
-        ``peur`` fuel, the storage cost label) that are tech facts, not unit math. Override only
-        if a model's REMIND interface genuinely diverges.
+        handful of genuine per-technology exceptions (``fnrs``/``tnrs`` efficiencies, ``peur``
+        fuel, the storage cost label) that are tech facts, not unit math. Override only if a
+        model's REMIND interface genuinely diverges.
         """
         y = str(year)
         load = lambda name: load_frame(self.loader, self.symbols[name])  # noqa: E731
@@ -222,7 +178,6 @@ class CouplingAdapter(ABC):
         eff = pd.concat([eta, fallback]).assign(parameter="efficiency", unit="p.u.")
         eff.loc[eff["technology"].isin(["fnrs", "tnrs"]), "value"] *= HOURS_PER_YEAR / 1e6
         eff.loc[eff["technology"].isin(["fnrs", "tnrs"]), "unit"] = "MWh/g_U"
-        eff = self.adjust_cost_efficiencies(eff)
 
         # fuel: T$/TWa→$/MWh for all but the per-tech exception `peur` (already $/g_U).
         fuel = load("fuel_price").query("year == @y").copy()
@@ -249,18 +204,3 @@ class CouplingAdapter(ABC):
         overrides = build_cost_overrides(tech_map, remind_long)
         overrides = convert_investment_to_input_capacity_basis(overrides)
         return merge_cost_overrides_into_baseline(baseline, overrides)
-
-    # -- model-specific (abstract) --------------------------------------------------
-
-    @abstractmethod
-    def build_config_overrides(self) -> dict[str, Any]:
-        """Return a nested dict of PyPSA config keys whose values come from REMIND, not the user.
-
-        Used by each model's ``build_co2_prices``-style rule to patch the run config before the
-        network is built — e.g. ``{"co2_price": [...], "planning_horizons": [...],
-        "run": {"name": ..., "version": ...}}``. It is the only abstract method because this
-        key *structure* genuinely differs per workflow (PyPSA-Eur and PyPSA-China nest it
-        differently); every other builder is REMIND-side and inherited. Keys not derived from
-        REMIND stay in the workflow's own config and are not returned here.
-        """
-        ...

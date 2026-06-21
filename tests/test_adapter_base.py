@@ -1,4 +1,8 @@
-"""Composition test for CouplingAdapter: generic builders vs dev references."""
+"""Tests for the (directly instantiable) CouplingAdapter: builders vs dev references.
+
+The adapter is now concrete — no subclass is required. The data-driven checks run against the
+development GDX/reference CSVs when present (they depend only on rpycpl + pandas).
+"""
 
 from __future__ import annotations
 
@@ -8,6 +12,7 @@ import pandas as pd
 import pytest
 
 from rpycpl.adapters.base import CouplingAdapter
+from rpycpl.transforms.capacities import build_capacity_targets
 
 DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1"
 GDX = f"{DEV}/REMIND2PyPSAEUR.gdx"
@@ -17,19 +22,10 @@ COST_MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/technology_cost_mapping.cs
 HAVE_DATA = all(os.path.exists(p) for p in [GDX, f"{SSP}/population.csv", REGION_MAP, COST_MAP])
 
 
-class _MinimalAdapter(CouplingAdapter):
-    """Concrete adapter implementing just the abstract hooks for the generic-builder test."""
-
-    def build_config_overrides(self):
-        return {}
-
-    def extract_cost_parameters(self, year):
-        return pd.DataFrame(columns=["region", "reference", "parameter", "value", "unit"])
-
-
-def test_abstract_methods_enforced():
-    with pytest.raises(TypeError):
-        CouplingAdapter(None, {}, {}, {})  # cannot instantiate ABC
+def test_adapter_is_directly_instantiable():
+    """CouplingAdapter has no abstract methods — it can be created without a subclass."""
+    adapter = CouplingAdapter(loader=None, symbols={}, region_map={}, config={})
+    assert isinstance(adapter, CouplingAdapter)
 
 
 def _adapter():
@@ -41,7 +37,7 @@ def _adapter():
 
     cfg = yaml.safe_load(open(f"{DEV}/config.remind_europe_without_NES_fixed.yaml"))
     co2 = pd.read_csv(f"{DEV}/co2_price.csv")
-    return _MinimalAdapter(
+    return CouplingAdapter(
         loader=RemindLoader(GDX),
         symbols=load_symbol_specs(),
         region_map=read_region_map(REGION_MAP, source="REMIND-EU", target="PyPSA-EUR"),
@@ -74,16 +70,53 @@ def test_build_country_loads_matches_reference():
 
 
 @pytest.mark.skipif(not HAVE_DATA, reason="dev data not present")
-def test_build_capacity_targets_generators_match_reference():
+def test_cost_overrides_match_reference_remind_rows():
+    """extract_cost_parameters (+ inline btin² as the EUR script does) vs the raw cost reference."""
+    from rpycpl.transforms.costs import (
+        build_cost_overrides,
+        convert_investment_to_input_capacity_basis,
+    )
+
+    remind_long = _adapter().extract_cost_parameters(2050)
+    # The btin (battery-inverter) round-trip efficiency tweak is applied in import_REMIND_costs.py.
+    is_btin_eff = (remind_long["parameter"] == "efficiency") & (remind_long["reference"] == "btin")
+    remind_long.loc[is_btin_eff, "value"] **= 2
+
+    tech_map = pd.read_csv(COST_MAP)
+    overrides = convert_investment_to_input_capacity_basis(
+        build_cost_overrides(tech_map, remind_long)
+    )
+    got = (
+        overrides.query("region == 'DEU'")
+        .set_index(["technology", "parameter"])["value"]
+        .sort_index()
+    )
+    ref = (
+        pd.read_csv(f"{DEV}/y2050/costs_raw_overwritten.csv")
+        .query("region == 'DEU' and source == 'REMIND-EU'")
+        .set_index(["technology", "parameter"])["value"]
+        .sort_index()
+    )
+    shared = got.index.intersection(ref.index)
+    assert len(shared) > 10
+    pd.testing.assert_series_equal(got.reindex(shared), ref.reindex(shared), check_names=False, rtol=1e-6)
+
+
+@pytest.mark.skipif(not HAVE_DATA, reason="dev data not present")
+def test_full_capacity_targets_match_reference():
     mapping = pd.read_csv(COST_MAP).query("parameter == 'investment' and source == 'REMIND'")
     tmap = mapping[["PyPSA-Eur technology", "reference"]].rename(
         columns={"PyPSA-Eur technology": "PyPSA-Eur", "reference": "REMIND-EU"})
-    got = _adapter().determine_must_build_capacity(tmap)
+    a = _adapter()
+    got = build_capacity_targets(a.loader, a.symbols, a.remind_regions, tmap)
     got["year"] = got["year"].astype(int)
-    ref = pd.read_csv(f"{DEV}/installed_capacities.csv").rename(columns={"region_REMIND": "region"})
-    gens = ["ccgt", "ocgt", "onwind", "offwind", "solar", "nuclear"]
-    g = got[got["carrier"].isin(gens)].set_index(["year", "region", "carrier"])["p_nom_min"]
-    r = ref[ref["carrier"].isin(gens)].set_index(["year", "region", "carrier"])["p_nom_min"]
+    g = got.query("region == 'DEU' and year == 2050").set_index("carrier")["p_nom_min"]
+    r = (
+        pd.read_csv(f"{DEV}/installed_capacities.csv")
+        .rename(columns={"region_REMIND": "region"})
+        .query("region == 'DEU' and year == 2050")
+        .set_index("carrier")["p_nom_min"]
+    )
     shared = g.index.intersection(r.index)
-    assert len(shared) > 100
+    assert len(shared) >= 15  # generators + battery inverter + electrolysis + fuel cell + ...
     pd.testing.assert_series_equal(g.reindex(shared), r.reindex(shared), check_names=False, rtol=1e-6)

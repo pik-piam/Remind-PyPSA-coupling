@@ -16,6 +16,7 @@ from rpycpl.transforms.capacities import (
     adjust_link_capacities_to_input,
     aggregate_capacities_to_carriers,
     convert_capacities,
+    prepare_capacities,
 )
 
 DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1"
@@ -48,6 +49,64 @@ def test_aggregate_sums_and_filters():
     tmap = pd.DataFrame({"REMIND-EU": ["spv", "csp"], "PyPSA-Eur": ["solar", "solar"]})
     out = aggregate_capacities_to_carriers(caps, tmap)
     assert out.query("carrier=='solar'")["p_nom_min"].iloc[0] == pytest.approx(15.0)
+
+
+def test_prepare_capacities_noop_without_params():
+    """An IAMC-style config (no consolidation block) leaves capacities untouched."""
+    caps = pd.DataFrame({"year": [2050, 2050], "region": ["DEU", "DEU"],
+                         "technology": ["elh2VRE", "storspv"], "value": [10.0, 5.0]})
+    out = prepare_capacities(caps)
+    pd.testing.assert_frame_equal(out, caps)
+
+
+def test_prepare_capacities_merges_vre_and_scales_battery():
+    """REMIND-GDX prep: elh2VRE→elh2 merge and storX→btin scaling."""
+    caps = pd.DataFrame(
+        {"year": [2050, 2050, 2050], "region": ["DEU", "DEU", "DEU"],
+         "technology": ["elh2VRE", "storspv", "storwindon"], "value": [10.0, 5.0, 2.0]})
+    out = prepare_capacities(
+        caps,
+        vre_to_primary={"elh2VRE": "elh2"},
+        battery_scaling={"storspv": 4.0, "storwindon": 1.2},
+    ).set_index("technology")["value"]
+    assert out.loc["elh2"] == pytest.approx(10.0)           # variant merged to primary name
+    # storX rows are renamed+scaled to btin (summed into one carrier later in aggregate)
+    assert out.loc["btin"].sum() == pytest.approx(5.0 * 4.0 + 2.0 * 1.2)
+
+
+def test_prepare_capacities_uses_btin_directly_when_present():
+    """Bidirectional guard: an explicit btin capacity is kept; storX rows are dropped, not scaled."""
+    caps = pd.DataFrame(
+        {"year": [2050, 2050], "region": ["DEU", "DEU"],
+         "technology": ["btin", "storspv"], "value": [7.0, 5.0]})
+    out = prepare_capacities(caps, battery_scaling={"storspv": 4.0}).set_index("technology")["value"]
+    assert out["btin"] == pytest.approx(7.0)
+    assert "storspv" not in out.index
+
+
+def test_build_capacity_targets_reads_consolidation_from_symbols():
+    """build_capacity_targets pulls the prep + link techs from the capacity symbol spec."""
+    from rpycpl.transforms.capacities import build_capacity_targets
+
+    class _FakeLoader:
+        def load_symbol(self, ref, rename_columns=None):
+            if ref == "p32_capAvg":
+                return pd.DataFrame({"year": [2050], "region": ["DEU"],
+                                     "technology": ["storspv"], "value": [5.0]})
+            return pd.DataFrame({"year": [], "region": [], "technology": [], "value": []})
+
+        def resolve_symbol(self, ref):
+            return ref
+
+    symbols = {
+        "capacity": {
+            "symbol": "p32_capAvg",
+            "consolidation": {"battery_scaling": {"storspv": 4.0}, "link_techs": []},
+        },
+    }
+    tmap = pd.DataFrame({"REMIND-EU": ["btin"], "PyPSA-Eur": ["battery charger"]})
+    out = build_capacity_targets(_FakeLoader(), symbols, ["DEU"], tmap)
+    assert out.query("carrier == 'battery charger'")["p_nom_min"].iloc[0] == pytest.approx(5.0 * 4.0)
 
 
 @pytest.mark.skipif(not (os.path.exists(EUR_GDX) and os.path.exists(INSTALLED) and os.path.exists(MAP)),

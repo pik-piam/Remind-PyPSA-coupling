@@ -43,6 +43,13 @@ default:
     rename: {ttot: year, all_regi: region, all_te: technology}
     unit: TW
     to_unit: MW              # 1e6
+    # REMIND-GDX tech consolidation params (declarative, like `rename`/`to_unit`; the operation
+    # lives in rpycpl.transforms.capacities.prepare_capacities). Present only for the REMIND
+    # interface — an IAMC/.mif config omits this block, so no scaling/merge is applied there.
+    consolidation:
+      vre_to_primary: {elh2VRE: elh2, h2turbVRE: h2turb}   # merge VRE-coupled variants
+      battery_scaling: {storspv: 4.0, storwindon: 1.2, storwindoff: 1.2}  # storX -> btin (battery charger)
+      link_techs: [elh2, h2turb, btin, elh2VRE, h2turbVRE]  # output->input capacity adjustment
   cost_investment:
     symbol: p32_capCost
     rename: {ttot: year, all_regi: region, all_te: technology}
@@ -85,6 +92,16 @@ default:
   coupled_years:
     symbol: t
     rename: {ttot: year}
+  hydro_capacity:
+    symbol: p32_hydroCapacity
+    rename: {ttot: year, all_regi: region}
+    unit: TW
+    to_unit: MW              # 1e6
+  hydro_generation:
+    symbol: p32_hydroGeneration
+    rename: {ttot: year, all_regi: region}
+    unit: TWa
+    to_unit: MWh             # 1e6 * 8760
 
 overrides:
   # Keyed by REMIND region name. Each region lists only the logical names that differ from
