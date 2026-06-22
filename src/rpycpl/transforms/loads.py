@@ -11,7 +11,9 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-TWA_TO_MWH = 1e6 * 8760  # TWa -> MWh annual
+from rpycpl.units import unit_factor
+
+TWA_TO_MWH = unit_factor("TWa", "MWh")
 
 
 def convert_loads(

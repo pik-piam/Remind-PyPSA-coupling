@@ -7,6 +7,7 @@ import os
 import pytest
 
 from rpycpl.io import RemindLoader, read_iamc
+from rpycpl.io.iamc import parse_currency_year
 
 EUR_GDX = "/workspace/remind_pypsa_coupling/development_data/REMIND2PyPSAEUR.gdx"
 
@@ -37,6 +38,13 @@ def test_iamc_read_and_melt(tmp_path):
     filtered = read_iamc(mif, variables=["Cap|Electricity|Nuclear"])
     assert list(filtered["variable"].unique()) == ["Cap|Electricity|Nuclear"]
     assert len(filtered) == 1  # only the 2030 row (2025 was NA)
+
+
+def test_parse_currency_year():
+    assert parse_currency_year("US$2017/kW") == 2017
+    assert parse_currency_year("US$2005/GJ") == 2005
+    assert parse_currency_year("GW") is None
+    assert parse_currency_year("EUR2020/MWh") is None
 
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")

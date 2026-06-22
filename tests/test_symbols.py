@@ -187,6 +187,37 @@ def test_load_variable_set_basic(tmp_path):
     assert all(result["unit"] == "MW")
 
 
+def test_load_variable_set_synthesises_fallback_rows(tmp_path):
+    """Absent tokens with a declared fallback value are appended across the (year, region) grid."""
+    from rpycpl.io import RemindLoader
+
+    mif = tmp_path / "t.mif"
+    mif.write_text(
+        "Model;Scenario;Region;Variable;Unit;2030;2040\n"
+        "REMIND;SSP2;DEU;Efficiency|Electricity|Gas|GT;p.u.;0.58;0.60\n"
+        "REMIND;SSP2;FRA;Efficiency|Electricity|Gas|GT;p.u.;0.57;0.59\n"
+    )
+    loader = RemindLoader(mif)
+    spec = {
+        "variables": {"Efficiency|Electricity|Gas|GT": "ngt"},
+        "label_col": "reference",
+        "to_unit": "p.u.",
+        "fallback": {
+            "tnrs": {"value": 0.33, "reason": "nuclear absent from mif"},
+        },
+    }
+    result = load_variable_set(loader, spec)
+
+    # ngt loaded normally
+    assert set(result[result["reference"] == "ngt"]["year"].unique()) == {2030, 2040}
+    # tnrs synthesised for every (year, region) combo present in the data
+    tnrs = result[result["reference"] == "tnrs"]
+    assert set(tnrs["year"].unique()) == {2030, 2040}
+    assert set(tnrs["region"].unique()) == {"DEU", "FRA"}
+    assert (tnrs["value"] == 0.33).all()
+    assert (tnrs["unit"] == "p.u.").all()  # defaults to to_unit
+
+
 def test_load_spec_dispatches_on_shape(tmp_path):
     from rpycpl.io import RemindLoader
 

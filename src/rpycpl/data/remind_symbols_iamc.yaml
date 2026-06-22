@@ -215,7 +215,7 @@ default:
       "Tech|Electricity|Hydro|Efficiency":                                   hydro
     label_col: reference
     to_unit: "p.u."
-    # fallback for absent nuclear efficiency — metadata only; adapter synthesises rows.
+    # fallback for absent nuclear efficiency
     fallback:
       tnrs:
         value: 0.33

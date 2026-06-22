@@ -67,7 +67,11 @@ def list_iamc_variables(path: str | PathLike, sep: str = ";") -> list[str]:
 
 
 def parse_currency_year(unit: str) -> int | None:
-    """Extract the reference year from a unit string such as ``'US$2017/kW'`` → 2017."""
+    """Extract the reference year from a unit string such as ``'US$2017/kW'`` → 2017.
+
+    Building block for future automatic currency-year handling (deflating IAMC cost units to
+    a common reference year). Not yet wired into the cost pipeline.
+    """
     m = re.search(r"US\$(\d{4})", unit)
     return int(m.group(1)) if m else None
 

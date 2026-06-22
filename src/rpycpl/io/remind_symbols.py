@@ -199,8 +199,9 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
     Requires ``loader.backend == 'iamc'``. The spec must have a ``variables:`` block mapping
     IAMC variable names to token labels. Optional ``derived:`` declares linear combinations.
     Unit conversion is applied via ``assemble_variable_set``. Fallback tokens declared in
-    ``spec['fallback']`` are logged as warnings; the *caller* (typically an adapter) is
-    responsible for synthesising fallback rows with the correct region/year grid.
+    ``spec['fallback']`` as ``{token: {value: float, unit: str, reason: str}}`` are
+    automatically synthesised and appended when absent from the loaded data (one row per
+    present ``(year, region)`` combination). ``unit`` defaults to the spec's ``to_unit``.
     """
     from rpycpl.io.iamc import assemble_variable_set, read_iamc
 
@@ -226,17 +227,34 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
     df = read_iamc(loader.source, variables=all_vars)
     result = assemble_variable_set(df, mapping, label_col=label_col, derived=derived, to_unit=to_unit)
 
-    # Report declared fallbacks for missing tokens.
+    # Synthesise rows for any fallback tokens absent from the loaded data.
+    # A fallback entry must declare a ``value``; ``unit`` defaults to ``to_unit`` if omitted.
     fallback = spec.get("fallback", {})
     if fallback:
         present = set(result[label_col].unique()) if not result.empty else set()
+        yr_reg = (
+            result[["year", "region"]].drop_duplicates()
+            if not result.empty
+            else pd.DataFrame(columns=["year", "region"])
+        )
+        fallback_frames = []
         for token, fb in fallback.items():
-            if token not in present:
-                logger.warning(
-                    "Token %r absent from mif variable set; fallback needed: %s",
-                    token,
-                    fb.get("reason", "(no reason given)"),
-                )
+            if token in present:
+                continue
+            logger.warning(
+                "Token %r absent from mif variable set; using declared fallback: %s",
+                token,
+                fb.get("reason", "(no reason given)"),
+            )
+            if "value" not in fb:
+                continue
+            rows = yr_reg.copy()
+            rows[label_col] = token
+            rows["value"] = fb["value"]
+            rows["unit"] = fb.get("unit", to_unit or "")
+            fallback_frames.append(rows)
+        if fallback_frames:
+            result = pd.concat([result, *fallback_frames], ignore_index=True)
 
     return result
 

@@ -27,8 +27,10 @@ from rpycpl.transforms.capacities import (
     apply_consolidation,
 )
 from rpycpl.transforms.loads import TWA_TO_MWH, convert_loads
+from rpycpl.transforms.mapping import read_region_map
 
 __all__ = [
+    "read_region_map",
     "extract_co2_prices",
     "convert_co2_prices",
     "TONNE_C_TO_TONNE_CO2",

@@ -1,7 +1,7 @@
 """The IAM→PyPSA coupling adapter interface.
 
 ``CouplingAdapter`` is the backend-neutral base: it holds the shared, concrete builders
-(``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``, ``build_costs``)
+(``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
 driven by the resolved symbol map and config, and declares the two source-specific hooks
 (``build_regional_demand``, ``extract_cost_parameters``) as abstract-style methods that
 raise ``NotImplementedError``.
@@ -16,9 +16,13 @@ config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``plan
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Sequence
 from typing import Any
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from rpycpl.downscale.demand import disaggregate_demand_to_country
 from rpycpl.io.remind_symbols import load_frame
@@ -88,16 +92,19 @@ class CouplingAdapter:
 
     # -- Shared concrete builders -------------------------------------------
 
-    def build_co2_prices(self) -> pd.DataFrame:
+    def build_co2_prices(self, years: Sequence[int] | None = None) -> pd.DataFrame:
         """Build the per-(region, year) CO2 price pathway.
 
         Works for both backends: GDX spec applies tC→tCO2 conversion; IAMC spec reports
         directly in t CO2 (no conversion). The runtime ``currency_factor`` is always applied.
+
+        ``years`` selects the year set to reindex to (missing filled with 0); when ``None``
+        it falls back to ``config["planning_horizons"]``. Callers that derive the coupled-year
+        set from the REMIND source (e.g. the GDX ``t`` symbol) pass it explicitly.
         """
         raw = load_frame(self.loader, self.symbols["co2_price"])
-        prices = extract_co2_prices(
-            raw, regions=self.remind_regions, years=self.config.get("planning_horizons")
-        )
+        years = years if years is not None else self.config.get("planning_horizons")
+        prices = extract_co2_prices(raw, regions=self.remind_regions, years=years)
         return convert_co2_prices(
             prices, currency_factor=self.config.get("currency_factor", 1.0), carbon_to_co2=False
         )
@@ -121,15 +128,26 @@ class CouplingAdapter:
         """Return the REMIND discount rate per region for ``year``, indexed by region.
 
         Works for both backends: GDX spec reads ``p_r``; IAMC spec reads
-        ``Interest Rate t/(t-1)|Real``.
+        ``Interest Rate t/(t-1)|Real``. When a region has no value for ``year`` (e.g. NaN
+        in the last mif column), the most recent earlier year's value is used with a warning.
         """
-        p_r = load_frame(self.loader, self.symbols["discount_rate"])
-        p_r = p_r[
-            (p_r["year"].astype(str) == str(year)) & (p_r["region"].isin(self.remind_regions))
-        ]
-        missing = set(self.remind_regions) - set(p_r["region"])
+        p_r = (
+            load_frame(self.loader, self.symbols["discount_rate"])
+            .pipe(lambda df: df[df["region"].isin(self.remind_regions)])
+        )
+        # Last-value per region: covers both the requested year and any forward-fill fallback.
+        last = p_r.sort_values("year").groupby("region")["value"].last()
+        missing = set(self.remind_regions) - set(last.index)
         if missing:
             raise ValueError(
-                f"No REMIND discount rate for year {year}, regions: {sorted(missing)}"
+                f"No REMIND discount rate for year {year} or any earlier year, "
+                f"regions: {sorted(missing)}"
             )
-        return p_r.set_index("region")["value"]
+        exact = p_r[p_r["year"].astype(str) == str(year)].set_index("region")["value"]
+        filled = last.index.difference(exact.index)
+        if len(filled):
+            logger.warning(
+                "Discount rate absent for year %d in regions %s; using most-recent value.",
+                year, sorted(filled),
+            )
+        return exact.combine_first(last)

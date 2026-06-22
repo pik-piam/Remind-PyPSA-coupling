@@ -5,8 +5,8 @@ backend: ``build_regional_demand`` (reads ``load_sector`` via a single ``load_fr
 and ``extract_cost_parameters`` (reads investment/tech_data/efficiency/emission_factor/fuel
 from GDX symbols, with the REMIND-specific per-tech quirks).
 
-All other builders (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``,
-``build_costs``) are inherited from ``CouplingAdapter`` unchanged.
+All other builders (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
+are inherited from ``CouplingAdapter`` unchanged.
 """
 
 from __future__ import annotations

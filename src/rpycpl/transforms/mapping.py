@@ -5,6 +5,7 @@ from __future__ import annotations
 from os import PathLike
 
 import pandas as pd
+import country_converter as coco
 
 
 def read_region_map(
@@ -19,7 +20,6 @@ def read_region_map(
     mapping (columns ``RegionCode``/``CountryCode``), converts ISO3 country codes to ISO2, and
     adds Kosovo (XK → NES). ``source``/``target`` are ``"REMIND-EU"`` or ``"PyPSA-EUR"``.
     """
-    import country_converter as coco
 
     region_mapping = pd.read_csv(fn, sep=";").rename(columns={"RegionCode": "remind-eu"})
     region_mapping["pypsa-eur"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")

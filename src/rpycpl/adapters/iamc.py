@@ -10,9 +10,9 @@ source-specific hooks:
   FOM from absolute (USD/MW/yr) to percentage of capex (%/yr), injects constant fallbacks
   for absent nuclear efficiency and CO2 intensity.
 
-All other builders (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``,
-``build_costs``) are inherited from ``CouplingAdapter`` unchanged — they work for both
-backends via spec-shape dispatch (``load_frame`` for ``symbol:``-shaped specs).
+All other builders (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
+are inherited from ``CouplingAdapter`` unchanged — they work for both backends via
+spec-shape dispatch (``load_frame`` for ``symbol:``-shaped specs).
 """
 
 from __future__ import annotations
@@ -76,47 +76,26 @@ class RemindIamcAdapter(CouplingAdapter):
 
         rows = []
         for (region, year), grp in scalar_df.groupby(["region", "year"]):
-            def get(v: str) -> float:
-                vals = grp.loc[grp["variable"] == v, "value"]
-                return float(vals.sum()) if not vals.empty else 0.0
+            get = self._group_getter(grp)
 
             se = get(se_var)
             losses = get(losses_var)
-            eta_td = (se - losses) / se if se > 0 else 1.0
+            eta_td = self._td_efficiency(se, losses)
 
             fe_slice = fe_df[(fe_df["region"] == region) & (fe_df["year"] == year)]
-            rebased_sum_mwh = 0.0
-            for _, fe_row in fe_slice.iterrows():
-                se_val_mwh = fe_row["value"] / eta_td if eta_td > 0 else fe_row["value"]
-                rebased_sum_mwh += se_val_mwh
-                rows.append({
-                    "year": year, "region": region, "sector": fe_row["sector"],
-                    "value": se_val_mwh, "unit": "MWh",
-                })
+            fe_rows, rebased_sum_mwh = self._rebase_fe_sectors(fe_slice, eta_td, region, year)
+            rows.extend(fe_rows)
 
-            # Net H2 for FE demand (EJ H2) ÷ η_elec (p.u.) → EJ electricity → MWh.
-            h2_prod_ej = get(h2_prod_var)
-            h2_turb_ej = get(h2_turb_var)
-            eta_elec   = get(eta_var) / 100.0  # mif reports in %
-            if eta_elec > 0:
-                elec_h2_mwh = (h2_prod_ej - h2_turb_ej) / eta_elec * _EJ_TO_MWH
-            else:
-                logger.warning("Zero electrolysis efficiency for region=%s year=%s; skipping.", region, year)
-                elec_h2_mwh = 0.0
-
+            eta_elec = get(eta_var) / 100.0  # mif reports in %
+            elec_h2_mwh = self._electrolysis_demand_mwh(
+                get(h2_prod_var), get(h2_turb_var), eta_elec, region, year
+            )
             rows.append({
                 "year": year, "region": region, "sector": "electrolysis",
                 "value": elec_h2_mwh, "unit": "MWh",
             })
 
-            # AC residual: (SE − Losses) − Σ(rebased FE sectors) − electrolysis, all in MWh.
-            ac_mwh = (se - losses) * _EJ_TO_MWH - rebased_sum_mwh - elec_h2_mwh
-            if ac_mwh < 0:
-                logger.warning(
-                    "Negative AC residual for region=%s year=%s: %.4f MWh — clamped to 0.",
-                    region, year, ac_mwh,
-                )
-                ac_mwh = 0.0
+            ac_mwh = self._ac_residual(se, losses, rebased_sum_mwh, elec_h2_mwh, region, year)
             rows.append({
                 "year": year, "region": region, "sector": "AC",
                 "value": ac_mwh, "unit": "MWh",
@@ -127,6 +106,62 @@ class RemindIamcAdapter(CouplingAdapter):
             .sort_values(["year", "region", "sector"])
             .reset_index(drop=True)
         )
+
+    # -- build_regional_demand helpers --------------------------------------
+
+    @staticmethod
+    def _group_getter(grp: pd.DataFrame):
+        """Return a ``get(variable) -> float`` summing that variable's values in ``grp``."""
+        def get(v: str) -> float:
+            vals = grp.loc[grp["variable"] == v, "value"]
+            return float(vals.sum()) if not vals.empty else 0.0
+        return get
+
+    @staticmethod
+    def _td_efficiency(se: float, losses: float) -> float:
+        """Derived T&D efficiency η_td = (SE − Losses) / SE (1.0 when SE is non-positive)."""
+        return (se - losses) / se if se > 0 else 1.0
+
+    @staticmethod
+    def _rebase_fe_sectors(
+        fe_slice: pd.DataFrame, eta_td: float, region: str, year: int
+    ) -> tuple[list[dict], float]:
+        """Rebase each FE sector to the SE level (FE / η_td); return (rows, summed MWh)."""
+        rows = []
+        rebased_sum_mwh = 0.0
+        for _, fe_row in fe_slice.iterrows():
+            se_val_mwh = fe_row["value"] / eta_td if eta_td > 0 else fe_row["value"]
+            rebased_sum_mwh += se_val_mwh
+            rows.append({
+                "year": year, "region": region, "sector": fe_row["sector"],
+                "value": se_val_mwh, "unit": "MWh",
+            })
+        return rows, rebased_sum_mwh
+
+    @staticmethod
+    def _electrolysis_demand_mwh(
+        h2_prod_ej: float, h2_turb_ej: float, eta_elec: float, region: str, year: int
+    ) -> float:
+        """Net H2 for FE demand (EJ H2) ÷ η_elec → EJ electricity → MWh (0 if η_elec ≤ 0)."""
+        if eta_elec > 0:
+            return (h2_prod_ej - h2_turb_ej) / eta_elec * _EJ_TO_MWH
+        logger.warning("Zero electrolysis efficiency for region=%s year=%s; skipping.", region, year)
+        return 0.0
+
+    @staticmethod
+    def _ac_residual(
+        se: float, losses: float, rebased_sum_mwh: float, elec_h2_mwh: float,
+        region: str, year: int,
+    ) -> float:
+        """AC residual: (SE − Losses) − Σ(rebased FE) − electrolysis, in MWh (clamped ≥ 0)."""
+        ac_mwh = (se - losses) * _EJ_TO_MWH - rebased_sum_mwh - elec_h2_mwh
+        if ac_mwh < 0:
+            logger.warning(
+                "Negative AC residual for region=%s year=%s: %.4f MWh — clamped to 0.",
+                region, year, ac_mwh,
+            )
+            ac_mwh = 0.0
+        return ac_mwh
 
     def extract_cost_parameters(self, year: int) -> pd.DataFrame:
         """Extract REMIND mif cost parameters as ``[region, reference, parameter, value, unit]``.
@@ -168,14 +203,7 @@ class RemindIamcAdapter(CouplingAdapter):
         fom_abs = load("cost_omf")
         if currency_factor != 1.0:
             fom_abs["value"] *= currency_factor
-        fom_pct = capex[["year", "region", "reference", "value"]].merge(
-            fom_abs[["year", "region", "reference", "value"]],
-            on=["year", "region", "reference"],
-            suffixes=("_cap", "_fom"),
-        )
-        fom_pct["value"] = fom_pct["value_fom"] / fom_pct["value_cap"] * 100
-        fom_pct["parameter"] = "FOM"
-        fom_pct["unit"] = "%/yr"
+        fom_pct = self._compute_fom_pct(capex, fom_abs)
 
         # --- VOM (USD/MWh) ---
         vom = load("cost_omv")
@@ -184,25 +212,13 @@ class RemindIamcAdapter(CouplingAdapter):
         if currency_factor != 1.0:
             vom["value"] *= currency_factor
 
-        # --- efficiency (p.u.) + nuclear fallback from config ---
+        # --- efficiency (p.u.) — nuclear (tnrs) fallback injected automatically by load_variable_set ---
         eff = load("efficiency")
         eff["parameter"] = "efficiency"
         eff["unit"] = "p.u."
-        # Inject nuclear (tnrs) fallback for all present (region, year) combos.
-        nuclear_eff = self.symbols["efficiency"]["fallback"]["tnrs"]["value"]
         yr_reg = eff[["year", "region"]].drop_duplicates() if not eff.empty else pd.DataFrame(
             columns=["year", "region"]
         )
-        eff_fallback = yr_reg.copy()
-        eff_fallback["reference"] = "tnrs"
-        eff_fallback["value"] = nuclear_eff
-        eff_fallback["parameter"] = "efficiency"
-        eff_fallback["unit"] = "p.u."
-        logger.warning(
-            "Nuclear efficiency (tnrs) absent from mif; using fallback %.2f (thermal p.u.).",
-            nuclear_eff,
-        )
-        eff = pd.concat([eff, eff_fallback], ignore_index=True)
 
         # --- fuel price (USD/MWh_th) ---
         fuel = load("fuel_price")
@@ -212,27 +228,8 @@ class RemindIamcAdapter(CouplingAdapter):
             fuel["value"] *= currency_factor
 
         # --- CO2 intensity fallback for all fossil techs — values and tech→fuel map from config ---
-        ef_spec = self.symbols["emission_factor"]
-        tech_fuel = ef_spec["tech_fuel_map"]
-        co2_by_fuel = {k: v["value"] for k, v in ef_spec["fallback"].items()}
         co2_grid = capex[["year", "region"]].drop_duplicates() if not capex.empty else yr_reg
-        co2_rows = []
-        for tech, fuel_key in tech_fuel.items():
-            tf = co2_grid.copy()
-            tf["reference"] = tech
-            tf["parameter"] = "CO2 intensity"
-            tf["value"] = co2_by_fuel.get(fuel_key, 0.0)
-            tf["unit"] = "t_CO2/MWh_th"
-            co2_rows.append(tf)
-        if co2_rows:
-            co2i = pd.concat(co2_rows, ignore_index=True)
-            logger.warning(
-                "CO2 emission intensity absent from mif; using IPCC Tier 1 fallback values "
-                "(%d tech×region×year rows). Refresh from GDX via src/dev/extract_co2_intensity.py.",
-                len(co2i),
-            )
-        else:
-            co2i = pd.DataFrame(columns=["year", "region", "reference", "parameter", "value", "unit"])
+        co2i = self._co2_intensity_fallback(co2_grid)
 
         # --- assemble ---
         frames = [capex, lifetime, fom_pct, vom, eff, fuel, co2i]
@@ -242,3 +239,44 @@ class RemindIamcAdapter(CouplingAdapter):
             ignore_index=True,
         )
         return df[df["region"].isin(set(self.remind_regions))]
+
+    # -- extract_cost_parameters helpers ------------------------------------
+
+    @staticmethod
+    def _compute_fom_pct(capex: pd.DataFrame, fom_abs: pd.DataFrame) -> pd.DataFrame:
+        """FOM %/yr = absolute FOM (USD/MW/yr) / capex (USD/MW) × 100, joined on tech/region/year."""
+        fom_pct = capex[["year", "region", "reference", "value"]].merge(
+            fom_abs[["year", "region", "reference", "value"]],
+            on=["year", "region", "reference"],
+            suffixes=("_cap", "_fom"),
+        )
+        fom_pct["value"] = fom_pct["value_fom"] / fom_pct["value_cap"] * 100
+        fom_pct["parameter"] = "FOM"
+        fom_pct["unit"] = "%/yr"
+        return fom_pct
+
+    def _co2_intensity_fallback(self, grid: pd.DataFrame) -> pd.DataFrame:
+        """Per-fuel IPCC Tier 1 CO2 intensity (t_CO2/MWh_th) for every fossil tech over ``grid``."""
+        ef_spec = self.symbols["emission_factor"]
+        tech_fuel = ef_spec["tech_fuel_map"]
+        co2_by_fuel = {k: v["value"] for k, v in ef_spec["fallback"].items()}
+        co2_rows = []
+        for tech, fuel_key in tech_fuel.items():
+            tf = grid.copy()
+            tf["reference"] = tech
+            tf["parameter"] = "CO2 intensity"
+            tf["value"] = co2_by_fuel.get(fuel_key, 0.0)
+            tf["unit"] = "t_CO2/MWh_th"
+            co2_rows.append(tf)
+        if not co2_rows:
+            return pd.DataFrame(
+                columns=["year", "region", "reference", "parameter", "value", "unit"]
+            )
+        co2i = pd.concat(co2_rows, ignore_index=True)
+        logger.warning(
+            "CO2 emission intensity absent from mif; using IPCC Tier 1 fallback values "
+            "(%d tech×region×year rows). Refresh from a GDX-derived emission_factor source "
+            "if exact REMIND intensities are needed.",
+            len(co2i),
+        )
+        return co2i
