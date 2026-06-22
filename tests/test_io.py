@@ -19,13 +19,24 @@ def test_detect_backend():
         RemindLoader.detect_backend("x.nc")
 
 
-def test_iamc_reader_is_shell(tmp_path):
-    # IAMC/.mif reader is a shell for now — backend resolves but reading is not implemented.
-    p = tmp_path / "remind.mif"
-    p.write_text("placeholder")
-    assert RemindLoader(p).backend == "iamc"
-    with pytest.raises(NotImplementedError):
-        read_iamc(p)
+def test_iamc_read_and_melt(tmp_path):
+    # Round-trip: write a minimal .mif and check that read_iamc melts it correctly.
+    mif = tmp_path / "remind.mif"
+    mif.write_text(
+        "Model;Scenario;Region;Variable;Unit;2025;2030\n"
+        "REMIND;SSP2;DEU;Cap|Electricity|Gas|GT;GW;1.2;2.4\n"
+        "REMIND;SSP2;DEU;Cap|Electricity|Nuclear;GW;NA;10.0\n"
+    )
+    assert RemindLoader(mif).backend == "iamc"
+    df = read_iamc(mif)
+    assert set(df.columns) >= {"model", "scenario", "region", "variable", "unit", "year", "value"}
+    # NA rows are dropped; 2025 Nuclear is NaN → only 3 rows remain.
+    assert len(df) == 3
+    assert set(df["year"].unique()) == {2025, 2030}
+    # Filter by variable
+    filtered = read_iamc(mif, variables=["Cap|Electricity|Nuclear"])
+    assert list(filtered["variable"].unique()) == ["Cap|Electricity|Nuclear"]
+    assert len(filtered) == 1  # only the 2030 row (2025 was NA)
 
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")

@@ -15,14 +15,16 @@ from rpycpl.transforms.co2_prices import (
 from rpycpl.transforms.costs import (
     DEFAULT_ETA_EXPONENTS,
     add_discount_rate,
-    build_cost_overrides,
+    build_baseline_overrides,
+    build_mapped_overrides,
+    build_set_value_overrides,
     convert_investment_to_input_capacity_basis,
-    merge_cost_overrides_into_baseline,
+    apply_overrides,
 )
 from rpycpl.transforms.capacities import (
     adjust_link_capacities_to_input,
     aggregate_capacities_to_carriers,
-    convert_capacities,
+    apply_consolidation,
 )
 from rpycpl.transforms.loads import TWA_TO_MWH, convert_loads
 
@@ -32,12 +34,14 @@ __all__ = [
     "TONNE_C_TO_TONNE_CO2",
     "convert_loads",
     "TWA_TO_MWH",
-    "convert_capacities",
+    "apply_consolidation",
     "adjust_link_capacities_to_input",
     "aggregate_capacities_to_carriers",
-    "build_cost_overrides",
+    "build_mapped_overrides",
+    "build_baseline_overrides",
+    "build_set_value_overrides",
     "convert_investment_to_input_capacity_basis",
     "add_discount_rate",
-    "merge_cost_overrides_into_baseline",
+    "apply_overrides",
     "DEFAULT_ETA_EXPONENTS",
 ]

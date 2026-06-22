@@ -73,7 +73,7 @@ def test_build_country_loads_matches_reference():
 def test_cost_overrides_match_reference_remind_rows():
     """extract_cost_parameters (+ inline btin² as the EUR script does) vs the raw cost reference."""
     from rpycpl.transforms.costs import (
-        build_cost_overrides,
+        build_mapped_overrides,
         convert_investment_to_input_capacity_basis,
     )
 
@@ -84,7 +84,11 @@ def test_cost_overrides_match_reference_remind_rows():
 
     tech_map = pd.read_csv(COST_MAP)
     overrides = convert_investment_to_input_capacity_basis(
-        build_cost_overrides(tech_map, remind_long)
+        build_mapped_overrides(
+            tech_map, remind_long,
+            tech_col="PyPSA-Eur technology", ref_col="reference",
+            param_col="parameter", source_col="source", model_value="REMIND", out_source="REMIND-EU",
+        )
     )
     got = (
         overrides.query("region == 'DEU'")

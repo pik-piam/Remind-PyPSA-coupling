@@ -11,9 +11,12 @@ from rpycpl.io.remind_symbols import (
     default_symbol_config_path,
     load_frame,
     load_set,
+    load_spec,
     load_symbol_specs,
+    load_variable_set,
     merge_region_overrides,
     read_symbol_config,
+    report_fallbacks,
 )
 from rpycpl.io.ssp import fetch_ssp_data, fetch_ssp_variable, read_ssp_data
 
@@ -30,10 +33,13 @@ __all__ = [
     "fetch_ssp_variable",
     "read_ssp_data",
     "load_symbol_specs",
+    "load_spec",
+    "load_variable_set",
     "read_symbol_config",
     "merge_region_overrides",
     "default_symbol_config_path",
     "load_frame",
     "load_set",
+    "report_fallbacks",
     "SYMBOL_CONFIG_ENV",
 ]

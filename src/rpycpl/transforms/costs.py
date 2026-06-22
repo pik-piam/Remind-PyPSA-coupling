@@ -1,10 +1,10 @@
 """Shared, model-agnostic cost-override mechanics.
 
-The *extraction* of individual REMIND cost parameters (which GDX symbols, which unit
-factors) is REMIND-interface/model-specific and lives in each model's adapter (it differs
-between the EUR coupling GDX and China's raw fulldata GDX). What is genuinely shared — and
-lives here — is how a long-format cost-override table is mapped to PyPSA carriers,
-basis-converted, given discount rates, and merged onto the PyPSA baseline cost table.
+The *extraction* of individual REMIND cost parameters is source-specific and lives in each
+adapter. What is genuinely shared — and lives here — is how a long-format cost-override table
+is mapped to PyPSA carriers, basis-converted, given discount rates, and merged onto the PyPSA
+baseline cost table; and how PyPSA-Eur baseline and fixed-value overrides are assembled from
+the technology cost mapping CSV.
 
 Unit factors are not defined here: they live centrally in ``rpycpl.units`` (re-exported below
 for convenience) so a non-REMIND IAM can swap the conversion table without touching transforms.
@@ -18,36 +18,6 @@ import pandas as pd
 
 # Unit conventions are centralized in rpycpl.units; re-exported here for convenient imports.
 from rpycpl.units import DEFAULT_ETA_EXPONENTS
-
-
-def build_cost_overrides(
-    tech_map: pd.DataFrame,
-    remind_long: pd.DataFrame,
-    *,
-    tech_col: str = "PyPSA-Eur technology",
-    ref_col: str = "reference",
-    param_col: str = "parameter",
-    source_col: str = "source",
-    remind_value: str = "REMIND",
-) -> pd.DataFrame:
-    """Build the long cost-override table by mapping REMIND values onto PyPSA carriers.
-
-    One row per (region, technology, parameter) via a 1:1 tech-map lookup; rows whose REMIND
-    reference is absent from ``remind_long`` are dropped (the baseline value is kept on merge).
-    Raises on duplicate (region, technology, parameter).
-    """
-    # Keep only the keys + target carrier from the map so its other columns (e.g. a 'unit'
-    # column) don't collide with the REMIND frame's columns on merge.
-    mapped = tech_map.loc[tech_map[source_col] == remind_value, [tech_col, ref_col, param_col]]
-    merged = mapped.merge(remind_long, on=[ref_col, param_col], how="left")
-    merged = merged[~merged["value"].isna()]
-    out = merged.rename(columns={tech_col: "technology"})[
-        ["region", "technology", param_col, "value", "unit"]
-    ].copy()
-    dups = out.duplicated(subset=["region", "technology", param_col], keep=False)
-    if dups.any():
-        raise ValueError(f"Duplicate (region, technology, parameter) after merge:\n{out[dups]}")
-    return out
 
 
 def convert_investment_to_input_capacity_basis(
@@ -96,7 +66,99 @@ def add_discount_rate(
     return pd.concat([costs, dr], ignore_index=True)
 
 
-def merge_cost_overrides_into_baseline(
+def build_mapped_overrides(
+    technology_mapping: pd.DataFrame,
+    model_long: pd.DataFrame,
+    *,
+    tech_col: str,
+    ref_col: str,
+    param_col: str,
+    source_col: str,
+    model_value: str,
+    out_source: str,
+) -> pd.DataFrame:
+    """Map model parameter values onto target carriers and log missing references.
+
+    Wraps ``build_cost_overrides`` with a warning for each mapped (reference, parameter) pair
+    that is absent from ``model_long`` — those fall back to the baseline on merge.
+    Tags provenance columns consumed by ``apply_overrides``.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    mapped = technology_mapping.loc[
+        technology_mapping[source_col] == model_value, [tech_col, ref_col, param_col]
+    ]
+    merged = mapped.merge(model_long, on=[ref_col, param_col], how="left")
+    merged = merged[~merged["value"].isna()]
+    overrides = merged.rename(columns={tech_col: "technology"})[
+        ["region", "technology", param_col, "value", "unit"]
+    ].copy()
+    dups = overrides.duplicated(subset=["region", "technology", param_col], keep=False)
+    if dups.any():
+        raise ValueError(f"Duplicate (region, technology, parameter) after merge:\n{overrides[dups]}")
+
+    present = set(zip(model_long[ref_col], model_long[param_col]))
+    for _, row in technology_mapping[technology_mapping[source_col] == model_value].iterrows():
+        if (row[ref_col], row[param_col]) not in present:
+            logger.warning(
+                "Reference '%s' (→ '%s', parameter '%s') absent from model output"
+                " — falling back to baseline.",
+                row[ref_col], row[tech_col], row[param_col],
+            )
+    overrides[source_col] = out_source
+    overrides["further description"] = f"Extracted from {out_source} model output"
+    return overrides
+
+
+def build_baseline_overrides(
+    technology_mapping: pd.DataFrame,
+    baseline_raw: pd.DataFrame,
+    *,
+    tech_col: str,
+    source_col: str,
+    baseline_value: str,
+) -> pd.DataFrame:
+    """Pull parameter values from the baseline cost table for rows marked source=<baseline_value>."""
+    df = technology_mapping[technology_mapping[source_col] == baseline_value].drop(columns=["unit"])
+    df = df.merge(
+        baseline_raw,
+        left_on=[tech_col, "parameter"],
+        right_on=["technology", "parameter"],
+        how="left",
+        validate="one_to_one",
+    )
+    df[source_col] = baseline_value
+    df["further description"] = f"Default parameter from {baseline_value} baseline cost file"
+    return df[["technology", "parameter", "value", "unit", source_col, "further description"]]
+
+
+def build_set_value_overrides(
+    technology_mapping: pd.DataFrame,
+    mapping_file: str,
+    *,
+    tech_col: str,
+    source_col: str,
+    fixed_value: str,
+    comment_col: str,
+) -> pd.DataFrame:
+    """Return overrides for rows marked source=<fixed_value>, with reference parsed as a number."""
+    set_df = (
+        technology_mapping[technology_mapping[source_col] == fixed_value]
+        .rename(columns={
+            tech_col: "technology",
+            "reference": "value",
+            comment_col: "further description",
+        })[["technology", "parameter", "value", "unit", "further description"]]
+        .copy()
+    )
+    set_df["value"] = pd.to_numeric(set_df["value"], errors="raise")
+    set_df[source_col] = f"Set via configuration file: {mapping_file}"
+    set_df["further description"] = set_df["further description"].fillna("")
+    return set_df
+
+
+def apply_overrides(
     baseline_raw: pd.DataFrame,
     overrides: pd.DataFrame,
 ) -> pd.DataFrame:

@@ -9,9 +9,9 @@ import pytest
 
 from rpycpl.transforms.costs import (
     add_discount_rate,
-    build_cost_overrides,
+    build_mapped_overrides,
     convert_investment_to_input_capacity_basis,
-    merge_cost_overrides_into_baseline,
+    apply_overrides,
 )
 
 DEV = "/workspace/remind_pypsa_coupling/development_data"
@@ -38,7 +38,11 @@ def test_build_overrides_maps_and_dedups():
             "unit": ["USD/MW", "p.u."],
         }
     )
-    out = build_cost_overrides(tech_map, remind_long)
+    out = build_mapped_overrides(
+        tech_map, remind_long,
+        tech_col="PyPSA-Eur technology", ref_col="reference",
+        param_col="parameter", source_col="source", model_value="REMIND", out_source="TEST",
+    )
     assert set(out["technology"]) == {"electrolysis"}
     assert len(out) == 2
 
@@ -55,7 +59,7 @@ def test_merge_overrides_replaces_and_appends():
             "unit": ["x", "x"],
         }
     )
-    merged = merge_cost_overrides_into_baseline(baseline, overrides)
+    merged = apply_overrides(baseline, overrides)
     assert merged.query("technology=='CCGT'")["value"].iloc[0] == 2.0  # replaced
     assert merged.query("technology=='electrolysis'")["value"].iloc[0] == 5.0  # appended
 

@@ -7,7 +7,14 @@ import os
 import pandas as pd
 import pytest
 
-from rpycpl.io.remind_symbols import load_frame, load_set, load_symbol_specs
+from rpycpl.io.remind_symbols import (
+    load_frame,
+    load_set,
+    load_spec,
+    load_symbol_specs,
+    load_variable_set,
+    report_fallbacks,
+)
 
 EUR_GDX = "/workspace/remind_pypsa_coupling/development_data/REMIND2PyPSAEUR.gdx"
 
@@ -82,7 +89,10 @@ def test_overlay_via_env_var(tmp_path, monkeypatch):
 def test_default_symbol_config_path_exists():
     from rpycpl.io.remind_symbols import default_symbol_config_path
 
-    assert default_symbol_config_path().name == "remind_symbols.yaml"
+    # Default (no backend) and explicit "gdx" both resolve to the GDX config.
+    assert default_symbol_config_path().name == "remind_symbols_gdx.yaml"
+    assert default_symbol_config_path(backend="gdx").name == "remind_symbols_gdx.yaml"
+    assert default_symbol_config_path(backend="iamc").name == "remind_symbols_iamc.yaml"
     assert "default:" in default_symbol_config_path().read_text()
 
 
@@ -127,6 +137,81 @@ def test_load_set_splits_mixed_units_via_schema():
     assert out.loc["FOM", "value"] == pytest.approx(5.0)  # 0.05 * 100
     assert out.loc["VOM", "value"] == pytest.approx(2.0 * 1e6 / 8760)
     assert out.loc["VOM", "unit"] == "$/MWh"
+
+
+def test_load_symbol_specs_iamc_backend():
+    iamc = load_symbol_specs(backend="iamc")
+    # IAMC config has no GDX symbols but has capacity variable-set
+    assert "variables" in iamc["capacity"]
+    assert "Cap|Electricity|Gas|GT" in iamc["capacity"]["variables"]
+    # Discount rate is a single symbol (not a variable-set)
+    assert iamc["discount_rate"]["symbol"] == "Interest Rate t/(t-1)|Real"
+    # GDX backend still has symbol: (not variables:)
+    gdx = load_symbol_specs(backend="gdx")
+    assert "symbol" in gdx["capacity"]
+
+
+def test_load_variable_set_basic(tmp_path):
+    from rpycpl.io import RemindLoader
+    from rpycpl.io.iamc import read_iamc
+
+    mif = tmp_path / "t.mif"
+    mif.write_text(
+        "Model;Scenario;Region;Variable;Unit;2030;2040\n"
+        "REMIND;SSP2;DEU;Cap|Electricity|Gas|GT;GW;1.0;2.0\n"
+        "REMIND;SSP2;DEU;Cap|Electricity|Nuclear;GW;5.0;5.0\n"
+        "REMIND;SSP2;DEU;Cap|Electricity|Coal|w/o CC;GW;10.0;8.0\n"
+        "REMIND;SSP2;DEU;Cap|Electricity|Coal|IGCC|w/o CC;GW;3.0;2.0\n"
+        "REMIND;SSP2;DEU;Cap|Electricity|Coal|CHP;GW;2.0;2.0\n"
+    )
+    loader = RemindLoader(mif)
+    spec = {
+        "variables": {
+            "Cap|Electricity|Gas|GT": "ngt",
+            "Cap|Electricity|Nuclear": "tnrs",
+        },
+        "derived": {
+            "pc": [
+                (1.0, "Cap|Electricity|Coal|w/o CC"),
+                (-1.0, "Cap|Electricity|Coal|IGCC|w/o CC"),
+                (-1.0, "Cap|Electricity|Coal|CHP"),
+            ],
+        },
+        "label_col": "technology",
+        "to_unit": "MW",
+    }
+    result = load_variable_set(loader, spec)
+    assert set(result.columns) >= {"year", "region", "technology", "value", "unit"}
+    pc_2030 = result[(result["technology"] == "pc") & (result["year"] == 2030)]["value"].iloc[0]
+    assert pc_2030 == pytest.approx(5000.0)  # (10-3-2) GW × 1000 = 5000 MW
+    assert all(result["unit"] == "MW")
+
+
+def test_load_spec_dispatches_on_shape(tmp_path):
+    from rpycpl.io import RemindLoader
+
+    mif = tmp_path / "t.mif"
+    mif.write_text(
+        "Model;Scenario;Region;Variable;Unit;2030\n"
+        "REMIND;SSP2;DEU;Cap|Electricity|Gas|GT;GW;1.5\n"
+    )
+    loader = RemindLoader(mif)
+    var_set_spec = {"variables": {"Cap|Electricity|Gas|GT": "ngt"}, "label_col": "technology", "to_unit": "MW"}
+    result = load_spec(loader, var_set_spec)
+    assert len(result) == 1
+    assert result["value"].iloc[0] == pytest.approx(1500.0)
+
+
+def test_report_fallbacks_lists_all():
+    iamc = load_symbol_specs(backend="iamc")
+    fb = report_fallbacks(iamc)
+    assert set(fb.columns) == {"logical_name", "token", "value", "reason"}
+    # nuclear efficiency fallback is declared
+    tnrs_row = fb[fb["token"] == "tnrs"]
+    assert len(tnrs_row) == 1
+    assert tnrs_row["value"].iloc[0] == pytest.approx(0.33)
+    # CO2 intensity fallbacks (pecoal, pegas, peoil, pebiolc)
+    assert set(fb["token"]).issuperset({"pecoal", "pegas", "peoil", "pebiolc"})
 
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")

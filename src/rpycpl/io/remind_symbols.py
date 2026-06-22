@@ -1,9 +1,9 @@
-"""Central REMIND symbol configuration: load logical→GDX symbol maps and load frames.
+"""Central REMIND symbol configuration: load logical→GDX/IAMC symbol maps and load frames.
 
 Symbol definitions evolve, so they live in YAML (not code) and are *layered*:
 
-1. the package default ships at ``rpycpl/data/remind_symbols.yaml`` (see
-   ``default_symbol_config_path()``);
+1. the package default ships at ``rpycpl/data/remind_symbols_gdx.yaml`` (or ``…_iamc.yaml``),
+   selected by ``backend`` — neither is the implicit default when an explicit backend is given;
 2. a model/run may overlay its own YAML — passed as ``path=`` or via the ``RPYCPL_SYMBOLS``
    environment variable — which is **deep-merged on top** of the default, so the overlay only
    needs to list what differs (a new symbol, a renamed candidate, a region override).
@@ -11,11 +11,23 @@ Symbol definitions evolve, so they live in YAML (not code) and are *layered*:
 ``load_symbol_specs`` is split into debuggable steps: ``read_symbol_config`` (I/O + overlay →
 raw ``{default, overrides}`` dict) and ``merge_region_overrides`` (pure per-logical-name merge
 → the flat map). Inspect either on its own when debugging.
+
+Loading layer:
+
+* ``load_frame``     — single-quantity symbol (GDX or mif via ``symbol:`` key).
+* ``load_set``       — mixed-unit set symbol (GDX, ``index:``/``schema:`` shape).
+* ``load_variable_set`` — IAMC many-variables-to-one-frame (``variables:`` shape).
+* ``load_spec``      — dispatcher: picks ``load_variable_set`` or ``load_frame`` based on
+  spec shape so callers (e.g. ``build_capacity_targets``) stay backend-agnostic.
+
+``report_fallbacks`` returns a summary of all fallback declarations in a symbol map so
+coverage gaps are inspectable without running a full coupling.
 """
 
 from __future__ import annotations
 
 import importlib.resources
+import logging
 import os
 from os import PathLike
 from typing import Any
@@ -26,13 +38,34 @@ import yaml
 from rpycpl.io.loader import RemindLoader
 from rpycpl.units import unit_factor
 
+logger = logging.getLogger(__name__)
+
 #: Environment variable holding a path to a symbol-config overlay (deep-merged onto the default).
 SYMBOL_CONFIG_ENV = "RPYCPL_SYMBOLS"
 
 
-def default_symbol_config_path():
-    """Return the path to the packaged default symbol config (easy to open/copy/inspect)."""
-    return importlib.resources.files("rpycpl.data").joinpath("remind_symbols.yaml")
+def default_symbol_config_path(backend: str | None = None) -> Any:
+    """Return the path to the packaged default symbol config for ``backend``.
+
+    ``backend="gdx"`` → ``remind_symbols_gdx.yaml``;
+    ``backend="iamc"`` → ``remind_symbols_iamc.yaml``;
+    ``backend=None`` → ``remind_symbols_gdx.yaml`` (backward-compatible default).
+    """
+    if backend == "iamc":
+        name = "remind_symbols_iamc.yaml"
+    else:
+        name = "remind_symbols_gdx.yaml"
+    path = importlib.resources.files("rpycpl.data").joinpath(name)
+    # Fall back to legacy remind_symbols.yaml if the gdx file is absent (shouldn't happen
+    # but guards against stale installs that haven't run the rename yet).
+    if not hasattr(path, "read_text"):
+        return path
+    try:
+        path.read_text()
+    except FileNotFoundError:
+        if backend in (None, "gdx"):
+            return importlib.resources.files("rpycpl.data").joinpath("remind_symbols.yaml")
+    return path
 
 
 def _merge_config(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -47,15 +80,19 @@ def _merge_config(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, An
     return out
 
 
-def read_symbol_config(path: str | PathLike | None = None) -> dict[str, Any]:
+def read_symbol_config(
+    path: str | PathLike | None = None,
+    *,
+    backend: str | None = None,
+) -> dict[str, Any]:
     """Read the raw symbol config (``{default, overrides}``), overlaying a user file if any.
 
-    Always starts from the packaged default. An overlay file (``path``, else the
-    ``RPYCPL_SYMBOLS`` env var) is deep-merged on top. Inspect the return value to debug what
-    was actually loaded before any region merge.
+    Always starts from the packaged default for ``backend``. An overlay file (``path``, else
+    the ``RPYCPL_SYMBOLS`` env var) is deep-merged on top.
     """
-    base = yaml.safe_load(default_symbol_config_path().read_text())
-    overlay_path = path if path is not None else os.environ.get(SYMBOL_CONFIG_ENV)
+    base_path = default_symbol_config_path(backend)
+    base = yaml.safe_load(base_path.read_text())
+    overlay_path = path if path is not None else os.environ.get(SYMBOL_CONFIG_ENV)  # noqa: E501
     if overlay_path:
         base = _merge_config(base, yaml.safe_load(open(overlay_path).read()))
     return base
@@ -73,13 +110,19 @@ def merge_region_overrides(config: dict[str, Any], region: str | None) -> dict[s
     return merged
 
 
-def load_symbol_specs(region: str | None = None, path: str | PathLike | None = None) -> dict[str, Any]:
-    """Return the resolved symbol map: packaged default (+ optional overlay) merged for ``region``.
+def load_symbol_specs(
+    region: str | None = None,
+    path: str | PathLike | None = None,
+    *,
+    backend: str | None = None,
+) -> dict[str, Any]:
+    """Return the resolved symbol map for ``backend`` and ``region``.
 
-    Thin orchestrator over ``read_symbol_config`` (I/O + overlay) and ``merge_region_overrides``
-    (region merge); call those directly when debugging which config was read vs. how it merged.
+    ``region`` and ``path`` are positional for backward compatibility with existing callers.
+    Pass ``backend=loader.backend`` as a keyword argument to select the GDX or IAMC config.
+    ``backend=None`` (default) falls back to the GDX config.
     """
-    return merge_region_overrides(read_symbol_config(path), region)
+    return merge_region_overrides(read_symbol_config(path, backend=backend), region)
 
 
 def _get_symbol_ref(spec: dict[str, Any]):
@@ -148,3 +191,83 @@ def load_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
         part["unit"] = sub.get("to_unit", sub.get("unit"))
         frames.append(part)
     return pd.concat(frames, ignore_index=True) if frames else raw.iloc[0:0].assign(parameter=[], unit=[])
+
+
+def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
+    """Load a *variable-set* spec: many IAMC variables → one token-labelled frame.
+
+    Requires ``loader.backend == 'iamc'``. The spec must have a ``variables:`` block mapping
+    IAMC variable names to token labels. Optional ``derived:`` declares linear combinations.
+    Unit conversion is applied via ``assemble_variable_set``. Fallback tokens declared in
+    ``spec['fallback']`` are logged as warnings; the *caller* (typically an adapter) is
+    responsible for synthesising fallback rows with the correct region/year grid.
+    """
+    from rpycpl.io.iamc import assemble_variable_set, read_iamc
+
+    if loader.backend != "iamc":
+        raise ValueError(
+            f"load_variable_set requires iamc backend, got {loader.backend!r}. "
+            "Use load_frame or load_set for GDX specs."
+        )
+
+    mapping: dict[str, str] = spec["variables"]
+    derived: dict[str, list] | None = spec.get("derived")
+    label_col: str = spec.get("label_col", "technology")
+    to_unit: str | None = spec.get("to_unit")
+
+    # Collect all variable names (direct + derived components).
+    direct_vars = set(mapping)
+    derived_vars: set[str] = set()
+    if derived:
+        for terms in derived.values():
+            derived_vars.update(v for _, v in terms)
+    all_vars = list(direct_vars | derived_vars)
+
+    df = read_iamc(loader.source, variables=all_vars)
+    result = assemble_variable_set(df, mapping, label_col=label_col, derived=derived, to_unit=to_unit)
+
+    # Report declared fallbacks for missing tokens.
+    fallback = spec.get("fallback", {})
+    if fallback:
+        present = set(result[label_col].unique()) if not result.empty else set()
+        for token, fb in fallback.items():
+            if token not in present:
+                logger.warning(
+                    "Token %r absent from mif variable set; fallback needed: %s",
+                    token,
+                    fb.get("reason", "(no reason given)"),
+                )
+
+    return result
+
+
+def load_spec(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
+    """Dispatch to ``load_variable_set`` or ``load_frame`` based on the spec shape.
+
+    A spec with a ``variables:`` key is an IAMC variable-set; one with ``symbol:`` is a
+    single-quantity symbol (GDX or single-variable IAMC). Callers that need to work with
+    both backends use this instead of ``load_frame`` directly.
+    """
+    if "variables" in spec:
+        return load_variable_set(loader, spec)
+    return load_frame(loader, spec)
+
+
+def report_fallbacks(symbols: dict[str, Any]) -> pd.DataFrame:
+    """Return a summary DataFrame of all fallback declarations in a symbol map.
+
+    Scans every spec in ``symbols`` for a ``fallback:`` block and returns
+    ``[logical_name, token, value, reason]`` so coverage gaps are inspectable without a run.
+    """
+    rows = []
+    for name, spec in symbols.items():
+        if not isinstance(spec, dict):
+            continue
+        for token, fb in spec.get("fallback", {}).items():
+            rows.append({
+                "logical_name": name,
+                "token": token,
+                "value": fb.get("value"),
+                "reason": fb.get("reason", ""),
+            })
+    return pd.DataFrame(rows, columns=["logical_name", "token", "value", "reason"])
