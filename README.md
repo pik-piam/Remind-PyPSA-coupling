@@ -1,27 +1,24 @@
-# Tools to couple REMIND & PySPA
+# IAM-PyPSA-coupling: Coupling Integrated Assessment Models with PyPSA
+
+This repository contains tools to couple long-term Integrated Assessment Models (IAMs) with high-resolution Energy System Models (ESMs) based on [PyPSA](https://github.com/pypsa/pypsa). Coupling IAMs with ESMs can combine the complementary strengths of both model types, jointly optimising long-term transformation pathways and short-term power system operation.
+
+IAM-PyPSA-coupling currently focuses on unidirectional coupling from the IAM [REMIND](https://github.com/remindmodel/remind) to PyPSA, specifically [PyPSA-Eur](https://github.com/pik-piam/pypsa-eur-iam) and [PyPSA-China](github.com/pik-piam/PyPSA-China-PIKl). Data can be read from REMIND's native GAMS GDX output or from the standardised [IAMC format](https://docs.ece.iiasa.ac.at/iamc.html).
+
+Other IAMs will be supported in the future.
+
+> [!NOTE]
+> This package is under active development, led by the Potsdam Institute for Climate Impact Research's [Energy Transition Lab](https://www.pik-potsdam.de/en/institute/labs/energy-transition).
 
 ## Overview
-`rpycpl` is the **shared layer** of the REMIND ↔ PyPSA soft-coupling: it holds the logic
-that is identical for every PyPSA model that couples to REMIND (reading REMIND output, unit
-conversion, the cost/capacity/demand/CO₂ transforms, region→country downscaling) behind a
-small adapter interface. Each PyPSA model supplies a thin **adapter** that subclasses
-`rpycpl.CouplingAdapter` and is driven by that model's own Snakemake rules.
 
-> REMIND-side logic lives in the package; PyPSA-side logic lives in the model. The adapter
-> is the only seam where the two meet.
+IAM-PyPSA-coupling (`iampypsa`) contains all logic that is identical for every PyPSA model such as reading IAM output, unit conversions, transformations of demand/costs/capacity, and downscaling of sectoral demand from IAM regions to country level.
 
-Test cases: PyPSA-EUR (Europe) and PyPSA-China-PIK (China); PyPSA-Earth is a near-term
-target. See **[Architecture & usage](docs/architecture.md)** for how the components fit
-together, what belongs in the package versus the adapter, and how to add a new model.
-
-## quick start
-1. install from pypi `pip install remind-pypsa-coupling`
-2. import with `import rpycpl`
-
-## Documentation
-https://pik-piam.github.io/Remind-PyPSA-coupling/
+PyPSA models call the package from their snakemake workflow, which needs to be adapted accordingly, see e.g. [PyPSA-Eur-IAM](https://github.com/pik-piam/pypsa-eur-iam).
 
 # Installation (development)
+
+To be updated.
+
 We recommend using `uv`. 
 1. install uv
 2. make a venv `uv venv` at `project/.venv`
@@ -34,19 +31,18 @@ We recommend using `uv`.
 > - run `uv pip install pip` after step 3
 > - run `pip install -e .` in the project worspace
 
-# Usage
-This package is intended for use in combination with REMIND and PyPSA, as part of a
-snakemake workflow. In a coupled model you:
+## Documentation
 
-1. subclass `rpycpl.CouplingAdapter` in the model repo, implementing `build_config_overrides`
-   and overriding only the hooks that genuinely differ for that model;
-2. write thin Snakemake rules that build a `RemindLoader` + `load_symbol_specs()`, construct
-   the adapter, call its methods, and write the outputs.
+https://pik-piam.github.io/IAM-PyPSA-coupling/ (to be updated)
 
-Worked examples (PyPSA-Eur and PyPSA-China adapters + rules) and a step-by-step walkthrough
-are in **[docs/architecture.md](docs/architecture.md)**.
+TODO: Update documentation with concrete steps how to use coupling package, data types exchanged between models, examples.
 
-Activate the venv with `source .venv/bin/activate`
+## Usage
 
+To be updated.
 
+## Further information
 
+For more background on the model coupling of IAMs and ESMs see:
+
+> Odenweller, A. et al. (2026). REMIND-PyPSA-Eur: integrating power system flexibility into sector-coupled energy transition pathways. *Progress in Energy*. https://doi.org/10.1088/2516-1083/ae3ffe
