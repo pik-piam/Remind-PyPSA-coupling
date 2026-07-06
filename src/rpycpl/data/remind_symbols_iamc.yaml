@@ -17,6 +17,10 @@
 #       fallback:   {token: {value: <float>, reason: <str>}} — temporary gaps; logged as warnings
 #
 # Unit strings must match the mif's 'Unit' column exactly and exist in rpycpl.units.UNIT_CONVERSIONS.
+# No per-region overrides for the IAMC backend: PyPSA-China couples REMIND region CHA from the
+# IAMC .mif, whose variable names are region-independent, so CHA inherits every `default` spec
+# (Price|Carbon, the Cap|… capacity variable-set, FE demand, costs). The raw-GDX CHA symbol names
+# (pm_taxCO2eq, vm_cap, c_expname, …) live in remind_symbols_gdx.yaml for a future raw-GDX path.
 overrides: {}
 
 

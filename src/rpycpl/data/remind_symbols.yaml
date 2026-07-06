@@ -29,9 +29,9 @@
 
 default:
   co2_price:
-    symbol: [v32_taxCO2eq, p_priceCO2]
+    symbol: [pm_taxCO2eqSum]
     rename: {tall: year, all_regi: region}
-    units: [$/tC, $/tC]      # both REMIND vintages report carbon price per tonne C
+    units: [$/tC]      # both REMIND vintages report carbon price per tonne C
     to_unit: $/tCO2          # -> factor 12/44 from the central table
   load_sector:
     symbol: [v32_load_sector, p32_load_sector]
@@ -39,7 +39,7 @@ default:
     unit: TWa
     to_unit: MWh             # year-average power -> annual energy (1e6 * 8760)
   capacity:
-    symbol: p32_capAvg
+    symbol: p32_cap
     rename: {ttot: year, all_regi: region, all_te: technology}
     unit: TW
     to_unit: MW              # 1e6
@@ -83,7 +83,7 @@ default:
     unit: Gt_C/TWa
     to_unit: t_CO2/MWh       # filtered to seel/co2 in the adapter; factor is uniform
   fuel_price:
-    symbol: p32_PEPriceAvg
+    symbol: p32_PEPrice
     rename: {ttot: year, all_regi: region, all_enty: technology}
     unit: T$/TWa             # converted in the adapter (the `peur` fuel is a per-tech exception)
   discount_rate:
@@ -103,28 +103,7 @@ default:
     unit: TWa
     to_unit: MWh             # 1e6 * 8760
 
-overrides:
-  # Keyed by REMIND region name. Each region lists only the logical names that differ from
-  # `default`; units and the tech_data schema are inherited unless re-stated here.
-  CHA:
-    # PyPSA-China couples REMIND region CHA from a RAW REMIND fulldata GDX, so a few names are the
-    # native REMIND symbols (not the curated p32_* coupling exports the EUR interface uses).
-    co2_price:
-      symbol: [pm_taxCO2eq]
-      rename: {ttot: year, all_regi: region}
-      units: [$/tC]
-      to_unit: $/tCO2
-    capacity:                       # variable -> 'level'; summed over rlf grades downstream
-      symbol: vm_cap
-      rename: {tall: year, all_regi: region, all_te: technology, level: value}
-      unit: TW
-      to_unit: MW
-    model_version:
-      symbol: c_model_version
-    run_name:
-      symbol: c_expname
-    # NOTE: tech_data / efficiency_* / emission_factor / discount_rate are identical to `default`
-    # for CHA, so they are inherited (including the tech_data schema and all units) — not repeated.
-    # TODO(china): the raw fulldata GDX has no p32_load_sector / p32_capCost coupling exports.
-    #   load_sector and cost_investment must be derived from native FE-demand symbols
-    #   (pm_fedemand / cesIO) and a China cost symbol — pending the China export convention.
+  model_version:
+    symbol: c_model_version
+  run_name:
+    symbol: c_expname
