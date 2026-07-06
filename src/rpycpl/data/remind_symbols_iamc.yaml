@@ -17,6 +17,8 @@
 #       fallback:   {token: {value: <float>, reason: <str>}} — temporary gaps; logged as warnings
 #
 # Unit strings must match the mif's 'Unit' column exactly and exist in rpycpl.units.UNIT_CONVERSIONS.
+overrides: {}
+
 
 default:
   # --- CO2 price -----------------------------------------------------------
@@ -272,6 +274,7 @@ default:
       "FE|Transport|Freight|Electricity":         EV_freight
       "FE|Buildings|Heating|Electricity|Heat pump": heatpump
       "FE|Buildings|Heating|Electricity|Resistance": resistive
+      "FE|Buildings|non-Heating|Electricity|Space Cooling": space_cooling
     label_col: sector
     to_unit: MWh    # EJ/yr → MWh (factor ~2.778e8)
 
@@ -311,5 +314,3 @@ default:
     symbol: "SE|Electricity|Hydro"
     unit: "EJ/yr"
     to_unit: "MWh"
-
-overrides: {}

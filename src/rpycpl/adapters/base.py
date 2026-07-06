@@ -110,7 +110,12 @@ class CouplingAdapter:
         )
 
     def downscale_country_demand(self, regional: pd.DataFrame | None = None) -> pd.DataFrame:
-        """Downscale REMIND regional demand to per-country annual demand by sector and year."""
+        """Downscale REMIND regional demand to per-country annual demand by sector and year.
+
+        The proxy registry is ``self.reference_data`` verbatim — it already holds ``population``/
+        ``gdp`` (and any ``heating_demand``/``cooling_demand`` the caller added). Each sector's
+        ``sector_weights`` entry names which of those proxies to blend.
+        """
         loads = self.build_regional_demand() if regional is None else regional
         if self.config.get("planning_horizons"):
             years = {int(y) for y in self.config["planning_horizons"]}
@@ -118,8 +123,7 @@ class CouplingAdapter:
         return disaggregate_demand_to_country(
             loads,
             self.region_map,
-            self.ssp_population,
-            self.ssp_gdp,
+            self.reference_data,
             self.config["sector_weights"],
             set(self.config["countries"]),
         )

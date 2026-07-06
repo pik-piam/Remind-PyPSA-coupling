@@ -30,6 +30,18 @@ ID_COLUMNS = ["model", "scenario", "region", "variable", "unit"]
 # IAMC id-column header names (as written in the file, before lower-casing).
 _ID_RAW = ["Model", "Scenario", "Region", "Variable", "Unit"]
 
+# REMIND writes variable trees with "+"-only segments marking the current summation level
+# (e.g. ``Cap|Electricity|+|Nuclear``, ``Cap|Electricity|Gas|CC|+|w/o CC``). Those markers are a
+# pure reporting artifact — the canonical variable name has no "+" — and their placement varies
+# with reporting depth. Strip them so symbol maps reference clean names (matching the wider REMIND
+# tooling, e.g. piamInterfaces/remind2). Verified collision-free on the reference REMIND .mif.
+_AGG_MARKER = re.compile(r"\|\++\|")
+
+
+def _strip_agg_markers(variables: "pd.Series") -> "pd.Series":
+    """Remove REMIND ``|+|``/``|++|`` summation-level markers from IAMC variable names."""
+    return variables.str.replace(_AGG_MARKER, "|", regex=True)
+
 
 def read_iamc(
     path: str | PathLike,
@@ -48,6 +60,10 @@ def read_iamc(
     # Lower-case the five id columns so callers can rely on consistent names.
     rename = {c: c.lower() for c in _ID_RAW if c in raw.columns}
     raw = raw.rename(columns=rename)
+    # Canonicalise variable names by dropping REMIND summation-level "+" markers (see above),
+    # so both the early filter and downstream mapping match clean spec names.
+    if "variable" in raw.columns:
+        raw["variable"] = _strip_agg_markers(raw["variable"])
     # Filter before the expensive melt — on a 167k-variable file this matters.
     if variables is not None:
         raw = raw[raw["variable"].isin(set(variables))]
@@ -63,7 +79,7 @@ def read_iamc(
 def list_iamc_variables(path: str | PathLike, sep: str = ";") -> list[str]:
     """List the IAMC variable names present in a ``.mif`` file (sorted)."""
     raw = pd.read_csv(path, sep=sep, usecols=["Variable"], dtype=str)
-    return sorted(raw["Variable"].dropna().unique().tolist())
+    return sorted(_strip_agg_markers(raw["Variable"].dropna()).unique().tolist())
 
 
 def parse_currency_year(unit: str) -> int | None:
