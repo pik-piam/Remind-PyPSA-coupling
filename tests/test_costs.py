@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import pytest
 
-from rpycpl.transforms.costs import (
+from iampypsa.transforms.costs import (
     add_discount_rate,
     build_mapped_overrides,
     convert_investment_to_input_capacity_basis,
@@ -88,7 +88,7 @@ def test_convert_investment_basis_synthetic():
 @pytest.mark.skipif(not (os.path.exists(EUR_GDX) and os.path.exists(REF_RAW)),
                     reason="EUR development data not present")
 def test_investment_basis_matches_reference_for_electrolysis():
-    from rpycpl.io import read_gdx_symbol as read_gdx
+    from iampypsa.io import read_gdx_symbol as read_gdx
 
     capcost = read_gdx(
         EUR_GDX, "p32_capCost",

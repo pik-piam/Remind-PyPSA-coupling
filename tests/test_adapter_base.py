@@ -1,7 +1,7 @@
 """Tests for the (directly instantiable) CouplingAdapter: builders vs dev references.
 
 The adapter is now concrete — no subclass is required. The data-driven checks run against the
-development GDX/reference CSVs when present (they depend only on rpycpl + pandas).
+development GDX/reference CSVs when present (they depend only on iampypsa + pandas).
 """
 
 from __future__ import annotations
@@ -11,8 +11,8 @@ import os
 import pandas as pd
 import pytest
 
-from rpycpl.adapters.base import CouplingAdapter
-from rpycpl.transforms.capacities import build_capacity_targets
+from iampypsa.adapters.base import CouplingAdapter
+from iampypsa.transforms.capacities import build_capacity_targets
 
 DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1"
 GDX = f"{DEV}/REMIND2PyPSAEUR.gdx"
@@ -31,9 +31,9 @@ def test_adapter_is_directly_instantiable():
 def _adapter():
     import yaml
 
-    from rpycpl.io import RemindLoader
-    from rpycpl.io.remind_symbols import load_symbol_specs
-    from rpycpl.transforms.mapping import read_region_map
+    from iampypsa.io import RemindLoader
+    from iampypsa.io.remind_symbols import load_symbol_specs
+    from iampypsa.transforms.mapping import read_region_map
 
     cfg = yaml.safe_load(open(f"{DEV}/config.remind_europe_without_NES_fixed.yaml"))
     co2 = pd.read_csv(f"{DEV}/co2_price.csv")
@@ -46,7 +46,7 @@ def _adapter():
             "countries": cfg["countries"],
             "planning_horizons": sorted(co2["year"].unique()),
         },
-        remind_regions=sorted(pd.read_csv(f"{DEV}/sectoral_load.csv")["region"].unique()),
+        model_regions=sorted(pd.read_csv(f"{DEV}/sectoral_load.csv")["region"].unique()),
         ssp_population=pd.read_csv(f"{SSP}/population.csv").set_index(["iso2", "year"]),
         ssp_gdp=pd.read_csv(f"{SSP}/gdp.csv").set_index(["iso2", "year"]),
     )
@@ -72,7 +72,7 @@ def test_build_country_loads_matches_reference():
 @pytest.mark.skipif(not HAVE_DATA, reason="dev data not present")
 def test_cost_overrides_match_reference_remind_rows():
     """extract_cost_parameters (+ inline btin² as the EUR script does) vs the raw cost reference."""
-    from rpycpl.transforms.costs import (
+    from iampypsa.transforms.costs import (
         build_mapped_overrides,
         convert_investment_to_input_capacity_basis,
     )
@@ -112,7 +112,7 @@ def test_full_capacity_targets_match_reference():
     tmap = mapping[["PyPSA-Eur technology", "reference"]].rename(
         columns={"PyPSA-Eur technology": "PyPSA-Eur", "reference": "REMIND-EU"})
     a = _adapter()
-    got = build_capacity_targets(a.loader, a.symbols, a.remind_regions, tmap)
+    got = build_capacity_targets(a.loader, a.symbols, a.model_regions, tmap)
     got["year"] = got["year"].astype(int)
     g = got.query("region == 'DEU' and year == 2050").set_index("carrier")["p_nom_min"]
     r = (

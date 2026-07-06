@@ -1,6 +1,6 @@
 # Architecture
 
-`rpycpl` is the **shared layer** of the REMIND ↔ PyPSA soft-coupling. It provides backend
+`iampypsa` is the **shared layer** of the REMIND ↔ PyPSA soft-coupling. It provides backend
 functions *that are needed* by all PyPSA models that couple to REMIND (reading REMIND
 output, unit conversion, downscaling, the cost/capacity/load/CO₂ transforms) behind a small,
 stable interface.
@@ -21,7 +21,7 @@ new model — see **[Plugging into a PyPSA workflow](workflow.md)**.
 
 !!! info "Symbols"
     "Symbol" is the GAMS name for sets, scalars, parameters and variables — these are the
-    REMIND outputs that `rpycpl` reads.
+    REMIND outputs that `iampypsa` reads.
 
 ---
 
@@ -35,7 +35,7 @@ flowchart TB
         cfg["data/remind_symbols.yaml"]
     end
 
-    subgraph pkg["rpycpl — shared package"]
+    subgraph pkg["iampypsa — shared package"]
         subgraph internal["internal modules — private, driven by the adapter"]
             direction LR
             io["io/<br/>RemindLoader · remind_symbols"] --> tf["transforms/<br/>co2 · loads · capacities · costs"] --> ds["downscale/<br/>region → country (SSP)"]
@@ -74,12 +74,12 @@ outputs into the model's own resource paths.
 
 ## What lives where
 
-### In the package (`rpycpl`) — shared, model-agnostic
+### In the package (`iampypsa`) — shared, model-agnostic
 
 | Subpackage | Component | Responsibility |
 |---|---|---|
 | `io/` | `loader.RemindLoader` | Open a REMIND source and resolve/read symbols. Backend (`gdx` via `gamspy`, or `iamc` `.mif`/`.csv`) is auto-detected; `lru`-cached. |
-| `io/` | `remind_symbols` (+ `data/remind_symbols.yaml`) | Map **coupling names** — rpycpl's own stable names for a quantity (`co2_price`, `capacity`, `tech_data`, …) → the actual REMIND symbol name(s), plus the unit each carries. `load_frame()` / `load_set()` read a symbol and apply the declared unit conversion. |
+| `io/` | `remind_symbols` (+ `data/remind_symbols.yaml`) | Map **coupling names** — iampypsa's own stable names for a quantity (`co2_price`, `capacity`, `tech_data`, …) → the actual REMIND symbol name(s), plus the unit each carries. `load_frame()` / `load_set()` read a symbol and apply the declared unit conversion. |
 | `io/` | `ssp` | Fetch / read the SSP population & GDP proxy datasets used by downscaling. |
 | `units` | `units.py` | Single source of truth for every `(from_unit, to_unit) → factor`. |
 | `transforms/` | `co2_prices`, `loads`, `capacities`, `costs`, `mapping` | Pure functions on already-loaded **tidy frames**. They never read files and never know REMIND symbol names. |
@@ -147,7 +147,7 @@ to the workflow, so it must be supplied. This keeps adapters tiny.
 can be overwritten in the PyPSA model's thin coupling layer.
 
 Each top-level key in the YAML (`co2_price`, `capacity`, `tech_data`, …) is a **coupling
-name**: rpycpl's own stable name for a quantity. The coupling code only ever refers to a
+name**: iampypsa's own stable name for a quantity. The coupling code only ever refers to a
 quantity by its coupling name (`self.symbols["co2_price"]`); the YAML maps that name to the
 actual REMIND symbol name(s). This is *not* the PyPSA carrier name — that mapping happens
 later, in the tech/carrier CSV. The indirection means REMIND can rename or version a symbol
