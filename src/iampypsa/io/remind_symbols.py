@@ -2,7 +2,7 @@
 
 Symbol definitions evolve, so they live in YAML (not code) and are *layered*:
 
-1. the package default ships at ``iampypsa/data/remind_symbols_gdx.yaml`` (or ``…_iamc.yaml``),
+1. the package default ships at ``iampypsa/data/remind_symbols_gdx.yaml`` (or ``…_mif.yaml``),
    selected by ``backend`` — neither is the implicit default when an explicit backend is given;
 2. a model/run may overlay its own YAML — passed as ``path=`` or via the ``RPYCPL_SYMBOLS``
    environment variable — which is **deep-merged on top** of the default, so the overlay only
@@ -51,24 +51,14 @@ def default_symbol_config_path(backend: str | None = None) -> Any:
     """Return the path to the packaged default symbol config for ``backend``.
 
     ``backend="gdx"`` → ``remind_symbols_gdx.yaml``;
-    ``backend="iamc"`` → ``remind_symbols_iamc.yaml``;
+    ``backend="iamc"`` → ``remind_symbols_mif.yaml``;
     ``backend=None`` → ``remind_symbols_gdx.yaml`` (backward-compatible default).
     """
     if backend == "iamc":
-        name = "remind_symbols_iamc.yaml"
+        name = "remind_symbols_mif.yaml"
     else:
         name = "remind_symbols_gdx.yaml"
-    path = importlib.resources.files("iampypsa.data").joinpath(name)
-    # Fall back to legacy remind_symbols.yaml if the gdx file is absent (shouldn't happen
-    # but guards against stale installs that haven't run the rename yet).
-    if not hasattr(path, "read_text"):
-        return path
-    try:
-        path.read_text()
-    except FileNotFoundError:
-        if backend in (None, "gdx"):
-            return importlib.resources.files("iampypsa.data").joinpath("remind_symbols.yaml")
-    return path
+    return importlib.resources.files("iampypsa.data").joinpath(name)
 
 
 def _merge_config(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:

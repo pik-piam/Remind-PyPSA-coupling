@@ -1,6 +1,7 @@
 # IAMC / .mif symbol map for the REMIND→PyPSA-Eur coupling.
 #
-# Parallel to remind_symbols_gdx.yaml; selected by load_symbol_specs(backend="iamc").
+# This is remind_symbols_mif.yaml, parallel to remind_symbols_gdx.yaml;
+# selected by load_symbol_specs(backend="iamc").
 #
 # Spec shapes:
 #

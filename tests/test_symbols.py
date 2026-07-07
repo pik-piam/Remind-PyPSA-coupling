@@ -92,7 +92,7 @@ def test_default_symbol_config_path_exists():
     # Default (no backend) and explicit "gdx" both resolve to the GDX config.
     assert default_symbol_config_path().name == "remind_symbols_gdx.yaml"
     assert default_symbol_config_path(backend="gdx").name == "remind_symbols_gdx.yaml"
-    assert default_symbol_config_path(backend="iamc").name == "remind_symbols_iamc.yaml"
+    assert default_symbol_config_path(backend="iamc").name == "remind_symbols_mif.yaml"
     assert "default:" in default_symbol_config_path().read_text()
 
 
