@@ -2,9 +2,7 @@
 
 This repository contains tools to couple long-term Integrated Assessment Models (IAMs) with high-resolution Energy System Models (ESMs) based on [PyPSA](https://github.com/pypsa/pypsa). Coupling IAMs with ESMs can combine the complementary strengths of both model types, jointly optimising long-term transformation pathways and short-term power system operation.
 
-IAM-PyPSA-coupling currently focuses on unidirectional coupling from the IAM [REMIND](https://github.com/remindmodel/remind) to PyPSA, specifically [PyPSA-Eur](https://github.com/pik-piam/pypsa-eur-iam) and [PyPSA-China](github.com/pik-piam/PyPSA-China-PIKl). Data can be read from REMIND's native GAMS GDX output or from the standardised [IAMC format](https://docs.ece.iiasa.ac.at/iamc.html).
-
-Other IAMs will be supported in the future.
+IAM-PyPSA-coupling currently focuses on unidirectional coupling from the IAM [REMIND](https://github.com/remindmodel/remind) to PyPSA, specifically [PyPSA-Eur](https://github.com/pik-piam/pypsa-eur-iam) and [PyPSA-China](github.com/pik-piam/PyPSA-China-PIK). Data can be read from REMIND's native GAMS GDX output or from the standardised [IAMC format](https://docs.ece.iiasa.ac.at/iamc.html).
 
 > [!NOTE]
 > This package is under active development, led by the Potsdam Institute for Climate Impact Research's [Energy Transition Lab](https://www.pik-potsdam.de/en/institute/labs/energy-transition).
@@ -13,9 +11,23 @@ Other IAMs will be supported in the future.
 
 IAM-PyPSA-coupling (`iampypsa`) contains all logic that is identical for every PyPSA model such as reading IAM output, unit conversions, transformations of demand/costs/capacity, and downscaling of sectoral demand from IAM regions to country level.
 
-PyPSA models call the package from their snakemake workflow, which needs to be adapted accordingly, see e.g. [PyPSA-Eur-IAM](https://github.com/pik-piam/pypsa-eur-iam).
+## Supported IAMs
 
-# Installation (development)
+Currently supported IAMs include:
+
+- [REMIND](https://github.com/remindmodel/remind) (under development)
+- Interested in adding your IAM? Contact us!
+
+## Supported PyPSA models
+
+PyPSA models call the package from their snakemake workflow, which needs to be adapted accordingly.
+
+Currently supported PyPSA models (under active development) include:
+
+* PyPSA-Eur, see dedicated [PyPSA-Eur-IAM](https://github.com/pik-piam/pypsa-eur-iam) repository
+* PyPSA-China, see dedicated [PyPSA-China-PIK](github.com/pik-piam/PyPSA-China-PIK) repository
+
+## Installation (development)
 
 To be updated.
 
