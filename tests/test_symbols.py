@@ -106,12 +106,20 @@ def test_load_frame_applies_per_candidate_unit():
     }
     out = load_frame(loader, spec)
     assert out["value"].iloc[0] == pytest.approx(100.0 * 12 / 44)
+    assert out["unit"].iloc[0] == "$/tCO2"  # stamped from to_unit
 
 
 def test_load_frame_no_conversion_without_to_unit():
     loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0]})})
     out = load_frame(loader, {"symbol": "sym", "unit": "T$/TWa"})  # no to_unit → untouched
     assert out["value"].iloc[0] == 5.0
+    assert out["unit"].iloc[0] == "T$/TWa"  # stamped from the declared source unit
+
+
+def test_load_frame_no_unit_column_when_unit_undeclared():
+    loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0]})})
+    out = load_frame(loader, {"symbol": "sym"})  # no unit/to_unit declared at all
+    assert "unit" not in out.columns
 
 
 def test_load_set_splits_mixed_units_via_schema():
@@ -231,6 +239,17 @@ def test_load_spec_dispatches_on_shape(tmp_path):
     result = load_spec(loader, var_set_spec)
     assert len(result) == 1
     assert result["value"].iloc[0] == pytest.approx(1500.0)
+
+
+def test_load_spec_variables_shape_rejects_gdx_backend():
+    # A `variables:` spec dispatches to load_variable_set regardless of backend, which
+    # raises clearly if the loader isn't IAMC-backed — spec-shape dispatch doesn't imply
+    # every shape is satisfiable by every backend.
+    loader = _FakeLoader({})
+    loader.backend = "gdx"
+    var_set_spec = {"variables": {"Cap|Electricity|Gas|GT": "ngt"}, "label_col": "technology", "to_unit": "MW"}
+    with pytest.raises(ValueError, match="requires an IAMC-backed loader"):
+        load_spec(loader, var_set_spec)
 
 
 def test_report_fallbacks_lists_all():

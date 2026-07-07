@@ -1,5 +1,6 @@
-"""IAM input readers (GDX + IAMC ``.mif``) behind one loader, plus the config-aware
-symbol layer (``remind_symbols``) that resolves logical names + units on top of the loader."""
+"""IAM input readers behind one loader — currently GDX and IAMC ``.mif`` (``Backend`` is the
+extension point for further formats), plus the config-aware symbol layer (``remind_symbols``)
+that resolves logical names + units on top of the loader."""
 
 from __future__ import annotations
 

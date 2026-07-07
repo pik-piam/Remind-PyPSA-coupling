@@ -14,11 +14,14 @@ raw ``{default, overrides}`` dict) and ``merge_region_overrides`` (pure per-logi
 
 Loading layer:
 
-* ``load_frame``     — single-quantity symbol (GDX or mif via ``symbol:`` key).
-* ``load_set``       — mixed-unit set symbol (GDX, ``index:``/``schema:`` shape).
-* ``load_variable_set`` — IAMC many-variables-to-one-frame (``variables:`` shape).
-* ``load_spec``      — dispatcher: picks ``load_variable_set`` or ``load_frame`` based on
-  spec shape so callers (e.g. ``build_capacity_targets``) stay backend-agnostic.
+* ``load_frame``     — single-quantity symbol, addressed via ``symbol:`` key.
+* ``load_set``       — mixed-unit set symbol (``index:``/``schema:`` shape).
+* ``load_variable_set`` — many-variables-to-one-frame assembly (``variables:`` shape);
+  only satisfiable by a loader whose source format exposes named-variable lookup (IAMC today).
+* ``load_spec``      — dispatcher: picks by spec shape (``variables:`` →
+  ``load_variable_set``; ``index:``/``schema:`` → ``load_set``; else → ``load_frame``).
+  A ``variables:`` spec still requires an IAMC-backed loader; the dispatch is on spec shape,
+  not a guarantee that every spec shape works with every backend.
 
 ``report_fallbacks`` returns a summary of all fallback declarations in a symbol map so
 coverage gaps are inspectable without running a full coupling.
@@ -149,11 +152,11 @@ def _source_unit(spec: dict[str, Any], ref, resolved_name: str) -> str | None:
 def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Load the frame for one single-quantity symbol spec, applying its unit conversion.
 
-    The source-symbol reference comes from ``symbol`` (backend-neutral; falls back to legacy
-    ``gdx``). If the spec declares a source unit (``unit:`` or a per-candidate ``units:`` list)
-    AND a target ``to_unit:``, the canonical ``value`` column is scaled by the central
-    ``iampypsa.units`` factor on load — so conversions live in config + one table, not in code.
-    A legacy ``unit_factor:`` scalar is still honoured. Use ``load_set`` for mixed-unit symbols.
+    Resolves ``symbol`` (falls back to legacy ``gdx``), then scales ``value`` via the central
+    ``iampypsa.units`` factor when both a source unit (``unit:``/``units:``) and ``to_unit:``
+    are declared (a legacy ``unit_factor:`` scalar is also honoured). Stamps the resolved unit
+    onto a ``unit`` column, matching ``load_set``/``load_variable_set``, unless no unit is
+    declared at all. Use ``load_set`` for mixed-unit symbols.
     """
     ref = _get_symbol_ref(spec)
     resolved = loader.resolve_symbol(ref)
@@ -166,6 +169,10 @@ def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     if "unit_factor" in spec and "value" in df.columns:
         df = df.copy()
         df["value"] = df["value"] * spec["unit_factor"]
+    unit = to_unit if to_unit is not None else src_unit
+    if unit is not None and "value" in df.columns:
+        df = df.copy()
+        df["unit"] = unit
     return df
 
 
@@ -196,18 +203,16 @@ def load_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
 def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Load a *variable-set* spec: many IAMC variables → one token-labelled frame.
 
-    Requires ``loader.backend == 'iamc'``. The spec must have a ``variables:`` block mapping
-    IAMC variable names to token labels. Optional ``derived:`` declares linear combinations.
-    Unit conversion is applied via ``assemble_variable_set``. Fallback tokens declared in
-    ``spec['fallback']`` as ``{token: {value: float, unit: str, reason: str}}`` are
-    automatically synthesised and appended when absent from the loaded data (one row per
-    present ``(year, region)`` combination). ``unit`` defaults to the spec's ``to_unit``.
+    IAMC-only (no GDX equivalent — GDX already carries a tech-domain column per symbol).
+    ``variables:`` maps IAMC variable names to token labels; optional ``derived:`` declares
+    linear combinations. Fallback tokens in ``spec['fallback']`` (``{token: {value, unit,
+    reason}}``) are synthesised for every ``(year, region)`` when absent from the data.
     """
     from iampypsa.io.iamc import assemble_variable_set, read_iamc
 
     if loader.backend != "iamc":
         raise ValueError(
-            f"load_variable_set requires iamc backend, got {loader.backend!r}. "
+            f"load_variable_set requires an IAMC-backed loader, got {loader.backend!r}. "
             "Use load_frame or load_set for GDX specs."
         )
 
@@ -262,9 +267,9 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
 def load_spec(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Dispatch to ``load_variable_set`` or ``load_frame`` based on the spec shape.
 
-    A spec with a ``variables:`` key is an IAMC variable-set; one with ``symbol:`` is a
-    single-quantity symbol (GDX or single-variable IAMC). Callers that need to work with
-    both backends use this instead of ``load_frame`` directly.
+    Dispatches on spec *shape* (``variables:`` vs ``symbol:``), not on ``loader.backend`` —
+    though a ``variables:`` spec still only works against a loader whose format supports it
+    (currently IAMC; see ``load_variable_set``).
     """
     if "variables" in spec:
         return load_variable_set(loader, spec)

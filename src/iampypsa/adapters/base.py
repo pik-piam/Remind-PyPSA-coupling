@@ -6,8 +6,8 @@ driven by the resolved symbol map and config, and declares the two source-specif
 (``build_regional_demand``, ``extract_cost_parameters``) as abstract-style methods that
 raise ``NotImplementedError``.
 
-Concrete adapters for each IAM output format (instantiated directly by the caller,
-which selects on ``loader.backend``):
+Concrete adapters (instantiated directly by the caller, which selects on ``loader.backend``);
+a new IAM or output format is added as a further ``CouplingAdapter`` subclass, not a branch here:
 - ``RemindGdxAdapter``  (``iampypsa.adapters.gdx``)
 - ``RemindIamcAdapter`` (``iampypsa.adapters.iamc``)
 
@@ -77,7 +77,8 @@ class CouplingAdapter:
         """
         raise NotImplementedError(
             f"{type(self).__name__} must implement build_regional_demand(). "
-            "Instantiate RemindGdxAdapter or RemindIamcAdapter (per loader.backend)."
+            "Instantiate RemindGdxAdapter or RemindIamcAdapter (per loader.backend), "
+            "or a new CouplingAdapter subclass for another IAM."
         )
 
     def extract_cost_parameters(self, year: int) -> pd.DataFrame:
@@ -87,7 +88,8 @@ class CouplingAdapter:
         """
         raise NotImplementedError(
             f"{type(self).__name__} must implement extract_cost_parameters(). "
-            "Instantiate RemindGdxAdapter or RemindIamcAdapter (per loader.backend)."
+            "Instantiate RemindGdxAdapter or RemindIamcAdapter (per loader.backend), "
+            "or a new CouplingAdapter subclass for another IAM."
         )
 
     # -- Shared concrete builders -------------------------------------------
@@ -95,8 +97,9 @@ class CouplingAdapter:
     def build_co2_prices(self, years: Sequence[int] | None = None) -> pd.DataFrame:
         """Build the per-(region, year) CO2 price pathway.
 
-        Works for both backends: GDX spec applies tC→tCO2 conversion; IAMC spec reports
-        directly in t CO2 (no conversion). The runtime ``currency_factor`` is always applied.
+        Conversion is spec-driven: applies whatever ``(unit, to_unit)`` factor the resolved
+        ``co2_price`` symbol's config declares (a no-op when the source already reports t CO2).
+        The runtime ``currency_factor`` is always applied.
 
         ``years`` selects the year set to reindex to (missing filled with 0); when ``None``
         it falls back to ``config["planning_horizons"]``. Callers that derive the coupled-year
@@ -127,9 +130,8 @@ class CouplingAdapter:
     def discount_rates(self, year: int) -> pd.Series:
         """Return the discount rate per region for ``year``, indexed by region.
 
-        Works for both backends: GDX spec reads ``p_r``; IAMC spec reads
-        ``Interest Rate t/(t-1)|Real``. When a region has no value for ``year`` (e.g. NaN
-        in the last mif column), the most recent earlier year's value is used with a warning.
+        When a region has no value for ``year`` (e.g. a trailing NaN in the source), the
+        most recent earlier year's value is used with a warning.
         """
         p_r = (
             load_frame(self.loader, self.symbols["discount_rate"])
