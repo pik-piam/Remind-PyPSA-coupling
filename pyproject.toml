@@ -1,7 +1,7 @@
 [project]
-name = "REMIND-PyPSA-coupling"
+name = "iam-pypsa-coupling"
 version = "0.2.0"
-description = "Tools to couple the REMIND IAM and PyPSA power models"
+description = "Tools to couple IAMs and PyPSA power models"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,21 +12,21 @@ dependencies = [
     "pytest"]
 
 [project.urls]
-Homepage = "https://github.com/pik-piam/Remind-PyPSA-coupling/"
-Documentation = "https://pik-piam.github.io/Remind-PyPSA-coupling/"
+Homepage = "https://github.com/pik-piam/IAM-PyPSA-coupling/"
+Documentation = "https://pik-piam.github.io/IAM-PyPSA-coupling/"
 
 # eg `uv pip install -r pyproject.toml --extra release`
 [project.optional-dependencies]
 jupyter = ["ipykernel","ipython"]
 gdx = ["gamspy"]
-ssp = ["httpx"]   # live SSP fetch from the IIASA API (rpycpl.io.ssp.fetch_ssp_data)
+ssp = ["httpx"]   # live SSP fetch from the IIASA API (iampypsa.io.ssp.fetch_ssp_data)
 docu= ["mkdocs", "mkdocs_gen_files", "mkdocstrings[python]", "mkdocs-literate-nav", "mkdocs-material", "mkdocs-include-dir-to-nav"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
-rpycpl = ["data/*.yaml"]
+iampypsa = ["data/*.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

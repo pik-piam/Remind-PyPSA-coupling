@@ -1,0 +1,316 @@
+# IAMC / .mif symbol map for the REMIND→PyPSA-Eur coupling.
+#
+# This is remind_symbols_mif.yaml, parallel to remind_symbols_gdx.yaml;
+# selected by load_symbol_specs(backend="iamc").
+#
+# Spec shapes:
+#
+# (1) Single-quantity symbol
+#       symbol: "IAMC variable name"
+#       rename: {source_col: canonical_col}  — optional; read_iamc already uses lowercase names
+#       unit / to_unit  — optional unit conversion
+#
+# (2) Variable-set  (IAMC-specific — one logical quantity from many IAMC variables):
+#       variables:  {IAMC variable name: token_label, ...}
+#       derived:    {token: [[coeff, IAMC variable], ...]}   — optional linear combinations
+#       label_col:  column name for the token (default: technology)
+#       to_unit:    target unit (source unit is read from the 'Unit' column of the mif)
+#       fallback:   {token: {value: <float>, reason: <str>}} — temporary gaps; logged as warnings
+#
+# Unit strings must match the mif's 'Unit' column exactly and exist in iampypsa.units.UNIT_CONVERSIONS.
+
+default:
+  # --- CO2 price -----------------------------------------------------------
+  co2_price:
+    symbol: "Price|Carbon"
+    unit: "US$2017/t CO2"
+
+  # --- Discount rate -------------------------------------------------------
+  discount_rate:
+    symbol: "Interest Rate t/(t-1)|Real"
+    unit: "unitless"
+
+  # --- Installed capacities ------------------------------------------------
+  # Variable-set: one IAMC Cap|… variable per REMIND tech token.
+  # Link techs (elh2, h2turb, btin) still need their output-basis capacity divided by
+  # efficiency to get PyPSA input-basis p_nom.
+  # Derived: pc and bioigcc have no own Cap| variable; detemined as residuals
+  capacity:
+    consolidation:
+      link_techs: [elh2, h2turb]
+    variables:
+      "Cap|Electricity|Gas|GT":                ngt
+      "Cap|Electricity|Gas|CC|w/o CC":         ngcc
+      "Cap|Electricity|Gas|CC|w/ CC":          ngccc
+      "Cap|Electricity|Gas|CHP":               gaschp
+      "Cap|Electricity|Coal|CHP":              coalchp
+      "Cap|Electricity|Coal|IGCC|w/o CC":      igcc
+      "Cap|Electricity|Coal|IGCC|w/ CC":       igccc
+      "Cap|Electricity|Biomass|CHP":           biochp
+      "Cap|Electricity|Biomass|w/ CC":         bioigccc
+      "Cap|Electricity|Nuclear":               tnrs
+      "Cap|Electricity|Wind|Onshore":          windon
+      "Cap|Electricity|Wind|Offshore":         windoff
+      "Cap|Electricity|Solar|PV":              spv
+      "Cap|Electricity|Solar|CSP":             csp
+      "Cap|Electricity|Oil|w/o CC":            dot
+      "Cap|Electricity|Geothermal":            geohdr
+      "Cap|Hydrogen|Electricity":              elh2
+      "Cap|Electricity|Hydrogen":              h2turb
+      "Cap|Electricity|Storage|Battery":       btin
+    derived:
+      # pc = Pulverised Coal = (all coal w/o CC) − IGCC − CHP (matches REMIND get_cap)
+      pc:
+        - [1.0,  "Cap|Electricity|Coal|w/o CC"]
+        - [-1.0, "Cap|Electricity|Coal|IGCC|w/o CC"]
+        - [-1.0, "Cap|Electricity|Coal|CHP"]
+      # bioigcc = biomass IGCC w/o CC = (all biomass w/o CC) − CHP
+      bioigcc:
+        - [1.0,  "Cap|Electricity|Biomass|w/o CC"]
+        - [-1.0, "Cap|Electricity|Biomass|CHP"]
+    label_col: technology
+    to_unit: MW
+
+  # --- Cost parameters — one variable-set per parameter -------------------
+  # Capital costs: US$2017/kW → USD/MW. Use plain "Capital Costs" (not "w/ Adj Costs").
+  cost_investment:
+    variables:
+      "Tech|Electricity|Gas|Gas Turbine|Capital Costs":                         ngt
+      "Tech|Electricity|Gas|Combined Cycle w/o CC|Capital Costs":               ngcc
+      "Tech|Electricity|Gas|Combined Cycle w/ CC|Capital Costs":                ngccc
+      "Tech|Electricity|Gas|Combined Heat and Power w/o CC|Capital Costs":      gaschp
+      "Tech|Electricity|Coal|Pulverised Coal w/o CC|Capital Costs":             pc
+      "Tech|Electricity|Coal|Combined Heat and Power w/o CC|Capital Costs":     coalchp
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Capital Costs": igcc
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Capital Costs":  igccc
+      "Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Capital Costs":  biochp
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Capital Costs": bioigcc
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Capital Costs":  bioigccc
+      "Tech|Electricity|Nuclear|Capital Costs":                                 tnrs
+      "Tech|Electricity|Wind|Onshore|Capital Costs":                            windon
+      "Tech|Electricity|Wind|Offshore|Capital Costs":                           windoff
+      "Tech|Electricity|Solar|PV|Capital Costs":                                spv
+      "Tech|Electricity|Solar|CSP|Capital Costs":                               csp
+      "Tech|Electricity|Oil|DOT|Capital Costs":                                 dot
+      "Tech|Electricity|Geothermal|Capital Costs":                              geohdr
+      "Tech|Hydrogen|Electricity|Capital Costs":                                elh2
+      "Tech|Electricity|Hydrogen|Capital Costs":                                h2turb
+      "Tech|Electricity|Hydro|Capital Costs":                                   hydro
+    label_col: reference
+    to_unit: "USD/MW"
+
+  # Lifetime: years → yr (factor 1.0 — unit string differs between mif and GDX).
+  tech_lifetime:
+    variables:
+      "Tech|Electricity|Gas|Gas Turbine|Lifetime":                         ngt
+      "Tech|Electricity|Gas|Combined Cycle w/o CC|Lifetime":               ngcc
+      "Tech|Electricity|Gas|Combined Cycle w/ CC|Lifetime":                ngccc
+      "Tech|Electricity|Gas|Combined Heat and Power w/o CC|Lifetime":      gaschp
+      "Tech|Electricity|Coal|Pulverised Coal w/o CC|Lifetime":             pc
+      "Tech|Electricity|Coal|Combined Heat and Power w/o CC|Lifetime":     coalchp
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Lifetime": igcc
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Lifetime":  igccc
+      "Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Lifetime":  biochp
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Lifetime": bioigcc
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Lifetime":  bioigccc
+      "Tech|Electricity|Nuclear|Lifetime":                                 tnrs
+      "Tech|Electricity|Wind|Onshore|Lifetime":                            windon
+      "Tech|Electricity|Wind|Offshore|Lifetime":                           windoff
+      "Tech|Electricity|Solar|PV|Lifetime":                                spv
+      "Tech|Electricity|Solar|CSP|Lifetime":                               csp
+      "Tech|Electricity|Oil|DOT|Lifetime":                                 dot
+      "Tech|Electricity|Geothermal|Lifetime":                              geohdr
+      "Tech|Hydrogen|Electricity|Lifetime":                                elh2
+      "Tech|Electricity|Hydrogen|Lifetime":                                h2turb
+      "Tech|Electricity|Hydro|Lifetime":                                   hydro
+    label_col: reference
+    to_unit: yr
+
+  # Absolute FOM: US$2017/kW/yr → USD/MW/yr.
+  # NOTE: PyPSA-Eur needs FOM as %/yr; the IAMC adapter divides by capex and multiplies by 100.
+  cost_omf:
+    variables:
+      "Tech|Electricity|Gas|Gas Turbine|OM Cost|fixed":                         ngt
+      "Tech|Electricity|Gas|Combined Cycle w/o CC|OM Cost|fixed":               ngcc
+      "Tech|Electricity|Gas|Combined Cycle w/ CC|OM Cost|fixed":                ngccc
+      "Tech|Electricity|Gas|Combined Heat and Power w/o CC|OM Cost|fixed":      gaschp
+      "Tech|Electricity|Coal|Pulverised Coal w/o CC|OM Cost|fixed":             pc
+      "Tech|Electricity|Coal|Combined Heat and Power w/o CC|OM Cost|fixed":     coalchp
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|OM Cost|fixed": igcc
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|OM Cost|fixed":  igccc
+      "Tech|Electricity|Biomass|Combined Heat and Power w/o CC|OM Cost|fixed":  biochp
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|OM Cost|fixed": bioigcc
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|OM Cost|fixed":  bioigccc
+      "Tech|Electricity|Nuclear|OM Cost|fixed":                                 tnrs
+      "Tech|Electricity|Wind|Onshore|OM Cost|fixed":                            windon
+      "Tech|Electricity|Wind|Offshore|OM Cost|fixed":                           windoff
+      "Tech|Electricity|Solar|PV|OM Cost|fixed":                                spv
+      "Tech|Electricity|Solar|CSP|OM Cost|fixed":                               csp
+      "Tech|Electricity|Oil|DOT|OM Cost|fixed":                                 dot
+      "Tech|Electricity|Geothermal|OM Cost|fixed":                              geohdr
+      "Tech|Hydrogen|Electricity|OM Cost|fixed":                                elh2
+      "Tech|Electricity|Hydrogen|OM Cost|fixed":                                h2turb
+      "Tech|Electricity|Hydro|OM Cost|fixed":                                   hydro
+    label_col: reference
+    to_unit: "USD/MW/yr"
+
+  # Variable O&M: US$2017/GJ → USD/MWh (per unit energy output).
+  cost_omv:
+    variables:
+      "Tech|Electricity|Gas|Gas Turbine|OM Cost|variable":                         ngt
+      "Tech|Electricity|Gas|Combined Cycle w/o CC|OM Cost|variable":               ngcc
+      "Tech|Electricity|Gas|Combined Cycle w/ CC|OM Cost|variable":                ngccc
+      "Tech|Electricity|Gas|Combined Heat and Power w/o CC|OM Cost|variable":      gaschp
+      "Tech|Electricity|Coal|Pulverised Coal w/o CC|OM Cost|variable":             pc
+      "Tech|Electricity|Coal|Combined Heat and Power w/o CC|OM Cost|variable":     coalchp
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|OM Cost|variable": igcc
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|OM Cost|variable":  igccc
+      "Tech|Electricity|Biomass|Combined Heat and Power w/o CC|OM Cost|variable":  biochp
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|OM Cost|variable": bioigcc
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|OM Cost|variable":  bioigccc
+      "Tech|Electricity|Nuclear|OM Cost|variable":                                 tnrs
+      "Tech|Electricity|Wind|Onshore|OM Cost|variable":                            windon
+      "Tech|Electricity|Wind|Offshore|OM Cost|variable":                           windoff
+      "Tech|Electricity|Solar|PV|OM Cost|variable":                                spv
+      "Tech|Electricity|Solar|CSP|OM Cost|variable":                               csp
+      "Tech|Electricity|Oil|DOT|OM Cost|variable":                                 dot
+      "Tech|Electricity|Geothermal|OM Cost|variable":                              geohdr
+      "Tech|Hydrogen|Electricity|OM Cost|variable":                                elh2
+      "Tech|Electricity|Hydrogen|OM Cost|variable":                                h2turb
+    label_col: reference
+    to_unit: "USD/MWh"
+
+  # Efficiency for link-capacity adjustment (output→input basis for elh2 and h2turb).
+  # Used by build_capacity_targets; subset of the full efficiency variable-set.
+  efficiency_conv:
+    variables:
+      "Tech|Hydrogen|Electricity|Efficiency":  elh2
+      "Tech|Electricity|Hydrogen|Efficiency":  h2turb
+    label_col: technology
+    to_unit: "p.u."
+
+  # Efficiency: % → p.u. (factor 0.01).
+  # Nuclear (tnrs) is absent — REMIND parametrises it on a uranium-mass basis.
+  # The adapter injects the tnrs fallback value (0.33 thermal efficiency).
+  efficiency:
+    variables:
+      "Tech|Electricity|Gas|Gas Turbine|Efficiency":                         ngt
+      "Tech|Electricity|Gas|Combined Cycle w/o CC|Efficiency":               ngcc
+      "Tech|Electricity|Gas|Combined Cycle w/ CC|Efficiency":                ngccc
+      "Tech|Electricity|Gas|Combined Heat and Power w/o CC|Efficiency":      gaschp
+      "Tech|Electricity|Coal|Pulverised Coal w/o CC|Efficiency":             pc
+      "Tech|Electricity|Coal|Combined Heat and Power w/o CC|Efficiency":     coalchp
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Efficiency": igcc
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Efficiency":  igccc
+      "Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Efficiency":  biochp
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Efficiency": bioigcc
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Efficiency":  bioigccc
+      "Tech|Electricity|Wind|Onshore|Efficiency":                            windon
+      "Tech|Electricity|Wind|Offshore|Efficiency":                           windoff
+      "Tech|Electricity|Solar|PV|Efficiency":                                spv
+      "Tech|Electricity|Solar|CSP|Efficiency":                               csp
+      "Tech|Electricity|Oil|DOT|Efficiency":                                 dot
+      "Tech|Electricity|Geothermal|Efficiency":                              geohdr
+      "Tech|Hydrogen|Electricity|Efficiency":                                elh2
+      "Tech|Electricity|Hydrogen|Efficiency":                                h2turb
+      "Tech|Electricity|Hydro|Efficiency":                                   hydro
+    label_col: reference
+    to_unit: "p.u."
+    # fallback for absent nuclear efficiency
+    fallback:
+      tnrs:
+        value: 0.33
+        reason: >
+          Nuclear efficiency absent from mif (REMIND uses mass-basis uranium parametrisation).
+          Using plausible thermal efficiency 0.33 consistent with PyPSA-Eur baseline.
+
+  # Fuel prices: Price|Primary Energy|*|Moving Avg (matches GDX p32_PEPriceAvg).
+  # US$2017/GJ → USD/MWh (factor 3.6).  Nuclear is energy-basis like coal/gas (no exception).
+  fuel_price:
+    variables:
+      "Price|Primary Energy|Coal|Moving Avg":        pecoal
+      "Price|Primary Energy|Gas|Moving Avg":         pegas
+      "Price|Primary Energy|Oil|Moving Avg":         peoil
+      "Price|Primary Energy|Nuclear|Moving Avg":     peur
+      "Price|Primary Energy|Biomass|Modern|Moving Avg": pebiolc
+    label_col: reference
+    to_unit: "USD/MWh"
+
+  # CO2 emission intensity — absent from mif for all fossil techs.
+  emission_factor:
+    tech_fuel_map:
+      pc: pecoal
+      coalchp: pecoal
+      igcc: pecoal
+      igccc: pecoal
+      ngt: pegas
+      ngcc: pegas
+      ngccc: pegas
+      gaschp: pegas
+      dot: peoil
+      biochp: pebiolc
+      bioigcc: pebiolc
+      bioigccc: pebiolc
+    fallback:
+      # Per-fuel IPCC Tier 1 emission factors converted to t_CO2/MWh_th:
+      #   coal:  ~96 kgCO2/GJ × 3.6 GJ/MWh ≈ 0.341
+      #   gas:   ~56 kgCO2/GJ × 3.6           ≈ 0.202
+      #   oil:   ~74 kgCO2/GJ × 3.6           ≈ 0.267
+      pecoal:  {value: 0.341, reason: "CO2 intensity absent from mif; IPCC Tier 1 coal value"}
+      pegas:   {value: 0.202, reason: "CO2 intensity absent from mif; IPCC Tier 1 gas value"}
+      peoil:   {value: 0.267, reason: "CO2 intensity absent from mif; IPCC Tier 1 oil value"}
+      pebiolc: {value: 0.0,   reason: "CO2 intensity absent from mif; biomass carbon-neutral in REMIND"}
+
+  # --- Demand variables ----------------------------------------------------
+  # Read by RemindIamcAdapter.build_regional_demand via load_spec / symbol lookup.
+  # demand_fe_sectors uses load_variable_set (variables: block → token labels + unit conversion).
+  # The three scalar specs supply only the variable name (symbol:); the adapter reads
+  # them via read_iamc and applies the η_td formula and AC residual computation on top.
+  # All source units EJ/yr.
+  demand_fe_sectors:
+    variables:
+      "FE|Transport|Pass|Electricity":            EV_pass
+      "FE|Transport|Freight|Electricity":         EV_freight
+      "FE|Buildings|Heating|Electricity|Heat pump": heatpump
+      "FE|Buildings|Heating|Electricity|Resistance": resistive
+    label_col: sector
+    to_unit: MWh    # EJ/yr → MWh (factor ~2.778e8)
+
+  demand_se_electricity:
+    symbol: "SE|Electricity"
+    unit: "EJ/yr"
+
+  demand_transmission_losses:
+    symbol: "SE|Electricity|Transmission Losses"
+    unit: "EJ/yr"
+
+  # Net electrolysis demand = (H2 produced − H2 consumed by fuel cells) / η_elec.
+  # Both SE variables are in EJ H2; dividing by η_elec yields EJ electricity.
+  # SE|Input|Hydrogen|Electricity = H2 fed into H2→electricity turbines (h2turb).
+  # SE|Hydrogen|Electricity       = total H2 produced from electricity (elh2/elh2VRE).
+  demand_h2_from_electricity:
+    symbol: "SE|Hydrogen|Electricity"
+    unit: "EJ/yr"
+
+  demand_h2_to_turbines:
+    symbol: "SE|Input|Hydrogen|Electricity"
+    unit: "EJ/yr"
+
+  demand_electrolysis_efficiency:
+    symbol: "Tech|Hydrogen|Electricity|Efficiency"
+    unit: "%"
+
+  # --- Hydro special case --------------------------------------------------
+  # Hydro needs BOTH capacity and generation so the downstream step can derive a
+  # capacity factor (generation / (capacity × 8760)) to scale hydro inflow. Read by the
+  # dedicated import_REMIND_hydro.py via load_frame — outside the adapter/capacity/cost flow.
+  hydro_capacity:
+    symbol: "Cap|Electricity|Hydro"
+    unit: "GW"
+    to_unit: "MW"
+  hydro_generation:
+    symbol: "SE|Electricity|Hydro"
+    unit: "EJ/yr"
+    to_unit: "MWh"
+
+overrides: {}

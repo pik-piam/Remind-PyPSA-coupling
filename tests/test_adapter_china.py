@@ -19,8 +19,8 @@ pytestmark = pytest.mark.skipif(not HAVE, reason="China adapter or GDX not prese
 
 
 def _adapter():
-    from rpycpl.io import RemindLoader
-    from rpycpl.io.remind_symbols import load_symbol_specs
+    from iampypsa.io import RemindLoader
+    from iampypsa.io.remind_symbols import load_symbol_specs
 
     spec = importlib.util.spec_from_file_location("adapter_remind_china", ADAPTER)
     mod = importlib.util.module_from_spec(spec)
@@ -31,7 +31,7 @@ def _adapter():
         region_map={"CHA": ["CN"]},
         config={"planning_horizons": [2030, 2050], "currency_factor": 1.0,
                 "sector_weights": {}, "countries": ["CN"]},
-        remind_regions=["CHA"],
+        model_regions=["CHA"],
     )
 
 
