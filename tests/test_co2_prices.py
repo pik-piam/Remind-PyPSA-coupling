@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import pytest
 
-from rpycpl.transforms.co2_prices import (
+from iampypsa.transforms.co2_prices import (
     TONNE_C_TO_TONNE_CO2,
     convert_co2_prices,
     extract_co2_prices,
@@ -49,7 +49,7 @@ def test_convert_applies_carbon_and_currency_factor():
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")
 def test_against_real_eur_gdx():
-    from rpycpl.io import read_gdx_symbol as read_gdx
+    from iampypsa.io import read_gdx_symbol as read_gdx
 
     raw = read_gdx(EUR_GDX, "p_priceCO2", rename_columns={"tall": "year", "all_regi": "region"})
     prices = convert_co2_prices(

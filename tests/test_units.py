@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from rpycpl.units import (
+from iampypsa.units import (
     HOURS_PER_YEAR,
     TONNE_C_TO_TONNE_CO2,
     UNIT_CONVERSIONS,

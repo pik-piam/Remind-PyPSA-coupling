@@ -7,12 +7,12 @@ import os
 import pandas as pd
 import pytest
 
-from rpycpl.downscale import (
+from iampypsa.downscale import (
     ProportionalDownscaler,
     build_ssp_shares,
     disaggregate_demand_to_country,
 )
-from rpycpl.transforms.loads import TWA_TO_MWH, convert_loads
+from iampypsa.transforms.loads import TWA_TO_MWH, convert_loads
 
 DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1"
 EUR_GDX = f"{DEV}/REMIND2PyPSAEUR.gdx"
@@ -48,7 +48,7 @@ def test_proportional_downscaler_splits_by_share():
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")
 def test_convert_loads_matches_reference_regional():
-    from rpycpl.io import read_gdx_symbol as read_gdx
+    from iampypsa.io import read_gdx_symbol as read_gdx
 
     raw = read_gdx(EUR_GDX, "p32_load_sector",
                    rename_columns={"ttot": "year", "all_regi": "region", "loadPy32": "sector"})
@@ -76,7 +76,7 @@ CONFIG = (
 def test_full_ssp_downscaling_matches_reference():
     import yaml
 
-    from rpycpl.transforms.mapping import read_region_map
+    from iampypsa.transforms.mapping import read_region_map
 
     cfg = yaml.safe_load(open(CONFIG))
     sector_weights = cfg["remind_coupling"]["demand_downscaling"]["sector_weights"]

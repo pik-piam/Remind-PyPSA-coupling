@@ -12,7 +12,7 @@ import os
 import pandas as pd
 import pytest
 
-from rpycpl.transforms.capacities import (
+from iampypsa.transforms.capacities import (
     adjust_link_capacities_to_input,
     aggregate_capacities_to_carriers,
     apply_consolidation,
@@ -82,7 +82,7 @@ def test_apply_consolidation_uses_btin_directly_when_present():
 
 def test_build_capacity_targets_reads_consolidation_from_symbols():
     """build_capacity_targets applies the consolidation block declared in the capacity spec."""
-    from rpycpl.transforms.capacities import build_capacity_targets
+    from iampypsa.transforms.capacities import build_capacity_targets
 
     class _FakeLoader:
         def load_symbol(self, ref, rename_columns=None):
@@ -111,7 +111,7 @@ def test_build_capacity_targets_reads_consolidation_from_symbols():
 @pytest.mark.skipif(not (os.path.exists(EUR_GDX) and os.path.exists(INSTALLED) and os.path.exists(MAP)),
                     reason="EUR development data not present")
 def test_generator_targets_match_reference():
-    from rpycpl.io import read_gdx_symbol as read_gdx
+    from iampypsa.io import read_gdx_symbol as read_gdx
 
     raw = read_gdx(EUR_GDX, "p32_capAvg",
                    rename_columns={"ttot": "year", "all_regi": "region", "all_te": "technology"})

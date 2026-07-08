@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import pytest
 
-from rpycpl.io.remind_symbols import (
+from iampypsa.io.remind_symbols import (
     load_frame,
     load_set,
     load_spec,
@@ -78,7 +78,7 @@ def test_overlay_path_layers_onto_package_default(tmp_path):
 
 
 def test_overlay_via_env_var(tmp_path, monkeypatch):
-    from rpycpl.io.remind_symbols import SYMBOL_CONFIG_ENV
+    from iampypsa.io.remind_symbols import SYMBOL_CONFIG_ENV
 
     p = tmp_path / "syms.yaml"
     p.write_text(OVERLAY)
@@ -87,12 +87,12 @@ def test_overlay_via_env_var(tmp_path, monkeypatch):
 
 
 def test_default_symbol_config_path_exists():
-    from rpycpl.io.remind_symbols import default_symbol_config_path
+    from iampypsa.io.remind_symbols import default_symbol_config_path
 
     # Default (no backend) and explicit "gdx" both resolve to the GDX config.
     assert default_symbol_config_path().name == "remind_symbols_gdx.yaml"
     assert default_symbol_config_path(backend="gdx").name == "remind_symbols_gdx.yaml"
-    assert default_symbol_config_path(backend="iamc").name == "remind_symbols_iamc.yaml"
+    assert default_symbol_config_path(backend="iamc").name == "remind_symbols_mif.yaml"
     assert "default:" in default_symbol_config_path().read_text()
 
 
@@ -106,12 +106,20 @@ def test_load_frame_applies_per_candidate_unit():
     }
     out = load_frame(loader, spec)
     assert out["value"].iloc[0] == pytest.approx(100.0 * 12 / 44)
+    assert out["unit"].iloc[0] == "$/tCO2"  # stamped from to_unit
 
 
 def test_load_frame_no_conversion_without_to_unit():
     loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0]})})
     out = load_frame(loader, {"symbol": "sym", "unit": "T$/TWa"})  # no to_unit → untouched
     assert out["value"].iloc[0] == 5.0
+    assert out["unit"].iloc[0] == "T$/TWa"  # stamped from the declared source unit
+
+
+def test_load_frame_no_unit_column_when_unit_undeclared():
+    loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0]})})
+    out = load_frame(loader, {"symbol": "sym"})  # no unit/to_unit declared at all
+    assert "unit" not in out.columns
 
 
 def test_load_set_splits_mixed_units_via_schema():
@@ -152,8 +160,8 @@ def test_load_symbol_specs_iamc_backend():
 
 
 def test_load_variable_set_basic(tmp_path):
-    from rpycpl.io import RemindLoader
-    from rpycpl.io.iamc import read_iamc
+    from iampypsa.io import RemindLoader
+    from iampypsa.io.iamc import read_iamc
 
     mif = tmp_path / "t.mif"
     mif.write_text(
@@ -189,7 +197,7 @@ def test_load_variable_set_basic(tmp_path):
 
 def test_load_variable_set_synthesises_fallback_rows(tmp_path):
     """Absent tokens with a declared fallback value are appended across the (year, region) grid."""
-    from rpycpl.io import RemindLoader
+    from iampypsa.io import RemindLoader
 
     mif = tmp_path / "t.mif"
     mif.write_text(
@@ -219,7 +227,7 @@ def test_load_variable_set_synthesises_fallback_rows(tmp_path):
 
 
 def test_load_spec_dispatches_on_shape(tmp_path):
-    from rpycpl.io import RemindLoader
+    from iampypsa.io import RemindLoader
 
     mif = tmp_path / "t.mif"
     mif.write_text(
@@ -231,6 +239,17 @@ def test_load_spec_dispatches_on_shape(tmp_path):
     result = load_spec(loader, var_set_spec)
     assert len(result) == 1
     assert result["value"].iloc[0] == pytest.approx(1500.0)
+
+
+def test_load_spec_variables_shape_rejects_gdx_backend():
+    # A `variables:` spec dispatches to load_variable_set regardless of backend, which
+    # raises clearly if the loader isn't IAMC-backed — spec-shape dispatch doesn't imply
+    # every shape is satisfiable by every backend.
+    loader = _FakeLoader({})
+    loader.backend = "gdx"
+    var_set_spec = {"variables": {"Cap|Electricity|Gas|GT": "ngt"}, "label_col": "technology", "to_unit": "MW"}
+    with pytest.raises(ValueError, match="requires an IAMC-backed loader"):
+        load_spec(loader, var_set_spec)
 
 
 def test_report_fallbacks_lists_all():
@@ -247,7 +266,7 @@ def test_report_fallbacks_lists_all():
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")
 def test_load_frame_resolves_candidate_against_real_gdx():
-    from rpycpl.io import RemindLoader
+    from iampypsa.io import RemindLoader
 
     loader = RemindLoader(EUR_GDX)
     spec = load_symbol_specs()["co2_price"]

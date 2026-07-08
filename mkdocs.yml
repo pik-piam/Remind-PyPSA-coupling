@@ -1,10 +1,10 @@
-site_name: REMIND-PyPSA Coupling Tools
-site_description: Shared tooling for the REMIND ↔ PyPSA soft-coupling (rpycpl)
-site_url: https://pik-piam.github.io/Remind-PyPSA-coupling/
+site_name: IAM-PyPSA Coupling
+site_description: Shared tooling for the IAM - PyPSA soft-coupling (iampypsa)
+site_url: https://pik-piam.github.io/IAM-PyPSA-coupling/
 
 # Source repo — drives the header repo link + star/fork counts and the per-page edit button.
-repo_url: https://github.com/pik-piam/Remind-PyPSA-coupling
-repo_name: pik-piam/Remind-PyPSA-coupling
+repo_url: https://github.com/pik-piam/IAM-PyPSA-coupling
+repo_name: pik-piam/IAM-PyPSA-coupling
 edit_uri: edit/main/docs/
 
 copyright: Copyright &copy; Potsdam Institute for Climate Impact Research (PIK)
@@ -48,8 +48,8 @@ docs_dir: "./docs"
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/pik-piam/Remind-PyPSA-coupling
-      name: Remind-PyPSA-coupling on GitHub
+      link: https://github.com/pik-piam/IAM-PyPSA-coupling
+      name: IAM-PyPSA-coupling on GitHub
     - icon: fontawesome/solid/flask
       link: https://www.pik-potsdam.de/en/institute/labs/energy-transition/energy-transition-lab
       name: PIK Energy Transition Lab
@@ -85,7 +85,7 @@ plugins:
     default_handler: python
     handlers:
       python:
-        paths: ["./src/rpycpl"]
+        paths: ["./src/iampypsa"]
 
 nav:
   - Home: index.md
