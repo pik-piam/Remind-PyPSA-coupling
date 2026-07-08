@@ -38,17 +38,23 @@ class _FakeLoader:
 
 def test_load_specs_default():
     default = load_symbol_specs()
-    assert default["co2_price"]["symbol"] == ["v32_taxCO2eq", "p_priceCO2"]  # candidate fallback
+    assert default["co2_price"]["symbol"] == ["pm_taxCO2eqSum"]
     assert default["load_sector"]["rename"]["loadPy32"] == "sector"
 
 
-def test_load_specs_region_override_merges():
-    default = load_symbol_specs()
-    cha = load_symbol_specs("CHA")
-    # overridden entry differs from default
-    assert cha["co2_price"]["symbol"] == ["pm_taxCO2eq"]
-    # non-overridden entry still equals default (CHA does not override coupled_years)
-    assert cha["coupled_years"] == default["coupled_years"]
+def test_merge_region_overrides_prefers_region_entry():
+    """Pure dict-merge logic: a region entry overrides its logical name, others pass through."""
+    from iampypsa.io.remind_symbols import merge_region_overrides
+
+    config = {
+        "default": {"co2_price": {"symbol": ["default_symbol"]}, "coupled_years": {"symbol": "t"}},
+        "overrides": {"XYZ": {"co2_price": {"symbol": ["region_symbol"]}}},
+    }
+    merged = merge_region_overrides(config, "XYZ")
+    assert merged["co2_price"]["symbol"] == ["region_symbol"]
+    assert merged["coupled_years"] == config["default"]["coupled_years"]
+    # unknown region falls back to default unchanged
+    assert merge_region_overrides(config, "UNKNOWN") == config["default"]
 
 
 def test_load_specs_region_without_override_equals_default():
