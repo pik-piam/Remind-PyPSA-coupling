@@ -25,7 +25,8 @@ class RemindGdxAdapter(CouplingAdapter):
     Implements:
     - ``build_regional_demand``: reads ``load_sector`` GDX symbol (TWa→MWh via spec).
     - ``extract_cost_parameters``: reads all cost symbols from GDX, applies REMIND-GDX
-      tech-facts (fnrs/tnrs MWh/g_U efficiency, peur $/g_U fuel, storage $/MWh label).
+      tech-facts (tnrs raw efficiency in TWa_elec/Mt_Ur, converted to MWh/g_U; peur raw
+      fuel price in T$/Mt_Ur, relabelled USD/g_U; storage $/MWh label).
     """
 
     def build_regional_demand(self) -> pd.DataFrame:
@@ -44,10 +45,12 @@ class RemindGdxAdapter(CouplingAdapter):
 
         Unit conversions are config-declared (applied by ``load_frame``/``load_set``). The
         REMIND-GDX–specific tech-facts encoded here are:
-        - ``fnrs``/``tnrs`` efficiency is in MWh/g_U (not p.u.); kept as-is and labelled
-          accordingly — the cost model uses it together with the peur $/g_U fuel price.
-        - ``peur`` (uranium) fuel price is already in $/g_U in the GDX; other fuels get the
-          T$/TWa→$/MWh conversion applied.
+        - ``tnrs`` efficiency is raw ``TWa_elec/Mt_Ur`` (not p.u.) — converted to ``MWh/g_U``,
+          then combined with the peur fuel price into a true ``USD/MWh_el`` fuel cost with
+          ``tnrs`` efficiency reported as a genuine ``1.0`` p.u. (see ``_nuclear_fuel_cost``) —
+          mirrors the IAMC path, and keeps ``Generator.efficiency`` physically sane downstream.
+        - ``peur`` (uranium) fuel price is raw ``T$/Mt_Ur`` — numerically identical to
+          ``USD/g_U``; other fuels get the T$/TWa→$/MWh conversion.
         - Storage techs (``h2stor``, ``btstor``) share the $/MW capex factor but are
           relabelled $/MWh.
         """
@@ -77,18 +80,46 @@ class RemindGdxAdapter(CouplingAdapter):
             ~pd.MultiIndex.from_arrays([dataeta["region"], dataeta["technology"]]).isin(keys)
         ]
         eff = pd.concat([eta, fallback]).assign(parameter="efficiency", unit="p.u.")
-        # GDX nuclear efficiency is in MWh/g_U (mass basis), not thermal %; keep the unit.
+        # GDX nuclear efficiency is raw TWa_elec/Mt_Ur (mass basis, not thermal %). Convert to
+        # MWh/g_U via the TWa->MWh, Mt->g factor (HOURS_PER_YEAR/1e6 = 8.76e9/1e12).
         eff.loc[eff["technology"].isin(["fnrs", "tnrs"]), "value"] *= HOURS_PER_YEAR / 1e6
         eff.loc[eff["technology"].isin(["fnrs", "tnrs"]), "unit"] = "MWh/g_U"
 
-        # Fuel: T$/TWa→$/MWh for all except peur (already $/g_U in GDX).
+        # Fuel: T$/TWa→$/MWh for all except peur, whose raw unit is T$/Mt_Ur — numerically
+        # identical to USD/g_U (T$=1e12 USD, Mt=1e12 g cancel exactly), so no scaling is applied.
         fuel = load("fuel_price").query("year == @y").copy()
         fuel["parameter"] = "fuel"
         fuel.loc[fuel["technology"] != "peur", "value"] *= unit_factor("T$/TWa", "$/MWh")
         fuel["unit"] = "USD/MWh_th"
         fuel.loc[fuel["technology"] == "peur", "unit"] = "USD/g_U"
 
+        eff, fuel = self._nuclear_fuel_cost(eff, fuel)
+
         df = pd.concat([costs, techd, co2i, eff, fuel])[
             ["region", "technology", "parameter", "value", "unit"]
         ].rename(columns={"technology": "reference"})
         return df[df["region"].isin(self.model_regions)]
+
+    @staticmethod
+    def _nuclear_fuel_cost(eff: pd.DataFrame, fuel: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """Convert tnrs/peur's mass-basis MWh/g_U, USD/g_U into a true USD/MWh_el fuel cost +
+        1.0 p.u. efficiency (g_U cancels in the ratio); mirrors
+        ``RemindIamcAdapter._nuclear_fuel_cost``. fnrs is left untouched (unattached to any
+        network today).
+        """
+        eff = eff.copy()
+        fuel = fuel.copy()
+
+        tnrs_eta = eff.loc[eff["technology"] == "tnrs", ["region", "value"]].set_index("region")["value"]
+        peur_price = fuel.loc[fuel["technology"] == "peur", ["region", "value"]].set_index("region")["value"]
+        usd_per_mwh_el = peur_price / tnrs_eta
+
+        is_tnrs = eff["technology"] == "tnrs"
+        eff.loc[is_tnrs, "value"] = 1.0
+        eff.loc[is_tnrs, "unit"] = "p.u."
+
+        is_peur = fuel["technology"] == "peur"
+        fuel.loc[is_peur, "value"] = fuel.loc[is_peur, "region"].map(usd_per_mwh_el)
+        fuel.loc[is_peur, "unit"] = "USD/MWh_el"
+
+        return eff, fuel

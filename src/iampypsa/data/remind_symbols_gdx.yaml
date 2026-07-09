@@ -58,7 +58,8 @@ default:
   efficiency_conv:
     symbol: pm_eta_conv
     rename: {tall: year, all_regi: region, all_te: technology}
-    unit: p.u.               # p.u. -> p.u. (identity); per-tech quirks handled in the adapter
+    # p.u. holds for every tech except tnrs (raw TWa_elec/Mt_Ur) — handled in the adapter.
+    unit: p.u.
   efficiency_data:
     symbol: pm_dataeta
     rename: {tall: year, all_regi: region, all_te: technology}
@@ -85,7 +86,8 @@ default:
   fuel_price:
     symbol: p32_PEPriceAvg
     rename: {ttot: year, all_regi: region, all_enty: technology}
-    unit: T$/TWa             # converted in the adapter (the `peur` fuel is a per-tech exception)
+    # T$/TWa holds for every fuel except peur (raw T$/Mt_Ur) — handled in the adapter.
+    unit: T$/TWa
   discount_rate:
     symbol: p_r
     rename: {ttot: year, all_regi: region}
