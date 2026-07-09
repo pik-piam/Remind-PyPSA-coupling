@@ -1,10 +1,9 @@
-#  REMIND-PyPSA Coupling Tools
+#  IAM-PyPSA Coupling
 
-Welcome to the `rpycpl` docu! `rpycpl` is a package to support the soft-coupling of the [REMIND](https://github.com/remindmodel/remind)
-IAM and [PyPSA](https://github.com/PyPSA) power system model family, such as [PyPSA-eur](https://pypsa-eur.readthedocs.io/en/latest/) or [PyPSA-China](https://pik-piam.github.io/PyPSA-China-PIK/latest/). The package is written and maintained by the Potsdam Institute for Climate Impact
+Welcome to the `iampypsa` docu! `iampypsa` is a package to support the soft-coupling of Integrated Assessment Models (IAMs) and the [PyPSA](https://github.com/PyPSA) power system model family, such as [PyPSA-eur](https://pypsa-eur.readthedocs.io/en/latest/) or [PyPSA-China](https://pik-piam.github.io/PyPSA-China-PIK/latest/). The package is written and maintained by the Potsdam Institute for Climate Impact
 Research's [Energy Transition Lab](https://www.pik-potsdam.de/en/institute/labs/energy-transition/energy-transition-lab).
 
-`rpycpl` is the **shared layer** of the IAM-PSM coupling. It holds the logic that is identical for all PyPSA models that couple to REMIND. These include
+`iampypsa` is the **shared layer** of the IAM-PSM coupling. It holds the logic that is identical for all PyPSA models that couple to REMIND. These include
 - reading REMIND output
 - unit conversion
 - translation of costs, capacities
@@ -30,11 +29,11 @@ The interface to the PSM models' snakemake workflow is exposed via a thin `Coupl
 
 | Operations | Module(s) |
 |---|---|
-| Read REMIND output (GDX / IAMC) | `rpycpl.io` — `RemindLoader`, `remind_symbols` |
-| Coupling-name → REMIND symbol map + units | `data/remind_symbols.yaml`, `rpycpl.units` |
-| Tidy-frame transforms (CO₂, loads, capacities, costs, mapping) | `rpycpl.transforms` |
-| Region → country downscaling (SSP proxies) | `rpycpl.downscale`, `rpycpl.io.ssp` |
-| The coupling adapter interface | `rpycpl.adapters.CouplingAdapter` |
+| Read REMIND output (GDX / IAMC) | `iampypsa.io` — `RemindLoader`, `remind_symbols` |
+| Coupling-name → REMIND symbol map + units | `data/remind_symbols.yaml`, `iampypsa.units` |
+| Tidy-frame transforms (CO₂, loads, capacities, costs, mapping) | `iampypsa.transforms` |
+| Region → country downscaling (SSP proxies) | `iampypsa.downscale`, `iampypsa.io.ssp` |
+| The coupling adapter interface | `iampypsa.adapters.CouplingAdapter` |
 
 ## IAM REMIND data
 

@@ -7,14 +7,14 @@ import os
 import pandas as pd
 import pytest
 
-from rpycpl.downscale import (
+from iampypsa.downscale import (
     build_demand_proxy_from_dd,
     build_proxy_shares,
     build_ssp_shares,
     disaggregate_demand_to_country,
     normalise,
 )
-from rpycpl.io import read_degree_days
+from iampypsa.io import read_degree_days
 
 _DD_DIR = "/workspace/remind_pypsa_coupling/Remind-PyPSA-coupling/data/development_data"
 CDD = f"{_DD_DIR}/cdd/climbed_cdd_2060_ssp2.csv"
@@ -158,7 +158,7 @@ def test_read_degree_days_bad_selector_raises():
 
 def test_iamc_symbols_include_space_cooling():
     """The Space Cooling FE variable is mapped to the `space_cooling` sector token."""
-    from rpycpl.io.remind_symbols import load_symbol_specs
+    from iampypsa.io.remind_symbols import load_symbol_specs
 
     variables = load_symbol_specs(backend="iamc")["demand_fe_sectors"]["variables"]
     key = "FE|Buildings|non-Heating|Electricity|Space Cooling"

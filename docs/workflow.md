@@ -1,12 +1,12 @@
 # Plugging into a PyPSA workflow
 
-This page is the hands-on guide for connecting a PyPSA model to REMIND through `rpycpl`. For
+This page is the hands-on guide for connecting a PyPSA model to REMIND through `iampypsa`. For
 the conceptual map (what lives in the package vs the model, the full adapter interface, the
 symbol/unit config schema) see **[Architecture](architecture.md)**.
 
 Wiring a model up is two steps:
 
-1. **Write an adapter** in the model repo — subclass `rpycpl.CouplingAdapter`, implement
+1. **Write an adapter** in the model repo — subclass `iampypsa.CouplingAdapter`, implement
    `build_config_overrides`, and override only the hooks that genuinely differ for the model.
 2. **Write thin Snakemake rules** — each rule builds a `RemindLoader` + `load_symbol_specs()`,
    constructs the adapter, calls one method, and writes the output into the model's resource
@@ -23,7 +23,7 @@ The whole PyPSA-Eur adapter is ~40 lines
 (`pypsa-eur/scripts/remind/adapter_remind_eur.py`):
 
 ```python
-from rpycpl.adapters.base import CouplingAdapter
+from iampypsa.adapters.base import CouplingAdapter
 
 class RemindEurAdapter(CouplingAdapter):
     def adjust_cost_efficiencies(self, eff):          # hook: EUR-only quirk
@@ -122,9 +122,9 @@ If you ever need to drive the layers directly (a script, a test, a notebook) rat
 through an adapter:
 
 ```python
-from rpycpl.io import RemindLoader, load_symbol_specs
-from rpycpl.io.remind_symbols import load_frame
-from rpycpl.transforms.co2_prices import extract_co2_prices, convert_co2_prices
+from iampypsa.io import RemindLoader, load_symbol_specs
+from iampypsa.io.remind_symbols import load_frame
+from iampypsa.transforms.co2_prices import extract_co2_prices, convert_co2_prices
 
 loader  = RemindLoader("REMIND2PyPSA.gdx")        # 1. open source (backend auto-detected)
 symbols = load_symbol_specs(region=None)          # 2. resolve coupling names → symbols (+ overrides)

@@ -1,4 +1,4 @@
-"""Tests for the rpycpl.io loader (GDX + .mif backends, candidate resolution)."""
+"""Tests for the iampypsa.io loader (GDX + .mif backends, candidate resolution)."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import os
 
 import pytest
 
-from rpycpl.io import RemindLoader, read_iamc
-from rpycpl.io.iamc import parse_currency_year
+from iampypsa.io import RemindLoader, read_iamc
+from iampypsa.io.iamc import parse_currency_year
 
 EUR_GDX = "/workspace/remind_pypsa_coupling/development_data/REMIND2PyPSAEUR.gdx"
 
