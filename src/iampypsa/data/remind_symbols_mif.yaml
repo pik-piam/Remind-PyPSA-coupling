@@ -59,7 +59,7 @@ default:
       "Cap|Electricity|Hydrogen":              h2turb
       "Cap|Electricity|Storage|Battery":       btin
     derived:
-      # pc = Pulverised Coal = (all coal w/o CC) − IGCC − CHP (matches REMIND get_cap)
+      # pc = Pulverised Coal = (all coal w/o CC) − IGCC − CHP
       pc:
         - [1.0,  "Cap|Electricity|Coal|w/o CC"]
         - [-1.0, "Cap|Electricity|Coal|IGCC|w/o CC"]
@@ -72,7 +72,6 @@ default:
     to_unit: MW
 
   # --- Cost parameters — one variable-set per parameter -------------------
-  # Capital costs: US$2017/kW → USD/MW. Use plain "Capital Costs" (not "w/ Adj Costs").
   cost_investment:
     variables:
       "Tech|Electricity|Gas|Gas Turbine|Capital Costs":                         ngt
@@ -99,7 +98,7 @@ default:
     label_col: reference
     to_unit: "USD/MW"
 
-  # Lifetime: years → yr (factor 1.0 — unit string differs between mif and GDX).
+  # Lifetime: factor 1.0 — unit string differs between mif and GDX.
   tech_lifetime:
     variables:
       "Tech|Electricity|Gas|Gas Turbine|Lifetime":                         ngt
@@ -126,8 +125,7 @@ default:
     label_col: reference
     to_unit: yr
 
-  # Absolute FOM: US$2017/kW/yr → USD/MW/yr.
-  # NOTE: PyPSA-Eur needs FOM as %/yr; the IAMC adapter divides by capex and multiplies by 100.
+  # NOTE: PyPSA needs FOM as %/yr; the IAMC adapter divides by capex and multiplies by 100.
   cost_omf:
     variables:
       "Tech|Electricity|Gas|Gas Turbine|OM Cost|fixed":                         ngt
@@ -154,7 +152,7 @@ default:
     label_col: reference
     to_unit: "USD/MW/yr"
 
-  # Variable O&M: US$2017/GJ → USD/MWh (per unit energy output).
+  # Variable O&M, per unit energy output.
   cost_omv:
     variables:
       "Tech|Electricity|Gas|Gas Turbine|OM Cost|variable":                         ngt
@@ -189,9 +187,7 @@ default:
     label_col: technology
     to_unit: "p.u."
 
-  # Efficiency: % → p.u. (factor 0.01).
-  # Nuclear (tnrs) is absent — REMIND parametrises it on a uranium-mass basis.
-  # The adapter injects the tnrs fallback value (0.33 thermal efficiency).
+  # Nuclear (tnrs) is absent from this variable-set — see nuclear special case below.
   efficiency:
     variables:
       "Tech|Electricity|Gas|Gas Turbine|Efficiency":                         ngt
@@ -216,57 +212,54 @@ default:
       "Tech|Electricity|Hydro|Efficiency":                                   hydro
     label_col: reference
     to_unit: "p.u."
-    # fallback for absent nuclear efficiency
-    fallback:
-      tnrs:
-        value: 0.33
-        reason: >
-          Nuclear efficiency absent from mif (REMIND uses mass-basis uranium parametrisation).
-          Using plausible thermal efficiency 0.33 consistent with PyPSA-Eur baseline.
 
-  # Fuel prices: Price|Primary Energy|*|Moving Avg (matches GDX p32_PEPriceAvg).
-  # US$2017/GJ → USD/MWh (factor 3.6).  Nuclear is energy-basis like coal/gas (no exception).
+  # Fuel prices: Price|Primary Energy|*.
+  # Nuclear is intentionally excluded here — its mif price is mass-basis (US$2017/kg_Ur), not
+  # energy-basis, so it can't share this group's unit conversion. See `nuclear_conversion_factor`
+  # / `nuclear_price` below.
   fuel_price:
     variables:
-      "Price|Primary Energy|Coal|Moving Avg":        pecoal
-      "Price|Primary Energy|Gas|Moving Avg":         pegas
-      "Price|Primary Energy|Oil|Moving Avg":         peoil
-      "Price|Primary Energy|Nuclear|Moving Avg":     peur
-      "Price|Primary Energy|Biomass|Modern|Moving Avg": pebiolc
+      "Price|Primary Energy|Coal":        pecoal
+      "Price|Primary Energy|Gas":         pegas
+      "Price|Primary Energy|Oil":         peoil
+      "Price|Primary Energy|Biomass|Modern": pebiolc
     label_col: reference
     to_unit: "USD/MWh"
 
-  # CO2 emission intensity — absent from mif for all fossil techs.
+  # --- Nuclear special case — uranium mass-basis price and conversion factor ------------------
+  # REMIND parametrises nuclear on a uranium-mass basis instead of the energy-basis price/p.u.
+  # efficiency used elsewhere. Read raw here and combined by the adapter (RemindIamcAdapter.
+  # _nuclear_fuel_cost) into a $/MWh_el fuel cost, with efficiency injected as 1.0 p.u.
+  nuclear_conversion_factor:
+    symbol: "Tech|Electricity|Nuclear|Efficiency|Conversion factor"
+    unit: "GJ_el/kg_Ur"
+  nuclear_price:
+    symbol: "Price|Primary Energy|Nuclear"
+    unit: "US$2017/kg_Ur"
+
+  # CO2 emission intensity, thermal-input basis (t_CO2/MWh_th). Biomass (biochp, bioigcc) has no
+  # mif variable — REMIND treats it as carbon-neutral, so 0.0 is a real fallback, not a gap.
   emission_factor:
-    tech_fuel_map:
-      pc: pecoal
-      coalchp: pecoal
-      igcc: pecoal
-      igccc: pecoal
-      ngt: pegas
-      ngcc: pegas
-      ngccc: pegas
-      gaschp: pegas
-      dot: peoil
-      biochp: pebiolc
-      bioigcc: pebiolc
-      bioigccc: pebiolc
+    variables:
+      "Tech|Electricity|Gas|Gas Turbine|CO2 emission factor thermal input":                         ngt
+      "Tech|Electricity|Gas|Combined Cycle w/o CC|CO2 emission factor thermal input":                ngcc
+      "Tech|Electricity|Gas|Combined Cycle w/ CC|CO2 emission factor thermal input":                 ngccc
+      "Tech|Electricity|Gas|Combined Heat and Power w/o CC|CO2 emission factor thermal input":       gaschp
+      "Tech|Electricity|Coal|Pulverised Coal w/o CC|CO2 emission factor thermal input":              pc
+      "Tech|Electricity|Coal|Combined Heat and Power w/o CC|CO2 emission factor thermal input":      coalchp
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|CO2 emission factor thermal input":  igcc
+      "Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|CO2 emission factor thermal input":   igccc
+      "Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|CO2 emission factor thermal input": bioigccc
+      "Tech|Electricity|Oil|DOT|CO2 emission factor thermal input":                                  dot
+    label_col: reference
+    to_unit: "t_CO2/MWh_th"
     fallback:
-      # Per-fuel IPCC Tier 1 emission factors converted to t_CO2/MWh_th:
-      #   coal:  ~96 kgCO2/GJ × 3.6 GJ/MWh ≈ 0.341
-      #   gas:   ~56 kgCO2/GJ × 3.6           ≈ 0.202
-      #   oil:   ~74 kgCO2/GJ × 3.6           ≈ 0.267
-      pecoal:  {value: 0.341, reason: "CO2 intensity absent from mif; IPCC Tier 1 coal value"}
-      pegas:   {value: 0.202, reason: "CO2 intensity absent from mif; IPCC Tier 1 gas value"}
-      peoil:   {value: 0.267, reason: "CO2 intensity absent from mif; IPCC Tier 1 oil value"}
-      pebiolc: {value: 0.0,   reason: "CO2 intensity absent from mif; biomass carbon-neutral in REMIND"}
+      biochp:  {value: 0.0, reason: "No mif variable; biomass carbon-neutral in REMIND"}
+      bioigcc: {value: 0.0, reason: "No mif variable; biomass carbon-neutral in REMIND"}
 
   # --- Demand variables ----------------------------------------------------
-  # Read by RemindIamcAdapter.build_regional_demand via load_spec / symbol lookup.
-  # demand_fe_sectors uses load_variable_set (variables: block → token labels + unit conversion).
-  # The three scalar specs supply only the variable name (symbol:); the adapter reads
-  # them via read_iamc and applies the η_td formula and AC residual computation on top.
-  # All source units EJ/yr.
+  # Read by RemindIamcAdapter.build_regional_demand, which applies the η_td formula and AC
+  # residual computation on top. All source units EJ/yr.
   demand_fe_sectors:
     variables:
       "FE|Transport|Pass|Electricity":            EV_pass
@@ -274,7 +267,7 @@ default:
       "FE|Buildings|Heating|Electricity|Heat pump": heatpump
       "FE|Buildings|Heating|Electricity|Resistance": resistive
     label_col: sector
-    to_unit: MWh    # EJ/yr → MWh (factor ~2.778e8)
+    to_unit: MWh
 
   demand_se_electricity:
     symbol: "SE|Electricity"

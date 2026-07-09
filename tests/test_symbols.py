@@ -256,12 +256,14 @@ def test_report_fallbacks_lists_all():
     iamc = load_symbol_specs(backend="iamc")
     fb = report_fallbacks(iamc)
     assert set(fb.columns) == {"logical_name", "token", "value", "reason"}
-    # nuclear efficiency fallback is declared
-    tnrs_row = fb[fb["token"] == "tnrs"]
-    assert len(tnrs_row) == 1
-    assert tnrs_row["value"].iloc[0] == pytest.approx(0.33)
-    # CO2 intensity fallbacks (pecoal, pegas, peoil, pebiolc)
-    assert set(fb["token"]).issuperset({"pecoal", "pegas", "peoil", "pebiolc"})
+    # nuclear efficiency is no longer a declared fallback — it's computed directly from the
+    # mif's uranium mass-basis price/conversion-factor variables (see RemindIamcAdapter).
+    assert "tnrs" not in set(fb["token"])
+    # CO2 intensity fallbacks remain only for biomass techs without a mif variable
+    # (REMIND treats biomass as carbon-neutral, so 0.0 is a real value, not a data gap).
+    biomass_fb = fb[fb["logical_name"] == "emission_factor"]
+    assert set(biomass_fb["token"]) == {"biochp", "bioigcc"}
+    assert (biomass_fb["value"] == 0.0).all()
 
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")

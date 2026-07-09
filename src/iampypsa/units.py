@@ -49,6 +49,8 @@ UNIT_CONVERSIONS: dict[tuple[str, str], float] = {
     ("years", "yr"): 1.0,
     # efficiency reported as a percentage, convert to per-unit for a canonical basis
     ("%", "p.u."): 0.01,
+    # CO2 emission factor, thermal-input basis: g/kWh -> t/MWh (1 g/kWh = 1e-3 t/MWh)
+    ("gCO2/kWh_th", "t_CO2/MWh_th"): 0.001,
 }
 
 
