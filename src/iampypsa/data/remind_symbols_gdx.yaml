@@ -38,6 +38,14 @@ default:
     rename: {ttot: year, all_regi: region, loadPy32: sector, level: value}
     unit: TWa
     to_unit: MWh             # year-average power -> annual energy (1e6 * 8760)
+
+  # Backend-parity alias used by demand importers. GDX exposes demand sectors in
+  # the `loadPy32` domain of v32/p32_load_sector.
+  demand_fe_sectors:
+    symbol: [v32_load_sector, p32_load_sector]
+    rename: {ttot: year, all_regi: region, loadPy32: sector, level: value}
+    unit: TWa
+    to_unit: MWh
   capacity:
     symbol: p32_cap
     rename: {ttot: year, all_regi: region, all_te: technology}

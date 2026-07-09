@@ -66,7 +66,7 @@ def add_discount_rate(
     return pd.concat([costs, dr], ignore_index=True)
 
 
-def build_mapped_overrides(
+def build_remind_techdata(
     technology_mapping: pd.DataFrame,
     model_long: pd.DataFrame,
     *,
@@ -77,11 +77,22 @@ def build_mapped_overrides(
     model_value: str,
     out_source: str,
 ) -> pd.DataFrame:
-    """Map model parameter values onto target carriers and log missing references.
+    """
+    Map model parameter values onto target carriers and log missing references.
 
-    Wraps ``build_cost_overrides`` with a warning for each mapped (reference, parameter) pair
+    Log a warning for each mapped (reference, parameter) pair
     that is absent from ``model_long`` — those fall back to the baseline on merge.
     Tags provenance columns consumed by ``apply_overrides``.
+
+    Args:
+        technology_mapping: DataFrame of the technology mappings.
+        model_long: Long-format IAM cost table with columns ``reference, parameter, value, unit``.
+        tech_col: Column name in ``technology_mapping`` with PyPSA carrier names.
+        ref_col: Column name in ``technology_mapping`` with IAM reference names.
+        param_col: Column name in ``technology_mapping`` with IAM parameter names.
+        source_col: Column name in ``technology_mapping`` with source tags.
+        model_value: Value in ``source_col`` that triggers a model-derived override.
+        out_source: Value to write into the output ``source`` column for provenance.
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -111,18 +122,18 @@ def build_mapped_overrides(
     return overrides
 
 
-def build_baseline_overrides(
+def build_pypsa_techdata(
     technology_mapping: pd.DataFrame,
-    baseline_raw: pd.DataFrame,
-    *,
+    pypsa_raw: pd.DataFrame,
+    *, # TODO needed
     tech_col: str,
     source_col: str,
     baseline_value: str,
 ) -> pd.DataFrame:
-    """Pull parameter values from the baseline cost table for rows marked source=<baseline_value>."""
+    """Pull parameter values from the pypsa cost table for mapping rows marked source=<baseline_value>."""
     df = technology_mapping[technology_mapping[source_col] == baseline_value].drop(columns=["unit"])
     df = df.merge(
-        baseline_raw,
+        pypsa_raw,
         left_on=[tech_col, "parameter"],
         right_on=["technology", "parameter"],
         how="left",
@@ -135,14 +146,25 @@ def build_baseline_overrides(
 
 def build_set_value_overrides(
     technology_mapping: pd.DataFrame,
-    mapping_file: str,
-    *,
+    mapping_file: str, # TODO needed?
+    *, # TODO needed?
     tech_col: str,
     source_col: str,
     fixed_value: str,
     comment_col: str,
 ) -> pd.DataFrame:
-    """Return overrides for rows marked source=<fixed_value>, with reference parsed as a number."""
+    """ Set values for technologies directly from the mapping config value.
+    Useful for filling in expected data (e.g with zeros) 
+
+    Args:
+        technology_mapping: DataFrame of the technology mapping CSV.
+        mapping_file: Path to the mapping CSV (for provenance).
+        tech_col: Column name in ``technology_mapping`` with PyPSA carrier names.
+        source_col: Column name in ``technology_mapping`` with source tags.
+        fixed_value: Value in ``source_col`` that triggers a fixed-value override.
+        comment_col: Column name in ``technology_mapping`` with optional comments.
+    
+    Return overrides for rows marked source=<fixed_value>, with reference parsed as a number."""
     set_df = (
         technology_mapping[technology_mapping[source_col] == fixed_value]
         .rename(columns={

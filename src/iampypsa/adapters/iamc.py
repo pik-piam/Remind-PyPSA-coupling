@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 #: EJ/yr → MWh conversion factor (1 EJ = 10^18 J; 1 MWh = 3.6e9 J).
 _EJ_TO_MWH = unit_factor("EJ/yr", "MWh")
 
+
 class RemindIamcAdapter(CouplingAdapter):
     """CouplingAdapter specialised for REMIND IAMC ``.mif`` output.
 
@@ -47,7 +48,8 @@ class RemindIamcAdapter(CouplingAdapter):
         The algorithm applied on top is REMIND-specific:
 
         1. η_td = (SE − Losses) / SE  (derived T&D efficiency, replaces GDX pm_eta_conv).
-        2. Each FE sector is rebased to the SE level: FE_sector_MWh / η_td.
+          2. Electricity FE sectors are rebased to the SE level: FE_sector_MWh / η_td.
+              ``demand_h2`` is treated as a hydrogen-demand quantity and is not rebased.
         3. Electrolysis electricity demand (MWh_el) =
                (SE|Hydrogen|Electricity − SE|Input|Hydrogen|Electricity) / η_elec
            Both SE variables are in EJ H2; the difference is the net H2 from electricity
@@ -83,8 +85,24 @@ class RemindIamcAdapter(CouplingAdapter):
             eta_td = self._td_efficiency(se, losses)
 
             fe_slice = fe_df[(fe_df["region"] == region) & (fe_df["year"] == year)]
-            fe_rows, rebased_sum_mwh = self._rebase_fe_sectors(fe_slice, eta_td, region, year)
+            fe_rows, rebased_sum_mwh, has_fe_h2 = self._rebase_fe_sectors(
+                fe_slice, eta_td, region, year
+            )
             rows.extend(fe_rows)
+
+            h2_demand_mwh = self._net_h2_demand_mwh(
+                get(h2_prod_var), get(h2_turb_var), region, year
+            )
+            if not has_fe_h2:
+                rows.append(
+                    {
+                        "year": year,
+                        "region": region,
+                        "sector": "demand_h2",
+                        "value": h2_demand_mwh,
+                        "unit": "MWh",
+                    }
+                )
 
             eta_elec = get(eta_var) / 100.0  # mif reports in %
             elec_h2_mwh = self._electrolysis_demand_mwh(
@@ -125,24 +143,78 @@ class RemindIamcAdapter(CouplingAdapter):
     @staticmethod
     def _rebase_fe_sectors(
         fe_slice: pd.DataFrame, eta_td: float, region: str, year: int
-    ) -> tuple[list[dict], float]:
-        """Rebase each FE sector to the SE level (FE / η_td); return (rows, summed MWh)."""
+    ) -> tuple[list[dict], float, bool]:
+        """Return FE rows, rebased-electricity sum, and whether FE provided ``demand_h2``.
+
+        Electricity FE sectors are rebased by ``η_td`` and contribute to the AC residual
+        subtraction. ``demand_h2`` is treated as hydrogen demand and passed through
+        unchanged, i.e. it is not rebased and does not enter the AC residual sum.
+        """
         rows = []
         rebased_sum_mwh = 0.0
+        has_fe_h2 = False
         for _, fe_row in fe_slice.iterrows():
+            sector = str(fe_row["sector"])
+            if sector == "demand_h2":
+                has_fe_h2 = True
+                rows.append(
+                    {
+                        "year": year,
+                        "region": region,
+                        "sector": sector,
+                        "value": fe_row["value"],
+                        "unit": "MWh",
+                    }
+                )
+                continue
+
             se_val_mwh = fe_row["value"] / eta_td if eta_td > 0 else fe_row["value"]
             rebased_sum_mwh += se_val_mwh
             rows.append({
-                "year": year, "region": region, "sector": fe_row["sector"],
+                "year": year, "region": region, "sector": sector,
                 "value": se_val_mwh, "unit": "MWh",
             })
-        return rows, rebased_sum_mwh
+        return rows, rebased_sum_mwh, has_fe_h2
+
+    @staticmethod
+    def _net_h2_demand_mwh(h2_prod_ej: float, h2_turb_ej: float, region: str, year: int) -> float:
+        """Net hydrogen demand (MWh_H2) from electricity-route hydrogen balances.
+        Seasonal storage is a pypsa-decision for elec supply and not a load -> discarded
+
+        Computes ``(SE|Hydrogen|Electricity - SE|Input|Hydrogen|Electricity)`` and
+        converts EJ/yr to MWh/yr. Negative values are clamped to zero.
+        """
+        net_h2_mwh = (h2_prod_ej - h2_turb_ej) * _EJ_TO_MWH
+        if net_h2_mwh < 0:
+            logger.warning(
+                "Negative net H2 demand for region=%s year=%s: %.4f MWh - clamped to 0.",
+                region,
+                year,
+                net_h2_mwh,
+            )
+            return 0.0
+        return net_h2_mwh
+        
 
     @staticmethod
     def _electrolysis_demand_mwh(
         h2_prod_ej: float, h2_turb_ej: float, eta_elec: float, region: str, year: int
     ) -> float:
-        """Net H2 for FE demand (EJ H2) ÷ η_elec → EJ electricity → MWh (0 if η_elec ≤ 0)."""
+        """Electrolyser electricity demand caused by green H2 IAM demand.
+
+        electrolysis_el_dem = (Demand_H2_tot - H2_seasonal_storage)[EJ] ÷ η_elec x EJ_to_MWh 
+        (0 if η_elec ≤ 0).
+        Seasonal storage is a pypsa-decision to meet elec demand and not an H2 load -> discarded here
+
+        Args:
+            h2_prod_ej: SE|Hydrogen|Electricity (EJ H2)
+            h2_turb_ej: SE|Input|Hydrogen|Electricity (EJ H2)
+            eta_elec: Electrolysis efficiency (p.u.)
+            region: Region name (for logging)
+            year: Planning year (for logging)
+        Returns:
+            float: Net Electrolysis demand to produce green H2 in MWh excluding IAM seasonal storage.
+        """
         if eta_elec > 0:
             return (h2_prod_ej - h2_turb_ej) / eta_elec * _EJ_TO_MWH
         logger.warning("Zero electrolysis efficiency for region=%s year=%s; skipping.", region, year)
