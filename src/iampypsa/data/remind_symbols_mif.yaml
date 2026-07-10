@@ -266,7 +266,7 @@ default:
       pebiolc: {value: 0.0,   reason: "CO2 intensity absent from mif; biomass carbon-neutral in REMIND"}
 
   # --- Demand variables ----------------------------------------------------
-  # Read by RemindIamcAdapter.build_regional_demand via load_spec / symbol lookup.
+  # Read by RemindIamcCoupler.build_regional_demand via load_spec / symbol lookup.
   # demand_fe_sectors uses load_variable_set (variables: block → token labels + unit conversion).
   # The three scalar specs supply only the variable name (symbol:); the adapter reads
   # them via read_iamc and applies the η_td formula and AC residual computation on top.

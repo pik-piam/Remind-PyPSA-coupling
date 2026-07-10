@@ -1,4 +1,4 @@
-"""Tests for the (directly instantiable) CouplingAdapter: builders vs dev references.
+"""Tests for the (directly instantiable) Coupler: builders vs dev references.
 
 The adapter is now concrete — no subclass is required. The data-driven checks run against the
 development GDX/reference CSVs when present (they depend only on iampypsa + pandas).
@@ -11,7 +11,7 @@ import os
 import pandas as pd
 import pytest
 
-from iampypsa.couplers.base import CouplingAdapter
+from iampypsa.couplers.base import Coupler
 from iampypsa.transforms.capacities import build_capacity_targets
 
 DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1"
@@ -23,9 +23,9 @@ HAVE_DATA = all(os.path.exists(p) for p in [GDX, f"{SSP}/population.csv", REGION
 
 
 def test_adapter_is_directly_instantiable():
-    """CouplingAdapter has no abstract methods — it can be created without a subclass."""
-    adapter = CouplingAdapter(loader=None, symbols={}, region_map={}, config={})
-    assert isinstance(adapter, CouplingAdapter)
+    """Coupler has no abstract methods — it can be created without a subclass."""
+    adapter = Coupler(loader=None, symbols={}, region_map={}, config={})
+    assert isinstance(adapter, Coupler)
 
 
 def _adapter():
@@ -37,7 +37,7 @@ def _adapter():
 
     cfg = yaml.safe_load(open(f"{DEV}/config.remind_europe_without_NES_fixed.yaml"))
     co2 = pd.read_csv(f"{DEV}/co2_price.csv")
-    return CouplingAdapter(
+    return Coupler(
         loader=RemindLoader(GDX),
         symbols=load_symbol_specs(),
         region_map=read_region_map(REGION_MAP, source="REMIND-EU", target="PyPSA-EUR"),

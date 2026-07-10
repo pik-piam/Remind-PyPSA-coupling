@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from iampypsa.couplers.base import CouplingAdapter
-from iampypsa.couplers.remind import RemindGdxAdapter, RemindIamcAdapter
+from iampypsa.couplers.base import Coupler
+from iampypsa.couplers.remind import RemindGdxCoupler, RemindIamcCoupler
 
-__all__ = ["CouplingAdapter", "RemindGdxAdapter", "RemindIamcAdapter"]
+__all__ = ["Coupler", "RemindGdxCoupler", "RemindIamcCoupler"]

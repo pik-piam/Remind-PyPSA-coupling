@@ -1,13 +1,13 @@
 """iampypsa — shared IAM↔PyPSA coupling logic and the base coupling-adapter interface.
 
 Concrete per-model adapters live in each PyPSA model's own repository and subclass
-``CouplingAdapter``.
+``Coupler``.
 """
 
 import importlib.metadata
 
-from .couplers.base import CouplingAdapter
-from .couplers.remind import RemindGdxAdapter, RemindIamcAdapter
+from .couplers.base import Coupler
+from .couplers.remind import RemindGdxCoupler, RemindIamcCoupler
 from .io import (
     RemindLoader,
     default_symbol_config_path,
@@ -23,9 +23,9 @@ from .io import (
 from .validate import validate_scenario_against_remind
 
 __all__ = [
-    "CouplingAdapter",
-    "RemindGdxAdapter",
-    "RemindIamcAdapter",
+    "Coupler",
+    "RemindGdxCoupler",
+    "RemindIamcCoupler",
     "RemindLoader",
     "read_gdx_symbol",
     "read_ssp_data",

@@ -1,15 +1,15 @@
 """REMIND coupling backends: GDX and IAMC (``.mif``).
 
-Two ``CouplingAdapter`` subclasses implementing the source-specific hooks
+Two ``Coupler`` subclasses implementing the source-specific hooks
 (``build_regional_demand`` and ``extract_cost_parameters``) for REMIND output:
 
-- ``RemindGdxAdapter``  — GDX backend (reads ``load_sector``/cost symbols directly).
-- ``RemindIamcAdapter`` — IAMC ``.mif`` backend (derives demand via T&D efficiency + AC
+- ``RemindGdxCoupler``  — GDX backend (reads ``load_sector``/cost symbols directly).
+- ``RemindIamcCoupler`` — IAMC ``.mif`` backend (derives demand via T&D efficiency + AC
   residual; reads per-parameter variable-sets, converts FOM to %/capex, injects nuclear
   efficiency and CO2-intensity fallbacks).
 
 All other builders (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
-are inherited from ``CouplingAdapter`` unchanged — they work for both backends via
+are inherited from ``Coupler`` unchanged — they work for both backends via
 spec-shape dispatch.
 """
 
@@ -19,7 +19,7 @@ import logging
 
 import pandas as pd
 
-from iampypsa.couplers.base import CouplingAdapter
+from iampypsa.couplers.base import Coupler
 from iampypsa.io.iamc import read_iamc
 from iampypsa.io.remind_symbols import load_frame, load_set, load_spec, load_variable_set
 from iampypsa.transforms.loads import convert_loads
@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 _EJ_TO_MWH = unit_factor("EJ/yr", "MWh")
 
 
-class RemindGdxAdapter(CouplingAdapter):
-    """CouplingAdapter specialised for REMIND GDX output.
+class RemindGdxCoupler(Coupler):
+    """Coupler specialised for REMIND GDX output.
 
     Implements:
     - ``build_regional_demand``: reads ``load_sector`` GDX symbol (TWa→MWh via spec).
@@ -116,8 +116,8 @@ class RemindGdxAdapter(CouplingAdapter):
         return df[df["region"].isin(self.model_regions)]
 
 
-class RemindIamcAdapter(CouplingAdapter):
-    """CouplingAdapter specialised for REMIND IAMC ``.mif`` output.
+class RemindIamcCoupler(Coupler):
+    """Coupler specialised for REMIND IAMC ``.mif`` output.
 
     Implements:
     - ``build_regional_demand``: FE sector rebasing via derived η_td + AC residual.
