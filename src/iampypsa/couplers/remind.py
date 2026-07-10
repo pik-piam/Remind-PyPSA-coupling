@@ -171,7 +171,7 @@ class RemindIamcCoupler(Coupler):
             eta_td = self._td_efficiency(se, losses)
 
             fe_slice = fe_df[(fe_df["region"] == region) & (fe_df["year"] == year)]
-            fe_rows, rebased_sum_mwh, has_fe_h2 = self._rebase_fe_sectors(
+            fe_rows, rebased_sum_mwh, has_se_h2 = self._rebase_fe_sectors(
                 fe_slice, eta_td, region, year
             )
             rows.extend(fe_rows)
@@ -179,21 +179,20 @@ class RemindIamcCoupler(Coupler):
             h2_demand_mwh = self._net_h2_demand_mwh(
                 get(h2_prod_var), get(h2_turb_var), region, year
             )
-            if not has_fe_h2:
+            if not has_se_h2:
                 rows.append(
                     {
                         "year": year,
                         "region": region,
                         "sector": "demand_h2",
                         "value": h2_demand_mwh,
-                        "unit": "MWh",
+                        "unit": "MWh_H2",
                     }
                 )
 
             eta_elec = get(eta_var) / 100.0  # mif reports in %
-            elec_h2_mwh = self._electrolysis_demand_mwh(
-                get(h2_prod_var), get(h2_turb_var), eta_elec, region, year
-            )
+            elec_h2_mwh = h2_demand_mwh/eta_elec
+
             rows.append({
                 "year": year, "region": region, "sector": "electrolysis",
                 "value": elec_h2_mwh, "unit": "MWh",
@@ -238,18 +237,18 @@ class RemindIamcCoupler(Coupler):
         """
         rows = []
         rebased_sum_mwh = 0.0
-        has_fe_h2 = False
+        has_se_h2 = False
         for _, fe_row in fe_slice.iterrows():
             sector = str(fe_row["sector"])
             if sector == "demand_h2":
-                has_fe_h2 = True
+                has_se_h2 = True
                 rows.append(
                     {
                         "year": year,
                         "region": region,
                         "sector": sector,
                         "value": fe_row["value"],
-                        "unit": "MWh",
+                        "unit": "MWh_H2",
                     }
                 )
                 continue
@@ -260,7 +259,7 @@ class RemindIamcCoupler(Coupler):
                 "year": year, "region": region, "sector": sector,
                 "value": se_val_mwh, "unit": "MWh",
             })
-        return rows, rebased_sum_mwh, has_fe_h2
+        return rows, rebased_sum_mwh, has_se_h2
 
     @staticmethod
     def _net_h2_demand_mwh(h2_prod_ej: float, h2_turb_ej: float, region: str, year: int) -> float:
@@ -281,31 +280,6 @@ class RemindIamcCoupler(Coupler):
             return 0.0
         return net_h2_mwh
         
-
-    @staticmethod
-    def _electrolysis_demand_mwh(
-        h2_prod_ej: float, h2_turb_ej: float, eta_elec: float, region: str, year: int
-    ) -> float:
-        """Electrolyser electricity demand caused by green H2 IAM demand.
-
-        electrolysis_el_dem = (Demand_H2_tot - H2_seasonal_storage)[EJ] ÷ η_elec x EJ_to_MWh 
-        (0 if η_elec ≤ 0).
-        Seasonal storage is a pypsa-decision to meet elec demand and not an H2 load -> discarded here
-
-        Args:
-            h2_prod_ej: SE|Hydrogen|Electricity (EJ H2)
-            h2_turb_ej: SE|Input|Hydrogen|Electricity (EJ H2)
-            eta_elec: Electrolysis efficiency (p.u.)
-            region: Region name (for logging)
-            year: Planning year (for logging)
-        Returns:
-            float: Net Electrolysis demand to produce green H2 in MWh excluding IAM seasonal storage.
-        """
-        if eta_elec > 0:
-            return (h2_prod_ej - h2_turb_ej) / eta_elec * _EJ_TO_MWH
-        logger.warning("Zero electrolysis efficiency for region=%s year=%s; skipping.", region, year)
-        return 0.0
-
     @staticmethod
     def _ac_residual(
         se: float, losses: float, rebased_sum_mwh: float, elec_h2_mwh: float,
