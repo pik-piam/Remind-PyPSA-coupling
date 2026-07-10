@@ -19,6 +19,7 @@ from iampypsa.io.remind_symbols import (
     read_symbol_config,
     report_fallbacks,
 )
+from iampypsa.io.degree_days import read_degree_days
 from iampypsa.io.ssp import fetch_ssp_data, fetch_ssp_variable, read_ssp_data
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     "fetch_ssp_data",
     "fetch_ssp_variable",
     "read_ssp_data",
+    "read_degree_days",
     "load_symbol_specs",
     "load_spec",
     "load_variable_set",

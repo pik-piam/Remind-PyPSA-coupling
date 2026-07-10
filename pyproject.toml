@@ -1,14 +1,15 @@
 [project]
-name = "iam-pypsa-coupling"
-version = "0.2.0"
+name = "IAM-PyPSA-coupling"
+version = "0.3.0"
 description = "Tools to couple IAMs and PyPSA power models"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "numpy>1.9", 
     "pandas>2", 
-    "pyyaml", 
+    "pyyaml",
     "country_converter",
+    "typing_extensions",
     "pytest"]
 
 [project.urls]

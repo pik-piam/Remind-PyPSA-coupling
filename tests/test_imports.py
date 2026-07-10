@@ -6,13 +6,13 @@ def test_import_main_package():
     import iampypsa
 
     assert iampypsa is not None
-    for name in ("CouplingAdapter", "RemindLoader", "load_symbol_specs"):
+    for name in ("Coupler", "RemindLoader", "load_symbol_specs"):
         assert hasattr(iampypsa, name), name
 
 
 def test_import_subpackages():
     """The current sub-packages import correctly."""
-    from iampypsa import adapters, downscale, io, transforms  # noqa: F401
+    from iampypsa import couplers, downscale, io, transforms  # noqa: F401
     from iampypsa import units, validate  # noqa: F401
     from iampypsa.io import remind_symbols  # noqa: F401
 

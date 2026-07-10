@@ -1,15 +1,15 @@
-"""The IAM→PyPSA coupling adapter interface.
+"""The IAM→PyPSA coupling adapter interface. This is exposed to pypsa models 
+and is the entry point for the coupling workflow. 
 
-``CouplingAdapter`` is the backend-neutral base: it holds the shared, concrete builders
+- ``Coupler`` is the backend-neutral base: it holds the shared, concrete builders
 (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
-driven by the resolved symbol map and config, and declares the two source-specific hooks
-(``build_regional_demand``, ``extract_cost_parameters``) as abstract-style methods that
-raise ``NotImplementedError``.
+- it consumes the IAM symbols (resolved via their config) and the region map, and it contains
+ the reference data (population, GDP, etc.) for downscaling.
 
 Concrete adapters (instantiated directly by the caller, which selects on ``loader.backend``);
-a new IAM or output format is added as a further ``CouplingAdapter`` subclass, not a branch here:
-- ``RemindGdxAdapter``  (``iampypsa.adapters.gdx``)
-- ``RemindIamcAdapter`` (``iampypsa.adapters.iamc``)
+a new IAM or output format is added as a further ``Coupler`` subclass, not a branch here:
+- ``RemindGdxCoupler``  (``iampypsa.couplers.remind``)
+- ``RemindIamcCoupler`` (``iampypsa.couplers.remind``)
 
 config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``planning_horizons``.
 """
@@ -33,7 +33,7 @@ from iampypsa.transforms.costs import (
 )
 
 
-class CouplingAdapter:
+class Coupler:
     """Backend-neutral base: shared builders + source-specific hook declarations."""
 
     def __init__(
@@ -73,23 +73,23 @@ class CouplingAdapter:
     def build_regional_demand(self) -> pd.DataFrame:
         """Read IAM regional sectoral demand as ``[year, region, sector, value, unit]`` (MWh).
 
-        Implemented by ``RemindGdxAdapter`` / ``RemindIamcAdapter``.
+        Implemented by ``RemindGdxCoupler`` / ``RemindIamcCoupler``.
         """
         raise NotImplementedError(
             f"{type(self).__name__} must implement build_regional_demand(). "
-            "Instantiate RemindGdxAdapter or RemindIamcAdapter (per loader.backend), "
-            "or a new CouplingAdapter subclass for another IAM."
+            "Instantiate RemindGdxCoupler or RemindIamcCoupler (per loader.backend), "
+            "or a new Coupler subclass for another IAM."
         )
 
     def extract_cost_parameters(self, year: int) -> pd.DataFrame:
         """Extract cost parameters as long ``[region, reference, parameter, value, unit]``.
 
-        Implemented by ``RemindGdxAdapter`` / ``RemindIamcAdapter``.
+        Implemented by ``RemindGdxCoupler`` / ``RemindIamcCoupler``.
         """
         raise NotImplementedError(
             f"{type(self).__name__} must implement extract_cost_parameters(). "
-            "Instantiate RemindGdxAdapter or RemindIamcAdapter (per loader.backend), "
-            "or a new CouplingAdapter subclass for another IAM."
+            "Instantiate RemindGdxCoupler or RemindIamcCoupler (per loader.backend), "
+            "or a new Coupler subclass for another IAM."
         )
 
     # -- Shared concrete builders -------------------------------------------
@@ -113,7 +113,12 @@ class CouplingAdapter:
         )
 
     def downscale_country_demand(self, regional: pd.DataFrame | None = None) -> pd.DataFrame:
-        """Downscale IAM regional demand to per-country annual demand by sector and year."""
+        """Downscale IAM regional demand to per-country annual demand by sector and year.
+
+        The proxy registry is ``self.reference_data`` verbatim — it already holds ``population``/
+        ``gdp`` (and any ``heating_demand``/``cooling_demand`` the caller added). Each sector's
+        ``sector_weights`` entry names which of those proxies to blend.
+        """
         loads = self.build_regional_demand() if regional is None else regional
         if self.config.get("planning_horizons"):
             years = {int(y) for y in self.config["planning_horizons"]}
@@ -121,8 +126,7 @@ class CouplingAdapter:
         return disaggregate_demand_to_country(
             loads,
             self.region_map,
-            self.ssp_population,
-            self.ssp_gdp,
+            self.reference_data,
             self.config["sector_weights"],
             set(self.config["countries"]),
         )

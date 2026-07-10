@@ -11,20 +11,26 @@ import logging
 
 import pandas as pd
 
-from iampypsa.downscale.proxy import build_ssp_shares
+from iampypsa.downscale.proxy import build_proxy_shares
 
 logger = logging.getLogger(__name__)
 
 
+# TODO  add example of proxies/weights
+# TODO -> should this be vectorised?
 def disaggregate_demand_to_country(
     sectoral_load: pd.DataFrame,
     region_to_countries: dict[str, list[str]],
-    pop_data: pd.DataFrame,
-    gdp_data: pd.DataFrame,
+    proxies: dict[str, pd.DataFrame],
     sector_weights: dict,
     configured_countries: set[str],
 ) -> pd.DataFrame:
-    """Split each (year, region, sector) row into per-country rows; return a tidy frame."""
+    """Split each (year, region, sector) row into per-country rows; return a tidy frame.
+
+    ``proxies`` is a name→frame registry (e.g. ``{"population": ..., "gdp": ...,
+    "heating_demand": ..., "cooling_demand": ...}``); each sector's ``sector_weights`` entry names
+    which proxies to blend. Passed straight to :func:`build_proxy_shares`.
+    """
     rows: list[dict] = []
     warned: set[str] = set()
 
@@ -42,8 +48,8 @@ def disaggregate_demand_to_country(
             rows.append({**row.to_dict(), "region": configured[0]})
             continue
 
-        weights = build_ssp_shares(
-            members, int(row["year"]), row["sector"], pop_data, gdp_data,
+        weights = build_proxy_shares(
+            members, int(row["year"]), row["sector"], proxies,
             sector_weights, configured_countries=configured_countries,
         )
         unconfigured = [c for c in members if c not in configured_countries]

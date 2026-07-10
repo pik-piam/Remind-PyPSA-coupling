@@ -88,7 +88,7 @@ def test_full_ssp_downscaling_matches_reference():
     ref = pd.read_csv(SECT_LOAD_COUNTRY)
     load_in = pd.read_csv(SECT_LOAD).query("year in @ref.year.unique()")
     got = disaggregate_demand_to_country(
-        load_in, region_to_countries, pop, gdp, sector_weights, configured
+        load_in, region_to_countries, {"population": pop, "gdp": gdp}, sector_weights, configured
     )
     g = got.set_index(["year", "region", "sector"])["value"].sort_index()
     r = ref.set_index(["year", "region", "sector"])["value"].sort_index()
@@ -103,8 +103,7 @@ def test_disaggregate_single_country_is_noop_vs_reference():
     out = disaggregate_demand_to_country(
         sectoral_load,
         region_to_countries={"DEU": ["DE"]},
-        pop_data=pd.DataFrame(columns=["iso2", "year", "value"]).set_index(["iso2", "year"]),
-        gdp_data=pd.DataFrame(columns=["iso2", "year", "value"]).set_index(["iso2", "year"]),
+        proxies={},  # single-member region is a no-op; no proxy needed
         sector_weights={},
         configured_countries={"DE"},
     ).set_index("sector")["value"].sort_index()

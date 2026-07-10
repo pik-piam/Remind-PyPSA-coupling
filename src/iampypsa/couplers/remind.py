@@ -1,18 +1,16 @@
-"""REMIND-IAMC / .mif coupling adapter.
+"""REMIND coupling backends: GDX and IAMC (``.mif``).
 
-Subclass of ``CouplingAdapter`` for the IAMC ``.mif`` backend. Implements the two
-source-specific hooks:
+Two ``Coupler`` subclasses implementing the source-specific hooks
+(``build_regional_demand`` and ``extract_cost_parameters``) for REMIND output:
 
-- ``build_regional_demand``: derives sectoral electricity demand from SE|Electricity,
-  transmission losses, and FE sector variables, applying an implicit T&D efficiency and
-  computing the AC residual (all other loads).
-- ``extract_cost_parameters``: reads per-parameter variable-sets from the mif, converts
-  FOM from absolute (USD/MW/yr) to percentage of capex (%/yr), injects constant fallbacks
-  for absent nuclear efficiency and CO2 intensity.
+- ``RemindGdxCoupler``  — GDX backend (reads ``load_sector``/cost symbols directly).
+- ``RemindIamcCoupler`` — IAMC ``.mif`` backend (derives demand via T&D efficiency + AC
+  residual; reads per-parameter variable-sets, converts FOM to %/capex, injects nuclear
+  efficiency and CO2-intensity fallbacks).
 
 All other builders (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
-are inherited from ``CouplingAdapter`` unchanged — they work for both backends via
-spec-shape dispatch (``load_frame`` for ``symbol:``-shaped specs).
+are inherited from ``Coupler`` unchanged — they work for both backends via
+spec-shape dispatch.
 """
 
 from __future__ import annotations
@@ -20,19 +18,108 @@ from __future__ import annotations
 import logging
 
 import pandas as pd
-
-from iampypsa.adapters.base import CouplingAdapter
+import country_converter as coco
+import os.path 
+from iampypsa.couplers.base import Coupler
 from iampypsa.io.iamc import read_iamc
-from iampypsa.io.remind_symbols import load_spec, load_variable_set
-from iampypsa.units import unit_factor
+from iampypsa.io.remind_symbols import PathLike, load_frame, load_set, load_spec, load_variable_set
+from iampypsa.transforms.loads import convert_loads
+from iampypsa.units import HOURS_PER_YEAR, unit_factor
+
 
 logger = logging.getLogger(__name__)
 
 #: EJ/yr → MWh conversion factor (1 EJ = 10^18 J; 1 MWh = 3.6e9 J).
 _EJ_TO_MWH = unit_factor("EJ/yr", "MWh")
 
-class RemindIamcAdapter(CouplingAdapter):
-    """CouplingAdapter specialised for REMIND IAMC ``.mif`` output.
+
+class RemindGdxCoupler(Coupler):
+    """Coupler specialised for REMIND GDX output.
+
+    Implements:
+    - ``build_regional_demand``: reads ``load_sector`` GDX symbol (TWa→MWh via spec).
+    - ``extract_cost_parameters``: reads all cost symbols from GDX, applies REMIND-GDX
+      tech-facts (fnrs/tnrs MWh/g_U efficiency, peur $/g_U fuel, storage $/MWh label).
+    """
+
+    def build_regional_demand(self) -> pd.DataFrame:
+        """Read REMIND regional sectoral demand as tidy ``[year, region, sector, value]`` (MWh/yr).
+
+        Reads ``demand_fe_sectors`` when present (fallback: ``load_sector``), with
+        TWa→MWh conversion applied by ``load_frame``, and restricts
+        to the configured REMIND regions. All available years are returned; the year filter to
+        planning horizons happens in ``downscale_country_demand``.
+        """
+        key = "demand_fe_sectors" if "demand_fe_sectors" in self.symbols else "load_sector"
+        raw = load_frame(self.loader, self.symbols[key])
+        raw["year"] = raw["year"].astype(int)
+        return convert_loads(raw, regions=self.model_regions, unit_factor=1.0)
+
+    def extract_cost_parameters(self, year: int) -> pd.DataFrame:
+        """Extract REMIND GDX cost parameters as long
+        ``[region, reference, parameter, value, unit]``.
+
+        Unit conversions are config-declared (applied by ``load_frame``/``load_set``). The
+        REMIND-GDX-specific tech-facts encoded here are:
+        - ``fnrs``/``tnrs`` efficiency is in MWh/g_U (not p.u.); kept as-is and labelled
+          accordingly - the cost model uses it together with the peur $/g_U fuel price.
+        - ``peur`` (uranium) fuel price is already in $/g_U in the GDX; other fuels get the
+          T$/TWa->$/MWh conversion applied.
+        - Storage techs (``h2stor``, ``btstor``) share the $/MW capex factor but are
+          relabelled $/MWh.
+        """
+        year_str = str(year)
+        load = lambda name: load_frame(self.loader, self.symbols[name])  # noqa: E731
+
+        # Investment: T$/TW->$/MW applied in load_frame; storage techs relabelled $/MWh.
+        costs = load("cost_investment")
+        costs = costs.loc[costs["year"].astype(str) == year_str].copy()
+        costs["parameter"] = "investment"
+        costs["unit"] = "USD/MW"
+        costs.loc[costs["technology"].isin(["h2stor", "btstor"]), "unit"] = "USD/MWh"
+
+        # tech_data: mixed-unit set (lifetime/FOM/VOM) - split + converted per YAML schema.
+        techd = load_set(self.loader, self.symbols["tech_data"])
+
+        # CO2 intensity: Gt_C/TWa->t_CO2/MWh applied in load_frame; carrier filter here.
+        co2i = load("emission_factor")
+        co2i = co2i.loc[
+            (co2i["to_carrier"] == "seel")
+            & (co2i["emission_type"] == "co2")
+            & (co2i["year"].astype(str) == year_str)
+        ].copy()
+        co2i = co2i.assign(parameter="CO2 intensity", unit="t_CO2/MWh_th")
+
+        # Efficiency: p.u. (identity); per-tech exceptions below are REMIND GDX tech facts.
+        eta = load("efficiency_conv")
+        eta = eta.loc[eta["year"].astype(str) == year_str]
+        dataeta = load("efficiency_data")
+        dataeta = dataeta.loc[dataeta["year"].astype(str) == year_str]
+        keys = set(zip(eta["region"], eta["technology"]))
+        fallback = dataeta[
+            ~pd.MultiIndex.from_arrays([dataeta["region"], dataeta["technology"]]).isin(keys)
+        ]
+        eff = pd.concat([eta, fallback]).assign(parameter="efficiency", unit="p.u.")
+        # GDX nuclear efficiency is in MWh/g_U (mass basis), not thermal %; keep the unit.
+        eff.loc[eff["technology"].isin(["fnrs", "tnrs"]), "value"] *= HOURS_PER_YEAR / 1e6
+        eff.loc[eff["technology"].isin(["fnrs", "tnrs"]), "unit"] = "MWh/g_U"
+
+        # Fuel: T$/TWa->$/MWh for all except peur (already $/g_U in GDX).
+        fuel = load("fuel_price")
+        fuel = fuel.loc[fuel["year"].astype(str) == year_str].copy()
+        fuel["parameter"] = "fuel"
+        fuel.loc[fuel["technology"] != "peur", "value"] *= unit_factor("T$/TWa", "$/MWh")
+        fuel["unit"] = "USD/MWh_th"
+        fuel.loc[fuel["technology"] == "peur", "unit"] = "USD/g_U"
+
+        df = pd.concat([costs, techd, co2i, eff, fuel])[
+            ["region", "technology", "parameter", "value", "unit"]
+        ].rename(columns={"technology": "reference"})
+        return df[df["region"].isin(self.model_regions)]
+
+
+class RemindIamcCoupler(Coupler):
+    """Coupler specialised for REMIND IAMC ``.mif`` output.
 
     Implements:
     - ``build_regional_demand``: FE sector rebasing via derived η_td + AC residual.
@@ -47,7 +134,8 @@ class RemindIamcAdapter(CouplingAdapter):
         The algorithm applied on top is REMIND-specific:
 
         1. η_td = (SE − Losses) / SE  (derived T&D efficiency, replaces GDX pm_eta_conv).
-        2. Each FE sector is rebased to the SE level: FE_sector_MWh / η_td.
+          2. Electricity FE sectors are rebased to the SE level: FE_sector_MWh / η_td.
+              ``demand_h2`` is treated as a hydrogen-demand quantity and is not rebased.
         3. Electrolysis electricity demand (MWh_el) =
                (SE|Hydrogen|Electricity − SE|Input|Hydrogen|Electricity) / η_elec
            Both SE variables are in EJ H2; the difference is the net H2 from electricity
@@ -83,13 +171,28 @@ class RemindIamcAdapter(CouplingAdapter):
             eta_td = self._td_efficiency(se, losses)
 
             fe_slice = fe_df[(fe_df["region"] == region) & (fe_df["year"] == year)]
-            fe_rows, rebased_sum_mwh = self._rebase_fe_sectors(fe_slice, eta_td, region, year)
+            fe_rows, rebased_sum_mwh, has_se_h2 = self._rebase_fe_sectors(
+                fe_slice, eta_td, region, year
+            )
             rows.extend(fe_rows)
 
-            eta_elec = get(eta_var) / 100.0  # mif reports in %
-            elec_h2_mwh = self._electrolysis_demand_mwh(
-                get(h2_prod_var), get(h2_turb_var), eta_elec, region, year
+            h2_demand_mwh = self._net_h2_demand_mwh(
+                get(h2_prod_var), get(h2_turb_var), region, year
             )
+            if not has_se_h2:
+                rows.append(
+                    {
+                        "year": year,
+                        "region": region,
+                        "sector": "demand_h2",
+                        "value": h2_demand_mwh,
+                        "unit": "MWh_H2",
+                    }
+                )
+
+            eta_elec = get(eta_var) / 100.0  # mif reports in %
+            elec_h2_mwh = h2_demand_mwh/eta_elec
+
             rows.append({
                 "year": year, "region": region, "sector": "electrolysis",
                 "value": elec_h2_mwh, "unit": "MWh",
@@ -125,29 +228,58 @@ class RemindIamcAdapter(CouplingAdapter):
     @staticmethod
     def _rebase_fe_sectors(
         fe_slice: pd.DataFrame, eta_td: float, region: str, year: int
-    ) -> tuple[list[dict], float]:
-        """Rebase each FE sector to the SE level (FE / η_td); return (rows, summed MWh)."""
+    ) -> tuple[list[dict], float, bool]:
+        """Return FE rows, rebased-electricity sum, and whether FE provided ``demand_h2``.
+
+        Electricity FE sectors are rebased by ``η_td`` and contribute to the AC residual
+        subtraction. ``demand_h2`` is treated as hydrogen demand and passed through
+        unchanged, i.e. it is not rebased and does not enter the AC residual sum.
+        """
         rows = []
         rebased_sum_mwh = 0.0
+        has_se_h2 = False
         for _, fe_row in fe_slice.iterrows():
+            sector = str(fe_row["sector"])
+            if sector == "demand_h2":
+                has_se_h2 = True
+                rows.append(
+                    {
+                        "year": year,
+                        "region": region,
+                        "sector": sector,
+                        "value": fe_row["value"],
+                        "unit": "MWh_H2",
+                    }
+                )
+                continue
+
             se_val_mwh = fe_row["value"] / eta_td if eta_td > 0 else fe_row["value"]
             rebased_sum_mwh += se_val_mwh
             rows.append({
-                "year": year, "region": region, "sector": fe_row["sector"],
+                "year": year, "region": region, "sector": sector,
                 "value": se_val_mwh, "unit": "MWh",
             })
-        return rows, rebased_sum_mwh
+        return rows, rebased_sum_mwh, has_se_h2
 
     @staticmethod
-    def _electrolysis_demand_mwh(
-        h2_prod_ej: float, h2_turb_ej: float, eta_elec: float, region: str, year: int
-    ) -> float:
-        """Net H2 for FE demand (EJ H2) ÷ η_elec → EJ electricity → MWh (0 if η_elec ≤ 0)."""
-        if eta_elec > 0:
-            return (h2_prod_ej - h2_turb_ej) / eta_elec * _EJ_TO_MWH
-        logger.warning("Zero electrolysis efficiency for region=%s year=%s; skipping.", region, year)
-        return 0.0
+    def _net_h2_demand_mwh(h2_prod_ej: float, h2_turb_ej: float, region: str, year: int) -> float:
+        """Net hydrogen demand (MWh_H2) from electricity-route hydrogen balances.
+        Seasonal storage is a pypsa-decision for elec supply and not a load -> discarded
 
+        Computes ``(SE|Hydrogen|Electricity - SE|Input|Hydrogen|Electricity)`` and
+        converts EJ/yr to MWh/yr. Negative values are clamped to zero.
+        """
+        net_h2_mwh = (h2_prod_ej - h2_turb_ej) * _EJ_TO_MWH
+        if net_h2_mwh < 0:
+            logger.warning(
+                "Negative net H2 demand for region=%s year=%s: %.4f MWh - clamped to 0.",
+                region,
+                year,
+                net_h2_mwh,
+            )
+            return 0.0
+        return net_h2_mwh
+        
     @staticmethod
     def _ac_residual(
         se: float, losses: float, rebased_sum_mwh: float, elec_h2_mwh: float,
@@ -280,3 +412,33 @@ class RemindIamcAdapter(CouplingAdapter):
             len(co2i),
         )
         return co2i
+
+def read_region_map(
+    source="country",
+    target="model_region",
+    file_path: str | PathLike | None = None,
+    flatten: bool = False,
+) -> dict:
+    """Read the REMIND region↔country mapping as ``{source: [target, ...]}``.
+
+    Reads the ``;``-separated mapping CSV (columns ``RegionCode``/``CountryCode``), converts
+    ISO3 country codes to ISO2, and adds Kosovo (XK → NES). Pass ``source``/``target`` as
+    ``"model_region"`` or ``"country"`` to select the groupby direction.
+    """
+    if file_path is None:
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        file_path = os.path.join(base_path, "data/remind", "regions.csv")
+    region_mapping = pd.read_csv(file_path, sep=";").rename(columns={"RegionCode": "model_region"})
+    region_mapping["country"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")
+    region_mapping = region_mapping[["country", "model_region"]]
+
+    # Kosovo: PyPSA-Eur uses "XK" (not recognised by country_converter); part of NES.
+    region_mapping = pd.concat(
+        [region_mapping, pd.DataFrame({"country": ["XK"], "model_region": ["NES"]})]
+    ).reset_index(drop=True)
+
+    grouped = region_mapping.groupby(source)[target].apply("unique").apply(list)
+    if flatten:
+        grouped = grouped.apply(lambda x: x[0])
+    return grouped.to_dict()
+
