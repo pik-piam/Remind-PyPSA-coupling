@@ -13,6 +13,7 @@ from iampypsa.io.remind_symbols import (
     load_spec,
     load_symbol_specs,
     load_variable_set,
+    read_symbol_config,
     report_fallbacks,
 )
 
@@ -247,7 +248,7 @@ def test_load_spec_variables_shape_rejects_gdx_backend():
     # every shape is satisfiable by every backend.
     loader = _FakeLoader({})
     loader.backend = "gdx"
-    var_set_spec = {"variables": {"Cap|Electricity|Gas|GT": "ngt"}, "label_col": "technology", "to_unit": "MW"}
+    var_set_spec = {"variables": {"Cap|Electricity|Gas|GT": "gas-ocgt"}, "label_col": "technology", "to_unit": "MW"}
     with pytest.raises(ValueError, match="requires an IAMC-backed loader"):
         load_spec(loader, var_set_spec)
 
@@ -258,12 +259,53 @@ def test_report_fallbacks_lists_all():
     assert set(fb.columns) == {"logical_name", "token", "value", "reason"}
     # nuclear efficiency is no longer a declared fallback — it's computed directly from the
     # mif's uranium mass-basis price/conversion-factor variables (see RemindIamcAdapter).
-    assert "tnrs" not in set(fb["token"])
-    # CO2 intensity fallbacks remain only for biomass techs without a mif variable
-    # (REMIND treats biomass as carbon-neutral, so 0.0 is a real value, not a data gap).
-    biomass_fb = fb[fb["logical_name"] == "emission_factor"]
-    assert set(biomass_fb["token"]) == {"biochp", "bioigcc"}
-    assert (biomass_fb["value"] == 0.0).all()
+    efficiency_fb = fb[fb["logical_name"] == "efficiency"]
+    assert "nuclear" not in set(efficiency_fb["token"])
+    # CO2 intensity fallbacks: biomass techs (carbon-neutral) plus zero-emission technologies
+    # with no mif variable at all (no direct emissions) — all real values, not data gaps.
+    emission_fb = fb[fb["logical_name"] == "emission_factor"]
+    assert set(emission_fb["token"]) == {
+        "biomass-chp", "biomass-igcc", "solar-pv", "wind-onshore", "wind-offshore",
+        "hydro", "nuclear", "electrolysis", "hydrogen-turbine",
+    }
+    assert (emission_fb["value"] == 0.0).all()
+
+
+def _mif_canonical_names() -> set[str]:
+    """Every canonical name used as a `variables:`/`derived:`/`fallback:` label in the mif config."""
+    mif = read_symbol_config(backend="iamc")["default"]
+    names: set[str] = set()
+    for spec in mif.values():
+        if not isinstance(spec, dict):
+            continue
+        names |= set(spec.get("variables", {}).values())
+        names |= set(spec.get("derived", {}))
+        names |= set(spec.get("fallback", {}))
+    return names
+
+
+def test_mif_vocabulary_matches_gdx_technology_names():
+    """remind_symbols_mif.yaml's canonical names must be exactly the values gdx tokens map to."""
+    gdx = read_symbol_config(backend="gdx")["default"]
+    canonical_values = set(gdx["technology_names"].values())
+    mif_names = _mif_canonical_names()
+    # mif also carries demand-sector labels (EV_pass, heatpump, ...) which have no gdx-token
+    # counterpart in technology_names (they're sector labels, not technology tokens).
+    demand_sectors = {"EV_pass", "EV_freight", "heatpump", "resistive"}
+    assert mif_names - demand_sectors <= canonical_values
+    assert (mif_names - demand_sectors) & canonical_values  # sanity: not vacuously true
+
+
+def test_tech_fuel_map_is_keyed_by_the_canonical_vocabulary():
+    """tech_fuel_map (gdx and mif) is keyed by canonical names, not raw tokens, and both
+    configs' tech_fuel_map blocks agree."""
+    gdx = read_symbol_config(backend="gdx")["default"]
+    mif = read_symbol_config(backend="iamc")["default"]
+    canonical_values = set(gdx["technology_names"].values())
+    tfm = gdx["tech_fuel_map"]
+    assert set(tfm) <= canonical_values
+    assert set(tfm.values()) <= canonical_values
+    assert tfm == mif["tech_fuel_map"]
 
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")

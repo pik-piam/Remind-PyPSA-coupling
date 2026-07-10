@@ -23,7 +23,8 @@ import pandas as pd
 
 from iampypsa.adapters.base import CouplingAdapter
 from iampypsa.io.iamc import read_iamc
-from iampypsa.io.remind_symbols import load_frame, load_spec, load_variable_set
+from iampypsa.io.remind_symbols import load_frame, load_spec, load_variable_set, rename_technologies
+from iampypsa.transforms.costs import broadcast_fuel_prices
 from iampypsa.units import unit_factor
 
 logger = logging.getLogger(__name__)
@@ -43,19 +44,12 @@ class RemindIamcAdapter(CouplingAdapter):
     def build_regional_demand(self) -> pd.DataFrame:
         """Derive regional sectoral electricity demand from IAMC mif variables (MWh/yr).
 
-        Variable names and sector token labels come from the symbol config.
-        The algorithm applied on top is REMIND-specific:
-
+        REMIND-specific algorithm:
         1. η_td = (SE − Losses) / SE  (derived T&D efficiency, replaces GDX pm_eta_conv).
         2. Each FE sector is rebased to the SE level: FE_sector_MWh / η_td.
-        3. Electrolysis electricity demand (MWh_el) =
-               (SE|Hydrogen|Electricity − SE|Input|Hydrogen|Electricity) / η_elec
-           Both SE variables are in EJ H2; the difference is the net H2 from electricity
-           destined for final-energy demand (not cycling back via fuel cells). Dividing
-           by η_elec converts to the electricity consumed to produce it.
-           This matches REMIND's p32_load_sector("elh2") on the GDX path exactly.
-        4. AC = (SE − Losses) − Σ(rebased FE sectors) − electrolysis  (residual).
-           Negative values are clamped to 0 with a warning.
+        3. Electrolysis demand (MWh_el) = (SE|Hydrogen|Electricity − SE|Input|Hydrogen|
+           Electricity) / η_elec — matches REMIND's p32_load_sector("elh2") on the GDX path.
+        4. AC = (SE − Losses) − Σ(rebased FE) − electrolysis  (residual, clamped to ≥ 0).
 
         Returns ``[year, region, sector, value, unit]`` matching the GDX path.
         """
@@ -164,20 +158,14 @@ class RemindIamcAdapter(CouplingAdapter):
         return ac_mwh
 
     def extract_cost_parameters(self, year: int) -> pd.DataFrame:
-        """Extract REMIND mif cost parameters as ``[region, reference, parameter, value, unit]``.
+        """Extract REMIND mif cost parameters as ``[region, technology, parameter, value, unit]``.
 
-        Reads six per-parameter variable-sets declared in the IAMC symbol config
-        (cost_investment, tech_lifetime, cost_omf, cost_omv, efficiency, fuel_price,
-        emission_factor), queries to ``year``, and:
-
-        - Computes FOM%/yr = absolute FOM (USD/MW/yr) / capex (USD/MW) × 100, because the
-          mif reports absolute FOM whereas PyPSA-Eur uses percent-of-capex.
-        - Injects nuclear's fuel cost and efficiency, computed from REMIND's uranium
-          mass-basis price and conversion-factor variables (see ``_nuclear_fuel_cost``).
-
-        Battery cost tokens are intentionally omitted (their mif values are full-system
-        costs per kW_power and are not comparable to PyPSA-Eur's separate inverter+storage
-        parametrisation; those techs fall back to the PyPSA-Eur baseline).
+        Reads six per-parameter variable-sets (investment, lifetime, FOM, VOM, efficiency,
+        fuel, CO2 intensity), computes FOM%/yr from absolute FOM ÷ capex, and injects
+        nuclear's fuel cost/efficiency from REMIND's uranium mass-basis variables (see
+        ``_nuclear_fuel_cost``). Battery cost tokens are omitted — their mif values aren't
+        comparable to PyPSA-Eur's separate inverter+storage parametrisation, so those techs
+        fall back to the PyPSA-Eur baseline.
         """
         y = str(year)
         currency_factor: float = self.config.get("currency_factor", 1.0)
@@ -239,21 +227,25 @@ class RemindIamcAdapter(CouplingAdapter):
 
         # --- assemble ---
         frames = [capex, lifetime, fom_pct, vom, eff, fuel, co2i]
-        keep = ["region", "reference", "parameter", "value", "unit"]
+        keep = ["region", "technology", "parameter", "value", "unit"]
         df = pd.concat(
             [f[keep] for f in frames if set(keep).issubset(f.columns)],
             ignore_index=True,
         )
-        return df[df["region"].isin(set(self.model_regions))]
+        # Output boundary (mirrors the GDX adapter): rename is a no-op here — mif labels are
+        # already canonical — then per-fuel price rows become one `fuel` row per technology.
+        df = rename_technologies(df, self.symbols.get("technology_names"))
+        df = broadcast_fuel_prices(df, self.symbols.get("tech_fuel_map"))
+        return df[df["region"].isin(set(self.model_regions))].reset_index(drop=True)
 
     # -- extract_cost_parameters helpers ------------------------------------
 
     @staticmethod
     def _compute_fom_pct(capex: pd.DataFrame, fom_abs: pd.DataFrame) -> pd.DataFrame:
         """FOM %/yr = absolute FOM (USD/MW/yr) / capex (USD/MW) × 100, joined on tech/region/year."""
-        fom_pct = capex[["year", "region", "reference", "value"]].merge(
-            fom_abs[["year", "region", "reference", "value"]],
-            on=["year", "region", "reference"],
+        fom_pct = capex[["year", "region", "technology", "value"]].merge(
+            fom_abs[["year", "region", "technology", "value"]],
+            on=["year", "region", "technology"],
             suffixes=("_cap", "_fom"),
         )
         fom_pct["value"] = fom_pct["value_fom"] / fom_pct["value_cap"] * 100
@@ -264,21 +256,10 @@ class RemindIamcAdapter(CouplingAdapter):
     def _nuclear_fuel_cost(self, year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Compute nuclear's fuel cost (USD/MWh_el) and efficiency (1.0 p.u.) for ``year``.
 
-        REMIND reports nuclear on a uranium-mass basis: a price (USD/kg_Ur) and a conversion
-        factor (GJ_el/kg_Ur, i.e. electric output per kg uranium) instead of the energy-basis
-        price and p.u. efficiency used for every other fuel. Dividing price by conversion
-        factor cancels kg_Ur and leaves a plain USD/GJ_el price, which needs the same
-        $/GJ -> $/MWh step (multiply by 3.6, since a bigger energy unit costs more per unit —
-        the reverse of converting a bare energy quantity) already used for every other fuel's
-        price via the ``("US$2017/GJ", "USD/MWh")`` table entry — this is not a different
-        physics, just a ratio of two mif variables that the yaml's `derived:` mechanism can't
-        express (linear combinations only).
-
-        The result is already on an electrical-output basis, so efficiency is reported as a
-        genuine 1.0 p.u. (not a placeholder) — nuclear's `fuel` row can be divided by 1.0
-        unchanged by both `marginal_cost = fuel / efficiency` (process_cost_data.py) and by
-        whatever consumes `costs.at["nuclear", "efficiency"]` as PyPSA's Generator.efficiency
-        attribute (add_electricity.py), keeping both consistent and correct.
+        REMIND reports nuclear on a uranium-mass basis (price ÷ conversion factor cancels
+        kg_Ur, leaving USD/GJ_el, converted to USD/MWh); efficiency is reported as a genuine
+        1.0 p.u. so downstream consumers (marginal_cost = fuel / efficiency,
+        Generator.efficiency) stay consistent.
         """
         y = str(year)
         conversion = load_frame(self.loader, self.symbols["nuclear_conversion_factor"])
@@ -298,16 +279,15 @@ class RemindIamcAdapter(CouplingAdapter):
         merged["unit"] = "USD/MWh_el"
 
         eff = merged[["year", "region"]].copy()
-        eff["reference"] = "tnrs"
+        eff["technology"] = "nuclear"
         eff["parameter"] = "efficiency"
         eff["value"] = 1.0
         eff["unit"] = "p.u."
 
-        # technology_cost_mapping.csv maps nuclear's `fuel` parameter to reference token
-        # `peur` (a historical convention — every other nuclear parameter, e.g. investment
-        # and efficiency, uses `tnrs`), so the computed fuel row must be tagged `peur` to
-        # actually reach the `nuclear` PyPSA-Eur technology.
-        merged["reference"] = "peur"
-        fuel = merged[["year", "region", "reference", "parameter", "value", "unit"]]
+        # Tag the computed fuel price with the canonical fuel name; broadcast_fuel_prices
+        # then folds it into nuclear's own `fuel` row via the config's tech_fuel_map
+        # (nuclear: uranium), like every other fuel.
+        merged["technology"] = "uranium"
+        fuel = merged[["year", "region", "technology", "parameter", "value", "unit"]]
 
         return fuel, eff

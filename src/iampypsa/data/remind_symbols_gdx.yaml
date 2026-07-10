@@ -28,6 +28,57 @@
 # or the RPYCPL_SYMBOLS env var (deep-merged on top).
 
 default:
+  # --- Canonical technology vocabulary --------------------------------------
+  # REMIND all_te/all_enty token -> canonical name; applied by rename_technologies() at the
+  # adapters' output boundary, the only place raw REMIND tokens remain.
+  technology_names:
+    ngt: gas-ocgt
+    ngcc: gas-ccgt
+    ngccc: gas-ccgt-ccs
+    gaschp: gas-chp
+    pc: coal-pulverised
+    igcc: coal-igcc
+    igccc: coal-igcc-ccs
+    coalchp: coal-chp
+    biochp: biomass-chp
+    bioigcc: biomass-igcc
+    bioigccc: biomass-igcc-ccs
+    tnrs: nuclear
+    dot: oil
+    csp: solar-csp
+    geohdr: geothermal
+    spv: solar-pv
+    windon: wind-onshore
+    windoff: wind-offshore
+    hydro: hydro
+    elh2: electrolysis
+    h2turb: hydrogen-turbine
+    btin: battery-inverter
+    btstor: battery-storage
+    h2stor: hydrogen-storage
+    pecoal: coal-fuel        # fuel-price tokens; only surface before the per-tech broadcast
+    pegas: gas-fuel
+    peoil: oil-fuel
+    pebiolc: biomass-fuel
+    peur: uranium
+
+  # --- Technology -> fuel map ------------------------------------------------
+  # Canonical technology -> canonical fuel.
+  tech_fuel_map:
+    coal-pulverised: coal-fuel
+    coal-igcc: coal-fuel
+    coal-igcc-ccs: coal-fuel
+    coal-chp: coal-fuel
+    gas-ocgt: gas-fuel
+    gas-ccgt: gas-fuel
+    gas-ccgt-ccs: gas-fuel
+    gas-chp: gas-fuel
+    oil: oil-fuel
+    biomass-chp: biomass-fuel
+    biomass-igcc: biomass-fuel
+    biomass-igcc-ccs: biomass-fuel
+    nuclear: uranium
+
   co2_price:
     symbol: [v32_taxCO2eq, p_priceCO2]
     rename: {tall: year, all_regi: region}

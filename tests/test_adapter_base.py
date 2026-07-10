@@ -18,8 +18,8 @@ DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_witho
 GDX = f"{DEV}/REMIND2PyPSAEUR.gdx"
 SSP = "/workspace/remind_pypsa_coupling/development_data/ssp"
 REGION_MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/regionmapping_21_EU11.csv"
-COST_MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/technology_cost_mapping.csv"
-HAVE_DATA = all(os.path.exists(p) for p in [GDX, f"{SSP}/population.csv", REGION_MAP, COST_MAP])
+TECH_PARAMS = "/workspace/pypsa-eur-aod/pypsa-eur/config/technology_parameters.yaml"
+HAVE_DATA = all(os.path.exists(p) for p in [GDX, f"{SSP}/population.csv", REGION_MAP, TECH_PARAMS])
 
 
 def test_adapter_is_directly_instantiable():
@@ -71,24 +71,21 @@ def test_build_country_loads_matches_reference():
 
 @pytest.mark.skipif(not HAVE_DATA, reason="dev data not present")
 def test_cost_overrides_match_reference_remind_rows():
-    """extract_cost_parameters (+ inline btin² as the EUR script does) vs the raw cost reference."""
+    """extract_cost_parameters (+ inline battery-inverter² as the EUR script does) vs the raw cost reference."""
+    from iampypsa.io import load_technology_parameters
     from iampypsa.transforms.costs import (
         build_mapped_overrides,
         convert_investment_to_input_capacity_basis,
     )
 
     remind_long = _adapter().extract_cost_parameters(2050)
-    # The btin (battery-inverter) round-trip efficiency tweak is applied in import_REMIND_costs.py.
-    is_btin_eff = (remind_long["parameter"] == "efficiency") & (remind_long["reference"] == "btin")
-    remind_long.loc[is_btin_eff, "value"] **= 2
+    # The battery-inverter round-trip efficiency tweak is applied in import_REMIND_costs.py.
+    is_eff = (remind_long["parameter"] == "efficiency") & (remind_long["technology"] == "battery-inverter")
+    remind_long.loc[is_eff, "value"] **= 2
 
-    tech_map = pd.read_csv(COST_MAP)
+    technologies = load_technology_parameters(TECH_PARAMS)["technologies"]
     overrides = convert_investment_to_input_capacity_basis(
-        build_mapped_overrides(
-            tech_map, remind_long,
-            tech_col="PyPSA-Eur technology", ref_col="reference",
-            param_col="parameter", source_col="source", model_value="REMIND", out_source="REMIND-EU",
-        )
+        build_mapped_overrides(technologies, remind_long, out_source="REMIND-EU")
     )
     got = (
         overrides.query("region == 'DEU'")
@@ -108,9 +105,18 @@ def test_cost_overrides_match_reference_remind_rows():
 
 @pytest.mark.skipif(not HAVE_DATA, reason="dev data not present")
 def test_full_capacity_targets_match_reference():
-    mapping = pd.read_csv(COST_MAP).query("parameter == 'investment' and source == 'REMIND'")
-    tmap = mapping[["PyPSA-Eur technology", "reference"]].rename(
-        columns={"PyPSA-Eur technology": "PyPSA-Eur", "reference": "REMIND-EU"})
+    from iampypsa.io import build_capacity_reporting_technologies, load_technology_parameters
+    from iampypsa.io.tech_params import iam_name
+
+    technologies = load_technology_parameters(TECH_PARAMS)["technologies"]
+    reports_capacity = build_capacity_reporting_technologies()
+    tmap = pd.DataFrame(
+        [
+            {"PyPSA-Eur": tech, "REMIND-EU": iam_name(tech, spec)}
+            for tech, spec in technologies.items()
+            if iam_name(tech, spec) in reports_capacity
+        ]
+    )
     a = _adapter()
     got = build_capacity_targets(a.loader, a.symbols, a.model_regions, tmap)
     got["year"] = got["year"].astype(int)

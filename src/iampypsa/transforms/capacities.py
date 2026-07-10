@@ -1,9 +1,7 @@
 """Build installed-capacity targets (p_nom_min) for PyPSA from IAM output.
 
-The shared pipeline is: read the capacity spec via ``load_spec`` (handles unit conversion and
-backend dispatch), optionally apply a ``consolidation`` block from the spec (VRE-variant merging,
-battery scaling — only exercised when the symbol config declares it, e.g. for GDX input),
-adjust link-like techs to input-capacity basis, and aggregate to PyPSA carriers.
+Pipeline: read the capacity spec, optionally apply ``consolidation`` (VRE-variant merge,
+battery scaling), adjust link-like techs to input basis, aggregate to PyPSA carriers.
 """
 
 from __future__ import annotations
@@ -28,7 +26,7 @@ def adjust_link_capacities_to_input(
 ) -> pd.DataFrame:
     """Divide output-based capacities by efficiency for link-like techs (→ input basis).
 
-    Rows with missing or zero efficiency are left unchanged (with a warning).
+    Rows with missing/zero efficiency are left unchanged, with a warning.
     """
     merged = capacities.merge(efficiencies, on=list(on), how="left")
     is_link = merged[tech_col].isin(link_techs)
@@ -56,11 +54,10 @@ def aggregate_capacities_to_carriers(
     min_value: float = 0.0,
     round_digits: int = 2,
 ) -> pd.DataFrame:
-    """Map model tech tokens to target carrier names, sum per (group, carrier).
+    """Map model tech tokens to carriers and sum per (group, carrier).
 
-    Returns ``[year, region, carrier, value, unit]``.
-    Rows whose tech token is absent from ``tech_to_carrier`` are dropped with a warning.
-    Aggregation is needed when the mapping is not 1:1 (several tokens share a carrier).
+    Returns ``[year, region, carrier, value, unit]``. Tokens absent from ``tech_to_carrier``
+    are dropped with a warning.
     """
     carrier_map = tech_to_carrier[[map_tech_col, map_carrier_col]].drop_duplicates(
         subset=map_tech_col, keep="first"
@@ -89,16 +86,11 @@ def apply_consolidation(
     tech_col: str = "technology",
     value_col: str = "value",
 ) -> pd.DataFrame:
-    """Apply the optional ``consolidation`` block from the capacity symbol spec.
+    """Apply the optional ``consolidation`` block from the capacity symbol spec (no-op if absent).
 
-    Two steps, both driven by config — no-op when params are absent (e.g. IAMC configs
-    that have no ``consolidation`` block):
-
-    1. **VRE-variant merge**: rename coupled VRE tech tokens to their primary token
-       (e.g. ``elh2VRE`` → ``elh2``).
-    2. **Battery scaling**: fold storage tech rows into the charger token (``btin``) by
-       multiplying each storage row by its scaling factor. If a ``btin`` row already carries
-       a positive value, the storage rows are dropped instead (bidirectional-coupling guard).
+    1. VRE-variant merge: rename coupled tokens to their primary (e.g. ``elh2VRE`` → ``elh2``).
+    2. Battery scaling: fold storage rows into ``btin`` by their scaling factor, unless ``btin``
+       already has a positive value, in which case the storage rows are dropped instead.
     """
     caps = caps.copy()
     vre_to_primary = vre_to_primary or {}
@@ -132,17 +124,12 @@ def build_capacity_targets(
 ) -> pd.DataFrame:
     """Build installed-capacity targets per ``[year, region, carrier, value, unit]``.
 
-    Full pipeline:
-    1. Read the ``capacity`` spec via ``load_spec`` (dispatches on spec shape; unit conversion
-       applied by the spec's ``to_unit``).
-    2. Apply the ``consolidation`` block if present (VRE-variant merge, battery scaling).
-    3. Adjust link-like techs to input-capacity basis (requires ``efficiency_conv`` symbol).
-    4. Map tech tokens to carriers via ``tech_map`` and sum.
-    5. Filter to ``regions``.
-
-    The ``unit`` column reflects the target unit declared in the capacity spec (``to_unit``).
+    Pipeline: read the ``capacity`` spec, apply ``consolidation`` if present, adjust link-like
+    techs to input basis, rename to canonical tokens, map to carriers via ``tech_map`` and sum,
+    filter to ``regions``. Consolidation and link adjustment run on raw tokens, before the
+    canonical rename — so ``tech_map`` must be keyed by canonical names.
     """
-    from iampypsa.io.remind_symbols import load_spec
+    from iampypsa.io.remind_symbols import load_spec, rename_technologies
 
     cap_spec = symbols["capacity"]
     cons = dict(cap_spec.get("consolidation", {}))
@@ -155,6 +142,8 @@ def build_capacity_targets(
     if link_techs and "efficiency_conv" in symbols:
         eff = load_spec(loader, symbols["efficiency_conv"]).rename(columns={"value": "efficiency"})
         caps = adjust_link_capacities_to_input(caps, eff, link_techs)
+
+    caps = rename_technologies(caps, symbols.get("technology_names"))
 
     caps = aggregate_capacities_to_carriers(
         caps, tech_map, map_tech_col=map_tech_col, map_carrier_col=map_carrier_col, unit=unit,

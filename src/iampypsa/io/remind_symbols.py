@@ -254,6 +254,35 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
     return result
 
 
+def rename_technologies(
+    df: pd.DataFrame,
+    names: dict[str, str] | None,
+    col: str = "technology",
+    *,
+    on_missing: str = "warn",
+) -> pd.DataFrame:
+    """Rename raw source-model technology tokens to the canonical vocabulary.
+
+    ``names`` is the ``technology_names`` token → canonical-name block; empty/absent is a
+    no-op. Unmapped values are kept as-is, per ``on_missing``: ``"warn"`` (default), ``"raise"``,
+    or ``"ignore"``.
+    """
+    if not names or col not in df.columns:
+        return df
+    values = df[col].astype(str)
+    missing = sorted(set(values.unique()) - set(names))
+    if missing:
+        if on_missing == "raise":
+            raise KeyError(f"Technologies without a technology_names entry: {missing}")
+        if on_missing == "warn":
+            logger.warning(
+                "Technologies without a technology_names entry (kept as-is): %s", missing
+            )
+    out = df.copy()
+    out[col] = values.map(lambda t: names.get(t, t))
+    return out
+
+
 def load_spec(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Dispatch to ``load_variable_set`` or ``load_frame`` based on the spec shape.
 
@@ -284,3 +313,15 @@ def report_fallbacks(symbols: dict[str, Any]) -> pd.DataFrame:
                 "reason": fb.get("reason", ""),
             })
     return pd.DataFrame(rows, columns=["logical_name", "token", "value", "reason"])
+
+
+def build_capacity_reporting_technologies() -> set[str]:
+    """Return every canonical technology REMIND reports installed capacity for.
+
+    Reads the ``capacity`` spec's ``variables:``/``derived:`` tokens, plus ``hydro`` (reported
+    via the separate ``hydro_capacity`` symbol, not picked up automatically).
+    """
+    cap_spec = read_symbol_config(backend="iamc")["default"]["capacity"]
+    names = set(cap_spec.get("variables", {}).values()) | set(cap_spec.get("derived", {}))
+    names.add("hydro")
+    return names
