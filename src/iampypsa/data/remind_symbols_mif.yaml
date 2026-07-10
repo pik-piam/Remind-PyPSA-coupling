@@ -272,20 +272,16 @@ default:
   # them via read_iamc and applies the η_td formula and AC residual computation on top.
   # All source units EJ/yr.
   demand_fe_sectors:
-    # Electricity FE sectors only: each is rebased to the SE level (÷ η_td) and subtracted
-    # from the AC residual in build_regional_demand. All source variables share EJ/yr, so a
-    # single flat variables: block satisfies load_variable_set's homogeneous-unit contract.
-    variables:
+    electricity:
       "FE|Transport|Pass|Electricity":                           EV_pass
       "FE|Transport|Freight|Electricity":                        EV_freight
       "FE|Buildings|Heating|Electricity|Heat pump":              heatpump
       "FE|Buildings|Heating|Electricity|Resistance":             resistive
       "FE|Buildings|non-Heating|Electricity|Space Cooling":      space_cooling
-    # DEFERRED: useful-energy heating ("UE|Buildings|Heating" → space_heating) is not a FE
-    # electricity load and must not be rebased/subtracted from AC. Feeding it into a coupled
-    # heat sector needs a central/decentral split and COP conversion (see the NotImplementedError
-    # in PyPSA-China import_REMIND_demand._consolidate_heating_fe_demand). Add it back — as a
-    # separately-handled group, not here — once that path exists.
+    heat:
+      # include COP
+      "UE|Buildings|Heating":                                    space_heating
+
     label_col: sector
     to_unit: MWh    # EJ/yr → MWh (factor ~2.778e8)
 
