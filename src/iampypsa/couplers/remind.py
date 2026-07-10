@@ -453,7 +453,7 @@ def read_region_map(
     """
     if file_path is None:
         base_path = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(base_path, "data/remind", "region_map.csv")
+        file_path = os.path.join(base_path, "data/remind", "regions.csv")
     region_mapping = pd.read_csv(file_path, sep=";").rename(columns={"RegionCode": "model_region"})
     region_mapping["country"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")
     region_mapping = region_mapping[["country", "model_region"]]
