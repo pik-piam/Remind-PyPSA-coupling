@@ -11,7 +11,7 @@ import os
 import pandas as pd
 import pytest
 
-from iampypsa.adapters.base import CouplingAdapter
+from iampypsa.couplers.base import CouplingAdapter
 from iampypsa.transforms.capacities import build_capacity_targets
 
 DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1"

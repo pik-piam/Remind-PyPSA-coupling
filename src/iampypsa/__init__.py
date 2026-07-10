@@ -6,9 +6,8 @@ Concrete per-model adapters live in each PyPSA model's own repository and subcla
 
 import importlib.metadata
 
-from .adapters.base import CouplingAdapter
-from .adapters.gdx import RemindGdxAdapter
-from .adapters.iamc import RemindIamcAdapter
+from .couplers.base import CouplingAdapter
+from .couplers.remind import RemindGdxAdapter, RemindIamcAdapter
 from .io import (
     RemindLoader,
     default_symbol_config_path,

@@ -8,8 +8,8 @@ and is the entry point for the coupling workflow.
 
 Concrete adapters (instantiated directly by the caller, which selects on ``loader.backend``);
 a new IAM or output format is added as a further ``CouplingAdapter`` subclass, not a branch here:
-- ``RemindGdxAdapter``  (``iampypsa.adapters.gdx``)
-- ``RemindIamcAdapter`` (``iampypsa.adapters.iamc``)
+- ``RemindGdxAdapter``  (``iampypsa.couplers.remind``)
+- ``RemindIamcAdapter`` (``iampypsa.couplers.remind``)
 
 config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``planning_horizons``.
 """
