@@ -452,7 +452,7 @@ def read_region_map(
     ``"model_region"`` or ``"country"`` to select the groupby direction.
     """
     if file_path is None:
-        base_path = os.path.dirname(os.path.abspath(__file__))
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         file_path = os.path.join(base_path, "data/remind", "regions.csv")
     region_mapping = pd.read_csv(file_path, sep=";").rename(columns={"RegionCode": "model_region"})
     region_mapping["country"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")
