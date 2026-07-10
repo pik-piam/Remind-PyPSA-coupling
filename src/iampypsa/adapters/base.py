@@ -1,10 +1,10 @@
-"""The IAM→PyPSA coupling adapter interface.
+"""The IAM→PyPSA coupling adapter interface. This is exposed to pypsa models 
+and is the entry point for the coupling workflow. 
 
-``CouplingAdapter`` is the backend-neutral base: it holds the shared, concrete builders
+- ``CouplingAdapter`` is the backend-neutral base: it holds the shared, concrete builders
 (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
-driven by the resolved symbol map and config, and declares the two source-specific hooks
-(``build_regional_demand``, ``extract_cost_parameters``) as abstract-style methods that
-raise ``NotImplementedError``.
+- it consumes the IAM symbols (resolved via their config) and the region map, and it contains
+ the reference data (population, GDP, etc.) for downscaling.
 
 Concrete adapters (instantiated directly by the caller, which selects on ``loader.backend``);
 a new IAM or output format is added as a further ``CouplingAdapter`` subclass, not a branch here:

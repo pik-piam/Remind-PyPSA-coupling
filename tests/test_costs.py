@@ -9,7 +9,7 @@ import pytest
 
 from iampypsa.transforms.costs import (
     add_discount_rate,
-    build_mapped_overrides,
+    build_iam_techdata,
     convert_investment_to_input_capacity_basis,
     apply_overrides,
 )
@@ -38,7 +38,7 @@ def test_build_overrides_maps_and_dedups():
             "unit": ["USD/MW", "p.u."],
         }
     )
-    out = build_mapped_overrides(
+    out = build_iam_techdata(
         tech_map, remind_long,
         tech_col="PyPSA-Eur technology", ref_col="reference",
         param_col="parameter", source_col="source", model_value="REMIND", out_source="TEST",

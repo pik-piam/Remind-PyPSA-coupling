@@ -1,13 +1,13 @@
-"""Shared, model-agnostic cost-override mechanics.
+"""Transform IAM techno-economic output into PyPSA cost tables.
 
-The *extraction* of individual cost parameters is source-specific and lives in each adapter.
-What is genuinely shared — and lives here — is how a long-format cost-override table is mapped
-to PyPSA carriers, basis-converted, given discount rates, and merged onto the PyPSA baseline
-cost table; and how PyPSA-Eur baseline and fixed-value overrides are assembled from the
-technology cost mapping CSV.
+Based on the technology mapping, extract cost parameters from the IAM output, from PyPSA costs
+or directly set them from values specified in the mapping.
 
-Unit factors are not defined here: they live centrally in ``iampypsa.units`` (re-exported below
-for convenience) so any IAM adapter can swap the conversion table without touching transforms.
+The *extraction* of individual cost parameters is source-specific and lives in each PyPSA-model adapter.
+The shared functions (which live here) — provide the conversion/mapping and merging tools.
+
+Unit factors are centrally defined in ``iampypsa.units`` (re-exported below
+for convenience) so any IAM or PyPSA adapter can swap the conversion table without touching transforms.
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ def add_discount_rate(
     return pd.concat([costs, dr], ignore_index=True)
 
 
-def build_remind_techdata(
+def build_iam_techdata(
     technology_mapping: pd.DataFrame,
     model_long: pd.DataFrame,
     *,
@@ -125,13 +125,13 @@ def build_remind_techdata(
 def build_pypsa_techdata(
     technology_mapping: pd.DataFrame,
     pypsa_raw: pd.DataFrame,
-    *, # TODO needed
-    tech_col: str,
-    source_col: str,
-    baseline_value: str,
+    *, # TODO needed?
+    source_col="source",
+    tech_col="PyPSA_tech",
+    baseline_value="use_pypsa",
 ) -> pd.DataFrame:
     """Pull parameter values from the pypsa cost table for mapping rows marked source=<baseline_value>."""
-    df = technology_mapping[technology_mapping[source_col] == baseline_value].drop(columns=["unit"])
+    df = technology_mapping.query("source==@baseline_value").drop(columns=["unit"])
     df = df.merge(
         pypsa_raw,
         left_on=[tech_col, "parameter"],
