@@ -19,7 +19,7 @@ import logging
 
 import pandas as pd
 import country_converter as coco
-
+import os.path 
 from iampypsa.couplers.base import Coupler
 from iampypsa.io.iamc import read_iamc
 from iampypsa.io.remind_symbols import PathLike, load_frame, load_set, load_spec, load_variable_set
@@ -116,36 +116,6 @@ class RemindGdxCoupler(Coupler):
             ["region", "technology", "parameter", "value", "unit"]
         ].rename(columns={"technology": "reference"})
         return df[df["region"].isin(self.model_regions)]
-
-
-    @staticmethod
-    def read_region_map(
-        source="country",
-        target="model_region",
-        file_path: str | PathLike | None = None,
-        flatten: bool = False,
-    ) -> dict:
-        """Read the REMIND region↔country mapping as ``{source: [target, ...]}``.
-
-        Reads the ``;``-separated mapping CSV (columns ``RegionCode``/``CountryCode``), converts
-        ISO3 country codes to ISO2, and adds Kosovo (XK → NES). Pass ``source``/``target`` as
-        ``"model_region"`` or ``"country"`` to select the groupby direction.
-        """
-        if file_path is None:
-            file_path = os.abspath("data/region_map.csv")
-        region_mapping = pd.read_csv(file_path, sep=";").rename(columns={"RegionCode": "model_region"})
-        region_mapping["country"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")
-        region_mapping = region_mapping[["country", "model_region"]]
-
-        # Kosovo: PyPSA-Eur uses "XK" (not recognised by country_converter); part of NES.
-        region_mapping = pd.concat(
-            [region_mapping, pd.DataFrame({"country": ["XK"], "model_region": ["NES"]})]
-        ).reset_index(drop=True)
-
-        grouped = region_mapping.groupby(source)[target].apply("unique").apply(list)
-        if flatten:
-            grouped = grouped.apply(lambda x: x[0])
-        return grouped.to_dict()
 
 
 class RemindIamcCoupler(Coupler):
@@ -469,32 +439,32 @@ class RemindIamcCoupler(Coupler):
         )
         return co2i
 
-    @staticmethod
-    def read_region_map(
-        source="country",
-        target="model_region",
-        file_path: str | PathLike | None = None,
-        flatten: bool = False,
-    ) -> dict:
-        """Read the REMIND region↔country mapping as ``{source: [target, ...]}``.
+def read_region_map(
+    source="country",
+    target="model_region",
+    file_path: str | PathLike | None = None,
+    flatten: bool = False,
+) -> dict:
+    """Read the REMIND region↔country mapping as ``{source: [target, ...]}``.
 
-        Reads the ``;``-separated mapping CSV (columns ``RegionCode``/``CountryCode``), converts
-        ISO3 country codes to ISO2, and adds Kosovo (XK → NES). Pass ``source``/``target`` as
-        ``"model_region"`` or ``"country"`` to select the groupby direction.
-        """
-        if file_path is None:
-            file_path = os.abspath("data/region_map.csv")
-        region_mapping = pd.read_csv(file_path, sep=";").rename(columns={"RegionCode": "model_region"})
-        region_mapping["country"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")
-        region_mapping = region_mapping[["country", "model_region"]]
+    Reads the ``;``-separated mapping CSV (columns ``RegionCode``/``CountryCode``), converts
+    ISO3 country codes to ISO2, and adds Kosovo (XK → NES). Pass ``source``/``target`` as
+    ``"model_region"`` or ``"country"`` to select the groupby direction.
+    """
+    if file_path is None:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(base_path, "data/remind", "region_map.csv")
+    region_mapping = pd.read_csv(file_path, sep=";").rename(columns={"RegionCode": "model_region"})
+    region_mapping["country"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")
+    region_mapping = region_mapping[["country", "model_region"]]
 
-        # Kosovo: PyPSA-Eur uses "XK" (not recognised by country_converter); part of NES.
-        region_mapping = pd.concat(
-            [region_mapping, pd.DataFrame({"country": ["XK"], "model_region": ["NES"]})]
-        ).reset_index(drop=True)
+    # Kosovo: PyPSA-Eur uses "XK" (not recognised by country_converter); part of NES.
+    region_mapping = pd.concat(
+        [region_mapping, pd.DataFrame({"country": ["XK"], "model_region": ["NES"]})]
+    ).reset_index(drop=True)
 
-        grouped = region_mapping.groupby(source)[target].apply("unique").apply(list)
-        if flatten:
-            grouped = grouped.apply(lambda x: x[0])
-        return grouped.to_dict()
+    grouped = region_mapping.groupby(source)[target].apply("unique").apply(list)
+    if flatten:
+        grouped = grouped.apply(lambda x: x[0])
+    return grouped.to_dict()
 

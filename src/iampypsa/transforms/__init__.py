@@ -29,10 +29,8 @@ from iampypsa.transforms.capacities import (
     prepare_capacities,
 )
 from iampypsa.transforms.loads import TWA_TO_MWH, convert_loads
-from iampypsa.transforms.mapping import read_region_map
 
 __all__ = [
-    "read_region_map",
     "extract_co2_prices",
     "convert_co2_prices",
     "TONNE_C_TO_TONNE_CO2",
