@@ -18,8 +18,8 @@ DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_witho
 GDX = f"{DEV}/REMIND2PyPSAEUR.gdx"
 SSP = "/workspace/remind_pypsa_coupling/development_data/ssp"
 REGION_MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/regionmapping_21_EU11.csv"
-COST_MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/technology_cost_mapping.csv"
-HAVE_DATA = all(os.path.exists(p) for p in [GDX, f"{SSP}/population.csv", REGION_MAP, COST_MAP])
+TECH_PARAMS = "/workspace/pypsa-eur-aod/pypsa-eur/config/technology_parameters.yaml"
+HAVE_DATA = all(os.path.exists(p) for p in [GDX, f"{SSP}/population.csv", REGION_MAP, TECH_PARAMS])
 
 
 def test_adapter_is_directly_instantiable():
@@ -33,14 +33,14 @@ def _adapter():
 
     from iampypsa.io import RemindLoader
     from iampypsa.io.remind_symbols import load_symbol_specs
-    from iampypsa.transforms.mapping import read_region_map
+    from iampypsa.couplers.remind import read_region_map
 
     cfg = yaml.safe_load(open(f"{DEV}/config.remind_europe_without_NES_fixed.yaml"))
     co2 = pd.read_csv(f"{DEV}/co2_price.csv")
     return Coupler(
         loader=RemindLoader(GDX),
         symbols=load_symbol_specs(),
-        region_map=read_region_map(REGION_MAP, source="REMIND-EU", target="PyPSA-EUR"),
+        region_map=read_region_map(source="model_region", target="country"),
         config={
             "sector_weights": cfg["remind_coupling"]["demand_downscaling"]["sector_weights"],
             "countries": cfg["countries"],
@@ -71,24 +71,21 @@ def test_build_country_loads_matches_reference():
 
 @pytest.mark.skipif(not HAVE_DATA, reason="dev data not present")
 def test_cost_overrides_match_reference_remind_rows():
-    """extract_cost_parameters (+ inline btin² as the EUR script does) vs the raw cost reference."""
+    """extract_cost_parameters (+ inline battery-inverter² as the EUR script does) vs the raw cost reference."""
+    from iampypsa.io import load_technology_parameters
     from iampypsa.transforms.costs import (
         build_iam_techdata,
         convert_investment_to_input_capacity_basis,
     )
 
     remind_long = _adapter().extract_cost_parameters(2050)
-    # The btin (battery-inverter) round-trip efficiency tweak is applied in import_REMIND_costs.py.
-    is_btin_eff = (remind_long["parameter"] == "efficiency") & (remind_long["reference"] == "btin")
-    remind_long.loc[is_btin_eff, "value"] **= 2
+    # The battery-inverter round-trip efficiency tweak is applied in import_REMIND_costs.py.
+    is_eff = (remind_long["parameter"] == "efficiency") & (remind_long["technology"] == "battery-inverter")
+    remind_long.loc[is_eff, "value"] **= 2
 
-    tech_map = pd.read_csv(COST_MAP)
+    technologies = load_technology_parameters(TECH_PARAMS)["technologies"]
     overrides = convert_investment_to_input_capacity_basis(
-        build_iam_techdata(
-            tech_map, remind_long,
-            tech_col="PyPSA-Eur technology", ref_col="reference",
-            param_col="parameter", source_col="source", model_value="REMIND", out_source="REMIND-EU",
-        )
+        build_iam_techdata(technologies, remind_long, out_source="REMIND-EU")
     )
     got = (
         overrides.query("region == 'DEU'")
@@ -108,13 +105,25 @@ def test_cost_overrides_match_reference_remind_rows():
 
 @pytest.mark.skipif(not HAVE_DATA, reason="dev data not present")
 def test_full_capacity_targets_match_reference():
-    mapping = pd.read_csv(COST_MAP).query("parameter == 'investment' and source == 'REMIND'")
-    tmap = mapping[["PyPSA-Eur technology", "reference"]].rename(
-        columns={"PyPSA-Eur technology": "PyPSA-Eur", "reference": "REMIND-EU"})
+    from iampypsa.io import build_capacity_reporting_technologies, load_technology_parameters
+    from iampypsa.io.technology_mapping import iam_name
+
+    technologies = load_technology_parameters(TECH_PARAMS)["technologies"]
+    reports_capacity = build_capacity_reporting_technologies()
+    tmap = pd.DataFrame(
+        [
+            {"PyPSA-Eur": tech, "REMIND-EU": iam_name(tech, spec)}
+            for tech, spec in technologies.items()
+            if iam_name(tech, spec) in reports_capacity
+        ]
+    )
     a = _adapter()
-    got = build_capacity_targets(a.loader, a.symbols, a.model_regions, tmap)
+    got = build_capacity_targets(
+        a.loader, a.symbols, a.model_regions, tmap,
+        map_tech_col="REMIND-EU", map_carrier_col="PyPSA-Eur",
+    )
     got["year"] = got["year"].astype(int)
-    g = got.query("region == 'DEU' and year == 2050").set_index("carrier")["p_nom_min"]
+    g = got.query("region == 'DEU' and year == 2050").set_index("carrier")["value"]
     r = (
         pd.read_csv(f"{DEV}/installed_capacities.csv")
         .rename(columns={"region_REMIND": "region"})

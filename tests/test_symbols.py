@@ -13,6 +13,7 @@ from iampypsa.io.remind_symbols import (
     load_spec,
     load_symbol_specs,
     load_variable_set,
+    read_symbol_config,
     report_fallbacks,
 )
 
@@ -38,8 +39,8 @@ class _FakeLoader:
 
 def test_load_specs_default():
     default = load_symbol_specs()
-    assert default["co2_price"]["symbol"] == ["pm_taxCO2eqSum"]
-    assert default["load_sector"]["rename"]["loadPy32"] == "sector"
+    assert default["co2_price"]["symbol"] == ["p_priceCO2"]
+    assert default["demand_fe_sectors"]["rename"]["loadPy32"] == "sector"
 
 
 def test_merge_region_overrides_prefers_region_entry():
@@ -78,7 +79,7 @@ def test_overlay_path_layers_onto_package_default(tmp_path):
     p.write_text(OVERLAY)
     specs = load_symbol_specs(path=p)
     assert specs["co2_price"]["symbol"] == "my_symbol"  # overlay overrides the package default
-    assert "load_sector" in specs  # an entry only in the package default is still present
+    assert "demand_fe_sectors" in specs  # an entry only in the package default is still present
     cha = load_symbol_specs("CHA", path=p)
     assert cha["co2_price"]["symbol"] == "cha_symbol"  # overlay region override wins
 
@@ -253,7 +254,7 @@ def test_load_spec_variables_shape_rejects_gdx_backend():
     # every shape is satisfiable by every backend.
     loader = _FakeLoader({})
     loader.backend = "gdx"
-    var_set_spec = {"variables": {"Cap|Electricity|Gas|GT": "ngt"}, "label_col": "technology", "to_unit": "MW"}
+    var_set_spec = {"variables": {"Cap|Electricity|Gas|GT": "gas-ocgt"}, "label_col": "technology", "to_unit": "MW"}
     with pytest.raises(ValueError, match="requires an IAMC-backed loader"):
         load_spec(loader, var_set_spec)
 
@@ -262,12 +263,55 @@ def test_report_fallbacks_lists_all():
     iamc = load_symbol_specs(backend="iamc")
     fb = report_fallbacks(iamc)
     assert set(fb.columns) == {"logical_name", "token", "value", "reason"}
-    # nuclear efficiency fallback is declared
-    tnrs_row = fb[fb["token"] == "tnrs"]
-    assert len(tnrs_row) == 1
-    assert tnrs_row["value"].iloc[0] == pytest.approx(0.33)
-    # CO2 intensity fallbacks (pecoal, pegas, peoil, pebiolc)
-    assert set(fb["token"]).issuperset({"pecoal", "pegas", "peoil", "pebiolc"})
+    # nuclear efficiency is no longer a declared fallback — it's computed directly from the
+    # mif's uranium mass-basis price/conversion-factor variables (see RemindIamcAdapter).
+    efficiency_fb = fb[fb["logical_name"] == "efficiency"]
+    assert "nuclear" not in set(efficiency_fb["token"])
+    # CO2 intensity fallbacks: biomass techs (carbon-neutral) plus zero-emission technologies
+    # with no mif variable at all (no direct emissions) — all real values, not data gaps.
+    emission_fb = fb[fb["logical_name"] == "emission_factor"]
+    assert set(emission_fb["token"]) == {
+        "biomass-chp", "biomass-igcc", "solar-pv", "wind-onshore", "wind-offshore",
+        "hydro", "nuclear", "electrolysis", "hydrogen-turbine",
+    }
+    assert (emission_fb["value"] == 0.0).all()
+
+
+def _mif_canonical_names() -> set[str]:
+    """Every canonical name used as a `variables:`/`derived:`/`fallback:` label in the mif config."""
+    mif = read_symbol_config(backend="iamc")["default"]
+    names: set[str] = set()
+    for spec in mif.values():
+        if not isinstance(spec, dict):
+            continue
+        names |= set(spec.get("variables", {}).values())
+        names |= set(spec.get("derived", {}))
+        names |= set(spec.get("fallback", {}))
+    return names
+
+
+def test_mif_vocabulary_matches_gdx_technology_names():
+    """remind_symbols_mif.yaml's canonical names must be exactly the values gdx tokens map to."""
+    gdx = read_symbol_config(backend="gdx")["default"]
+    canonical_values = set(gdx["technology_names"].values())
+    mif_names = _mif_canonical_names()
+    # mif also carries demand-sector labels (EV_pass, heatpump, ...) which have no gdx-token
+    # counterpart in technology_names (they're sector labels, not technology tokens).
+    demand_sectors = {"EV_pass", "EV_freight", "heatpump", "resistive", "space_cooling"}
+    assert mif_names - demand_sectors <= canonical_values
+    assert (mif_names - demand_sectors) & canonical_values  # sanity: not vacuously true
+
+
+def test_tech_fuel_map_is_keyed_by_the_canonical_vocabulary():
+    """The mif tech_fuel_map is keyed by canonical names, not raw tokens. (The gdx has no static
+    tech_fuel_map — it derives one from pe2se at runtime; see RemindGdxCoupler._tech_fuel_map_from_pe2se.)"""
+    gdx = read_symbol_config(backend="gdx")["default"]
+    mif = read_symbol_config(backend="iamc")["default"]
+    assert "tech_fuel_map" not in gdx  # gdx derives it from pe2se instead
+    canonical_values = set(gdx["technology_names"].values())
+    tfm = mif["tech_fuel_map"]
+    assert set(tfm) <= canonical_values
+    assert set(tfm.values()) <= canonical_values
 
 
 @pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")

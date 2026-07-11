@@ -12,12 +12,49 @@ for convenience) so any IAM or PyPSA adapter can swap the conversion table witho
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
+from typing import Any
 
 import pandas as pd
 
 # Unit conventions are centralized in iampypsa.units; re-exported here for convenient imports.
 from iampypsa.units import DEFAULT_ETA_EXPONENTS
+
+logger = logging.getLogger(__name__)
+
+
+def broadcast_fuel_prices(
+    df: pd.DataFrame,
+    tech_fuel_map: Mapping[str, str] | None,
+    *,
+    tech_col: str = "technology",
+    param_col: str = "parameter",
+) -> pd.DataFrame:
+    """Turn per-fuel ``fuel`` price rows into one ``fuel`` row per technology.
+
+    Each technology in ``tech_fuel_map`` (canonical technology → fuel) gets a copy of its
+    fuel's price row; technologies absent from the map get a synthesized ``fuel: 0`` row (they
+    consume no priced primary-energy carrier). No-op when the map is absent.
+    """
+    if not tech_fuel_map:
+        return df
+    is_fuel = df[param_col] == "fuel"
+    fuels, rest = df[is_fuel], df[~is_fuel]
+
+    mapping = pd.DataFrame(tech_fuel_map.items(), columns=[tech_col, "_fuel"])
+    broadcast = mapping.merge(fuels.rename(columns={tech_col: "_fuel"}), on="_fuel").drop(columns="_fuel")
+    missing = sorted(set(tech_fuel_map) - set(broadcast[tech_col]))
+    if missing:
+        logger.warning("No fuel-price rows to broadcast to technologies: %s", missing)
+
+    modeled = rest[["region", tech_col]].drop_duplicates()
+    no_fuel = modeled[~modeled[tech_col].isin(tech_fuel_map)].copy()
+    no_fuel[param_col] = "fuel"
+    no_fuel["value"] = 0.0
+    no_fuel["unit"] = "USD/MWh_th"
+
+    return pd.concat([rest, broadcast, no_fuel], ignore_index=True)
 
 
 def convert_investment_to_input_capacity_basis(
@@ -66,118 +103,114 @@ def add_discount_rate(
     return pd.concat([costs, dr], ignore_index=True)
 
 
+def _entries_by_source(technologies: Mapping[str, Any]) -> pd.DataFrame:
+    """Flatten a ``technologies`` map to long ``[technology, canonical, parameter, source]``.
+
+    ``source`` holds the raw per-parameter spec: the strings ``"IAM"``/``"PyPSA"`` or a
+    ``{value: ...}`` dict — resolved from each entry's ``source:``/``overrides:`` (or bare
+    string) via ``build_technology_sources``. ``canonical`` resolves the entry's ``iam_name:`` key
+    (defaults to the entry name) via ``iam_name``.
+    """
+    from iampypsa.io.technology_mapping import iam_name, build_technology_sources
+
+    rows = [
+        {
+            "technology": tech,
+            "canonical": iam_name(tech, spec),
+            "parameter": param,
+            "source_spec": src,
+        }
+        for tech, spec in technologies.items()
+        for param, src in build_technology_sources(spec).items()
+    ]
+    return pd.DataFrame(rows, columns=["technology", "canonical", "parameter", "source_spec"])
+
+
 def build_iam_techdata(
-    technology_mapping: pd.DataFrame,
+    technologies: Mapping[str, Any],
     model_long: pd.DataFrame,
     *,
-    tech_col: str,
-    ref_col: str,
-    param_col: str,
-    source_col: str,
-    model_value: str,
-    out_source: str,
+    out_source: str = "IAM",
 ) -> pd.DataFrame:
-    """
-    Map model parameter values onto target carriers and log missing references.
+    """Map ``IAM``-sourced parameter values onto target carriers, keeping the region dimension.
 
-    Log a warning for each mapped (reference, parameter) pair
-    that is absent from ``model_long`` — those fall back to the baseline on merge.
+    Flattens ``technologies`` (via ``build_technology_sources``), keeps the ``IAM`` entries, and
+    merges each ``(canonical, parameter)`` against ``model_long``. Raises if an ``IAM``-declared
+    entry has no matching data — those must be declared ``PyPSA`` or ``{value: ...}`` instead.
     Tags provenance columns consumed by ``apply_overrides``.
 
     Args:
-        technology_mapping: DataFrame of the technology mappings.
-        model_long: Long-format IAM cost table with columns ``reference, parameter, value, unit``.
-        tech_col: Column name in ``technology_mapping`` with PyPSA carrier names.
-        ref_col: Column name in ``technology_mapping`` with IAM reference names.
-        param_col: Column name in ``technology_mapping`` with IAM parameter names.
-        source_col: Column name in ``technology_mapping`` with source tags.
-        model_value: Value in ``source_col`` that triggers a model-derived override.
+        technologies: The ``technologies`` map (carrier → spec) from the technology-mapping YAML.
+        model_long: Long-format IAM cost table with columns ``region, technology, parameter, value, unit``.
         out_source: Value to write into the output ``source`` column for provenance.
     """
-    import logging
-    logger = logging.getLogger(__name__)
-
-    mapped = technology_mapping.loc[
-        technology_mapping[source_col] == model_value, [tech_col, ref_col, param_col]
-    ]
-    merged = mapped.merge(model_long, on=[ref_col, param_col], how="left")
-    merged = merged[~merged["value"].isna()]
-    overrides = merged.rename(columns={tech_col: "technology"})[
-        ["region", "technology", param_col, "value", "unit"]
-    ].copy()
-    dups = overrides.duplicated(subset=["region", "technology", param_col], keep=False)
+    entries = _entries_by_source(technologies)
+    mapped = entries[entries["source_spec"] == "IAM"][["technology", "canonical", "parameter"]]
+    merged = mapped.merge(
+        model_long.rename(columns={"technology": "canonical"}),
+        on=["canonical", "parameter"],
+        how="left",
+    )
+    missing = merged[merged["value"].isna()]
+    if not missing.empty:
+        pairs = "\n".join(
+            f"  {row.technology!r} (canonical {row.canonical!r}), parameter {row.parameter!r}"
+            for row in missing.itertuples()
+        )
+        raise ValueError(
+            f"'IAM' declared with no matching data in the adapter output:\n{pairs}\n"
+            "Declare these 'PyPSA' or {value: ...} instead, or fix the IAM output."
+        )
+    overrides = merged[["region", "technology", "parameter", "value", "unit"]].copy()
+    dups = overrides.duplicated(subset=["region", "technology", "parameter"], keep=False)
     if dups.any():
         raise ValueError(f"Duplicate (region, technology, parameter) after merge:\n{overrides[dups]}")
-
-    present = set(zip(model_long[ref_col], model_long[param_col]))
-    for _, row in technology_mapping[technology_mapping[source_col] == model_value].iterrows():
-        if (row[ref_col], row[param_col]) not in present:
-            logger.warning(
-                "Reference '%s' (→ '%s', parameter '%s') absent from model output"
-                " — falling back to baseline.",
-                row[ref_col], row[tech_col], row[param_col],
-            )
-    overrides[source_col] = out_source
+    overrides["source"] = out_source
     overrides["further description"] = f"Extracted from {out_source} model output"
     return overrides
 
 
 def build_pypsa_techdata(
-    technology_mapping: pd.DataFrame,
-    pypsa_raw: pd.DataFrame,
-    *, # TODO needed?
-    source_col="source",
-    tech_col="PyPSA_tech",
-    baseline_value="use_pypsa",
+    technologies: Mapping[str, Any],
+    baseline_raw: pd.DataFrame,
+    *,
+    baseline_label: str = "PyPSA",
 ) -> pd.DataFrame:
-    """Pull parameter values from the pypsa cost table for mapping rows marked source=<baseline_value>."""
-    df = technology_mapping.query("source==@baseline_value").drop(columns=["unit"])
+    """Pull values from the model's baseline cost table for ``PyPSA`` entries.
+
+    Silently drops ``(technology, parameter)`` pairs absent from ``baseline_raw`` — a
+    structurally-expected gap (e.g. no ``fuel`` cost for storage) filled later via
+    ``prepare_costs``'s ``fill_values``, not a real override.
+    """
+    entries = _entries_by_source(technologies)
+    df = entries[entries["source_spec"] == "PyPSA"][["technology", "parameter"]]
     df = df.merge(
-        pypsa_raw,
-        left_on=[tech_col, "parameter"],
-        right_on=["technology", "parameter"],
+        baseline_raw,
+        on=["technology", "parameter"],
         how="left",
         validate="one_to_one",
     )
-    df[source_col] = baseline_value
-    df["further description"] = f"Default parameter from {baseline_value} baseline cost file"
-    return df[["technology", "parameter", "value", "unit", source_col, "further description"]]
+    df = df.dropna(subset=["value"])
+    df["source"] = baseline_label
+    df["further description"] = f"Default parameter from {baseline_label} baseline cost file"
+    return df[["technology", "parameter", "value", "unit", "source", "further description"]]
 
 
 def build_set_value_overrides(
-    technology_mapping: pd.DataFrame,
-    mapping_file: str, # TODO needed?
-    *, # TODO needed?
-    tech_col: str,
-    source_col: str,
-    fixed_value: str,
-    comment_col: str,
+    technologies: Mapping[str, Any],
+    origin: str,
 ) -> pd.DataFrame:
-    """ Set values for technologies directly from the mapping config value.
-    Useful for filling in expected data (e.g with zeros) 
-
-    Args:
-        technology_mapping: DataFrame of the technology mapping CSV.
-        mapping_file: Path to the mapping CSV (for provenance).
-        tech_col: Column name in ``technology_mapping`` with PyPSA carrier names.
-        source_col: Column name in ``technology_mapping`` with source tags.
-        fixed_value: Value in ``source_col`` that triggers a fixed-value override.
-        comment_col: Column name in ``technology_mapping`` with optional comments.
-    
-    Return overrides for rows marked source=<fixed_value>, with reference parsed as a number."""
-    set_df = (
-        technology_mapping[technology_mapping[source_col] == fixed_value]
-        .rename(columns={
-            tech_col: "technology",
-            "reference": "value",
-            comment_col: "further description",
-        })[["technology", "parameter", "value", "unit", "further description"]]
-        .copy()
+    """Return overrides for ``{value: <number>, unit: ..., comment: ...}`` entries."""
+    entries = _entries_by_source(technologies)
+    fixed = entries[entries["source_spec"].map(lambda s: isinstance(s, Mapping) and "value" in s)]
+    set_df = fixed[["technology", "parameter"]].copy()
+    set_df["value"] = pd.to_numeric(
+        fixed["source_spec"].map(lambda s: s["value"]).values, errors="raise"
     )
-    set_df["value"] = pd.to_numeric(set_df["value"], errors="raise")
-    set_df[source_col] = f"Set via configuration file: {mapping_file}"
-    set_df["further description"] = set_df["further description"].fillna("")
-    return set_df
+    set_df["unit"] = fixed["source_spec"].map(lambda s: s.get("unit", "")).values
+    set_df["further description"] = fixed["source_spec"].map(lambda s: s.get("comment", "")).values
+    set_df["source"] = f"Set via configuration file: {origin}"
+    return set_df[["technology", "parameter", "value", "unit", "further description", "source"]]
 
 
 def apply_overrides(

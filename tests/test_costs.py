@@ -9,6 +9,8 @@ import pytest
 
 from iampypsa.transforms.costs import (
     add_discount_rate,
+    broadcast_fuel_prices,
+    build_pypsa_techdata,
     build_iam_techdata,
     convert_investment_to_input_capacity_basis,
     apply_overrides,
@@ -21,30 +23,114 @@ MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/technology_cost_mapping.csv"
 
 
 def test_build_overrides_maps_and_dedups():
-    tech_map = pd.DataFrame(
-        {
-            "PyPSA-Eur technology": ["electrolysis", "electrolysis"],
-            "reference": ["elh2", "elh2"],
-            "parameter": ["investment", "efficiency"],
-            "source": ["REMIND", "REMIND"],
-        }
-    )
+    technologies = {
+        "electrolysis": {"overrides": {"investment": "IAM", "efficiency": "IAM"}},
+    }
     remind_long = pd.DataFrame(
         {
             "region": ["DEU", "DEU"],
-            "reference": ["elh2", "elh2"],
+            "technology": ["electrolysis", "electrolysis"],
             "parameter": ["investment", "efficiency"],
             "value": [728594.28, 0.73],
             "unit": ["USD/MW", "p.u."],
         }
     )
-    out = build_iam_techdata(
-        tech_map, remind_long,
-        tech_col="PyPSA-Eur technology", ref_col="reference",
-        param_col="parameter", source_col="source", model_value="REMIND", out_source="TEST",
-    )
+    out = build_iam_techdata(technologies, remind_long, out_source="TEST")
     assert set(out["technology"]) == {"electrolysis"}
     assert len(out) == 2
+
+
+def test_build_overrides_raises_on_missing_iam_data():
+    """An 'IAM'-declared parameter with no matching adapter row is a hard failure."""
+    technologies = {"electrolysis": "IAM"}
+    remind_long = pd.DataFrame(
+        {"region": ["DEU"], "technology": ["electrolysis"], "parameter": ["investment"],
+         "value": [1.0], "unit": ["USD/MW"]}
+    )
+    with pytest.raises(ValueError, match="no matching data"):
+        build_iam_techdata(technologies, remind_long, out_source="TEST")
+
+
+def test_build_baseline_overrides_drops_parameters_missing_from_baseline():
+    """A 'PyPSA'-declared parameter absent from the baseline is skipped, not NaN-filled.
+
+    PHS has no 'VOM' row in real PyPSA-Eur cost tables; that's a structurally-expected gap
+    filled later via prepare_costs's fill_values, not a value/unit worth propagating as NaN.
+    """
+    technologies = {"PHS": "PyPSA"}
+    baseline_raw = pd.DataFrame(
+        {
+            "technology": ["PHS"],
+            "parameter": ["investment"],
+            "value": [1000.0],
+            "unit": ["USD/MW"],
+        }
+    )
+    out = build_pypsa_techdata(technologies, baseline_raw)
+    assert set(out["parameter"]) == {"investment"}
+    assert not out[["value", "unit"]].isna().any().any()
+
+
+def test_bare_string_shorthand_and_source_plus_overrides():
+    """gas-ccgt: IAM is shorthand; entries with source:+overrides: resolve correctly."""
+    from iampypsa.io.technology_mapping import iam_name, build_technology_sources
+
+    assert build_technology_sources("IAM") == {
+        p: "IAM" for p in
+        ("investment", "FOM", "VOM", "efficiency", "lifetime", "fuel", "CO2 intensity")
+    }
+
+    spec = {"iam_name": "solar-pv", "source": "IAM", "overrides": {"fuel": {"value": 0}}}
+    assert iam_name("solar", spec) == "solar-pv"
+    sources = build_technology_sources(spec)
+    assert sources["investment"] == "IAM"
+    assert sources["fuel"] == {"value": 0}
+
+    # No `source:` — only explicitly-listed parameters are sourced at all.
+    partial = {"overrides": {"investment": "PyPSA", "FOM": "PyPSA"}}
+    assert build_technology_sources(partial) == {"investment": "PyPSA", "FOM": "PyPSA"}
+
+
+def test_load_technology_parameters_reads_file_directly(tmp_path):
+    """load_technology_parameters is a plain YAML read — no merge, no renamed_from magic."""
+    from iampypsa.io import load_technology_parameters
+
+    config = tmp_path / "technology_parameters.yaml"
+    config.write_text(
+        "gas-ocgt: IAM\n"
+        "solar:\n"
+        "  iam_name: solar-pv\n"
+        "  source: IAM\n"
+    )
+    technologies = load_technology_parameters(str(config))["technologies"]
+    assert technologies == {
+        "gas-ocgt": "IAM",
+        "solar": {"iam_name": "solar-pv", "source": "IAM"},
+    }
+
+
+def test_broadcast_fuel_prices_zero_fills_technologies_outside_the_map():
+    """A modeled technology absent from tech_fuel_map gets a real fuel: 0 row, not a gap."""
+    df = pd.DataFrame(
+        {
+            "region": ["DEU", "DEU", "DEU", "DEU"],
+            "technology": ["coal-fuel", "coal-pulverised", "coal-pulverised", "solar-pv"],
+            "parameter": ["fuel", "investment", "efficiency", "investment"],
+            "value": [10.0, 500.0, 0.4, 300.0],
+            "unit": ["USD/MWh_th", "USD/MW", "p.u.", "USD/MW"],
+        }
+    )
+    out = broadcast_fuel_prices(df, {"coal-pulverised": "coal-fuel"})
+
+    coal_fuel = out.query("technology=='coal-pulverised' and parameter=='fuel'")
+    assert coal_fuel["value"].iloc[0] == 10.0  # real broadcast value, unaffected
+
+    solar_fuel = out.query("technology=='solar-pv' and parameter=='fuel'")
+    assert len(solar_fuel) == 1
+    assert solar_fuel["value"].iloc[0] == 0.0  # not in tech_fuel_map -> real 0, not missing
+
+    # the raw per-fuel pseudo-technology row ("coal-fuel") is dropped, not left dangling
+    assert "coal-fuel" not in set(out["technology"])
 
 
 def test_merge_overrides_replaces_and_appends():

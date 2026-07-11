@@ -147,10 +147,15 @@ def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     are declared (a legacy ``unit_factor:`` scalar is also honoured). Stamps the resolved unit
     onto a ``unit`` column, matching ``load_set``/``load_variable_set``, unless no unit is
     declared at all. Use ``load_set`` for mixed-unit symbols.
+
+    An optional ``filter: {column: value}`` drops rows that don't match — e.g. selecting a
+    single GAMS domain slice (``rlf: 1``) out of a symbol that carries extra dimensions.
     """
     ref = _get_symbol_ref(spec)
     resolved = loader.resolve_symbol(ref)
     df = loader.load_symbol(ref, rename_columns=spec.get("rename"))
+    for col, value in spec.get("filter", {}).items():
+        df = df[df[col] == value]
     to_unit = spec.get("to_unit")
     src_unit = _source_unit(spec, ref, resolved)
     if to_unit is not None and src_unit is not None and "value" in df.columns:
@@ -254,6 +259,35 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
     return result
 
 
+def rename_technologies(
+    df: pd.DataFrame,
+    names: dict[str, str] | None,
+    col: str = "technology",
+    *,
+    on_missing: str = "warn",
+) -> pd.DataFrame:
+    """Rename raw source-model technology tokens to the canonical vocabulary.
+
+    ``names`` is the ``technology_names`` token → canonical-name block; empty/absent is a
+    no-op. Unmapped values are kept as-is, per ``on_missing``: ``"warn"`` (default), ``"raise"``,
+    or ``"ignore"``.
+    """
+    if not names or col not in df.columns:
+        return df
+    values = df[col].astype(str)
+    missing = sorted(set(values.unique()) - set(names))
+    if missing:
+        if on_missing == "raise":
+            raise KeyError(f"Technologies without a technology_names entry: {missing}")
+        if on_missing == "warn":
+            logger.warning(
+                "Technologies without a technology_names entry (kept as-is): %s", missing
+            )
+    out = df.copy()
+    out[col] = values.map(lambda t: names.get(t, t))
+    return out
+
+
 def load_spec(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Dispatch to ``load_variable_set`` or ``load_frame`` based on the spec shape.
 
@@ -284,3 +318,12 @@ def report_fallbacks(symbols: dict[str, Any]) -> pd.DataFrame:
                 "reason": fb.get("reason", ""),
             })
     return pd.DataFrame(rows, columns=["logical_name", "token", "value", "reason"])
+
+
+def build_capacity_reporting_technologies() -> set[str]:
+    """Return every canonical technology REMIND reports installed capacity for.
+
+    Reads the ``capacity`` spec's ``variables:``/``derived:`` tokens (``hydro`` is included there).
+    """
+    cap_spec = read_symbol_config(backend="iamc")["default"]["capacity"]
+    return set(cap_spec.get("variables", {}).values()) | set(cap_spec.get("derived", {}))

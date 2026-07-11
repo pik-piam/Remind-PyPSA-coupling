@@ -15,6 +15,8 @@ from collections.abc import Sequence
 
 import pandas as pd
 
+from iampypsa.io.remind_symbols import load_spec, rename_technologies
+
 logger = logging.getLogger(__name__)
 
 
@@ -137,8 +139,6 @@ def prepare_capacities(loader, symbols: dict) -> pd.DataFrame:
     this to :func:`aggregate_capacities_to_carriers`; callers that need model-tech resolution
     (e.g. group-wise brownfield harmonisation) consume it directly.
     """
-    from iampypsa.io.remind_symbols import load_spec
-
     cap_spec = symbols["capacity"]
     cons = dict(cap_spec.get("consolidation", {}))
     link_techs = set(cons.pop("link_techs", []))
@@ -171,6 +171,7 @@ def build_capacity_targets(
     unit = symbols["capacity"].get("to_unit", "MW")
 
     caps = prepare_capacities(loader, symbols)
+    caps = rename_technologies(caps, symbols.get("technology_names"))
     caps = aggregate_capacities_to_carriers(
         caps, tech_map, map_tech_col=map_tech_col, map_carrier_col=map_carrier_col, unit=unit,
     )

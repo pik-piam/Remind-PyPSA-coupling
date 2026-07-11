@@ -76,12 +76,12 @@ CONFIG = (
 def test_full_ssp_downscaling_matches_reference():
     import yaml
 
-    from iampypsa.transforms.mapping import read_region_map
+    from iampypsa.couplers.remind import read_region_map
 
     cfg = yaml.safe_load(open(CONFIG))
     sector_weights = cfg["remind_coupling"]["demand_downscaling"]["sector_weights"]
     configured = set(cfg["countries"])
-    region_to_countries = read_region_map(REGION_MAP, source="REMIND-EU", target="PyPSA-EUR")
+    region_to_countries = read_region_map(source="model_region", target="country")
     pop = pd.read_csv(f"{SSP_DIR}/population.csv").set_index(["iso2", "year"])
     gdp = pd.read_csv(f"{SSP_DIR}/gdp.csv").set_index(["iso2", "year"])
 

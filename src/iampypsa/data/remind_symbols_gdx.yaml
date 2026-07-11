@@ -26,59 +26,91 @@
 #              DIFFERS from `default` (everything else, including units/schema, is inherited).
 # iampypsa ships these as defaults; a model may overlay its own YAML via load_symbol_specs(path=...)
 # or the RPYCPL_SYMBOLS env var (deep-merged on top).
+#
 
 default:
-  co2_price:
-    symbol: [pm_taxCO2eqSum]
-    rename: {tall: year, all_regi: region}
-    units: [$/tC]      # both REMIND vintages report carbon price per tonne C
-    to_unit: $/tCO2          # -> factor 12/44 from the central table
-  load_sector:
-    symbol: [v32_load_sector, p32_load_sector]
-    rename: {ttot: year, all_regi: region, loadPy32: sector, level: value}
-    unit: TWa
-    to_unit: MWh             # year-average power -> annual energy (1e6 * 8760)
+  # --- Canonical technology vocabulary --------------------------------------
+  # REMIND all_te/all_enty token -> canonical name; applied by rename_technologies()
+  technology_names:
+    ngt: gas-ocgt
+    ngcc: gas-ccgt
+    ngccc: gas-ccgt-ccs
+    gaschp: gas-chp
+    pc: coal-pulverised
+    igcc: coal-igcc
+    igccc: coal-igcc-ccs
+    coalchp: coal-chp
+    biochp: biomass-chp
+    bioigcc: biomass-igcc
+    bioigccc: biomass-igcc-ccs
+    tnrs: nuclear
+    dot: oil
+    csp: solar-csp
+    geohdr: geothermal
+    spv: solar-pv
+    windon: wind-onshore
+    windoff: wind-offshore
+    hydro: hydro
+    elh2: electrolysis
+    h2turb: hydrogen-turbine
+    btin: battery-inverter
+    btstor: battery-storage
+    h2stor: hydrogen-storage
+    pecoal: coal-fuel        # fuel-price tokens; only surface before the per-tech broadcast
+    pegas: gas-fuel
+    peoil: oil-fuel
+    pebiolc: biomass-fuel
+    peur: uranium
 
-  # Backend-parity alias used by demand importers. GDX exposes demand sectors in
-  # the `loadPy32` domain of v32/p32_load_sector.
+  # --- Technology -> fuel map ------------------------------------------------
+  # The tech->fuel map is derived from the `pe2se` set
+  pe2se:
+    symbol: pe2se
+
+  co2_price:
+    symbol: p_priceCO2
+    rename: {tall: year, all_regi: region}
+    unit: $/tC
+    to_unit: $/tCO2
+  # TODO: gdx currently doesn't have space cooling demand yet
   demand_fe_sectors:
-    symbol: [v32_load_sector, p32_load_sector]
-    rename: {ttot: year, all_regi: region, loadPy32: sector, level: value}
+    symbol: p32_load_sector
+    rename: {ttot: year, all_regi: region, loadPy32: sector}
     unit: TWa
-    to_unit: MWh
+    to_unit: MWh 
   capacity:
-    symbol: p32_cap
-    rename: {ttot: year, all_regi: region, all_te: technology}
+    symbol: vm_cap
+    rename: {tall: year, all_regi: region, all_te: technology, level: value}
+    filter: {rlf: 1}
     unit: TW
-    to_unit: MW              # 1e6
-    # REMIND-GDX tech consolidation params (declarative, like `rename`/`to_unit`; the operation
-    # lives in iampypsa.transforms.capacities.prepare_capacities). Present only for the REMIND
-    # interface — an IAMC/.mif config omits this block, so no scaling/merge is applied there.
+    to_unit: MW
+    # Electrolysis, hydrogen turbine and battery need postprocessing from gdx
     consolidation:
       vre_to_primary: {elh2VRE: elh2, h2turbVRE: h2turb}   # merge VRE-coupled variants
       battery_scaling: {storspv: 4.0, storwindon: 1.2, storwindoff: 1.2}  # storX -> btin (battery charger)
       link_techs: [elh2, h2turb, btin, elh2VRE, h2turbVRE]  # output->input capacity adjustment
   cost_investment:
-    symbol: p32_capCost
-    rename: {ttot: year, all_regi: region, all_te: technology}
+    symbol: vm_costTeCapital
+    rename: {ttot: year, all_regi: region, all_te: technology, level: value}
     unit: T$/TW
-    to_unit: $/MW            # 1e6 (storage techs share the factor; relabelled $/MWh in the adapter)
+    to_unit: $/MW
   efficiency_conv:
     symbol: pm_eta_conv
     rename: {tall: year, all_regi: region, all_te: technology}
-    unit: p.u.               # p.u. -> p.u. (identity); per-tech quirks handled in the adapter
+    # p.u. holds for every tech except tnrs (raw TWa_elec/Mt_Ur) — handled in the coupler.
+    unit: p.u.
   efficiency_data:
     symbol: pm_dataeta
     rename: {tall: year, all_regi: region, all_te: technology}
     unit: p.u.
-  tech_data:                 # pm_data — mixed-unit set, indexed by `char`
+  tech_data:
     symbol: pm_data
     rename: {all_regi: region, all_te: technology}
     index: char
     schema:
-      lifetime: {parameter: lifetime, unit: yr,     to_unit: yr}        # factor 1
-      omf:      {parameter: FOM,      unit: p.u.,   to_unit: "%/yr"}    # x100
-      omv:      {parameter: VOM,      unit: T$/TWa, to_unit: $/MWh}     # x1e6/8760
+      lifetime: {parameter: lifetime, unit: yr,     to_unit: yr}
+      omf:      {parameter: FOM,      unit: p.u.,   to_unit: "%/yr"}
+      omv:      {parameter: VOM,      unit: T$/TWa, to_unit: $/MWh}
   emission_factor:
     symbol: pm_emifac
     rename:
@@ -89,31 +121,23 @@ default:
       all_te_4: technology
       all_enty_5: emission_type
     unit: Gt_C/TWa
-    to_unit: t_CO2/MWh       # filtered to seel/co2 in the adapter; factor is uniform
+    to_unit: t_CO2/MWh
   fuel_price:
-    symbol: p32_PEPrice
+    symbol: pm_PEPrice
     rename: {ttot: year, all_regi: region, all_enty: technology}
-    unit: T$/TWa             # converted in the adapter (the `peur` fuel is a per-tech exception)
+    # T$/TWa holds for every fuel except peur (raw T$/Mt_Ur) — handled in the coupler.
+    unit: T$/TWa
   discount_rate:
     symbol: p_r
     rename: {ttot: year, all_regi: region}
   coupled_years:
     symbol: t
     rename: {ttot: year}
-  hydro_capacity:
-    symbol: p32_hydroCapacity
-    rename: {ttot: year, all_regi: region}
-    unit: TW
-    to_unit: MW              # 1e6
+  # Hydro treated as special case in PyPSA-Eur
   hydro_generation:
-    symbol: p32_hydroGeneration
+    symbol: p32_prodSeHydro
     rename: {ttot: year, all_regi: region}
     unit: TWa
-    to_unit: MWh             # 1e6 * 8760
-
-  model_version:
-    symbol: c_model_version
-  run_name:
-    symbol: c_expname
+    to_unit: MWh
 
 overrides: {}
