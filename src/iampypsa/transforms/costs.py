@@ -3,11 +3,13 @@
 Based on the technology mapping, extract cost parameters from the IAM output, from PyPSA costs
 or directly set them from values specified in the mapping.
 
-The *extraction* of individual cost parameters is source-specific and lives in each PyPSA-model adapter.
-The shared functions (which live here) — provide the conversion/mapping and merging tools.
+The *extraction* of individual cost parameters is IAM-backend-specific and lives in each
+``Coupler`` subclass (e.g. ``RemindGdxCoupler``, ``RemindIamcCoupler``). The shared functions
+(which live here) provide the conversion/mapping and merging tools.
 
 Unit factors are centrally defined in ``iampypsa.units`` (re-exported below
-for convenience) so any IAM or PyPSA adapter can swap the conversion table without touching transforms.
+for convenience) so any IAM or PyPSA ``Coupler`` subclass can swap the conversion table without
+touching transforms.
 """
 
 from __future__ import annotations
@@ -86,7 +88,7 @@ def add_discount_rate(
 ) -> pd.DataFrame:
     """Add a ``discount rate`` row for every technology that does not already have one.
 
-    ``source``/``reference`` annotate provenance; pass them through from the adapter's config
+    ``source``/``reference`` annotate provenance; pass them through from the Coupler's config
     so the same transform serves any IAM without code edits.
     """
     have = costs.loc[costs["parameter"] == "discount rate", "technology"]
@@ -158,7 +160,7 @@ def build_iam_techdata(
             for row in missing.itertuples()
         )
         raise ValueError(
-            f"'IAM' declared with no matching data in the adapter output:\n{pairs}\n"
+            f"'IAM' declared with no matching data in the Coupler output:\n{pairs}\n"
             "Declare these 'PyPSA' or {value: ...} instead, or fix the IAM output."
         )
     overrides = merged[["region", "technology", "parameter", "value", "unit"]].copy()

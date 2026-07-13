@@ -2,7 +2,7 @@
 
 Transforms operate on already-loaded, tidy DataFrames (canonical columns such as
 ``region``/``year``/``value``); they never read files or know GDX symbol names —
-that wiring lives in the loader and the per-model adapter config.
+that wiring lives in the loader and the Coupler's config.
 """
 
 from __future__ import annotations

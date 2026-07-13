@@ -89,7 +89,13 @@ plugins:
 
 nav:
   - Home: index.md
+  - Getting Started:
+    - Overview: getting-started/index.md
+    - Data Exchange: getting-started/data-exchange.md
+    - How the Package Works: getting-started/integrating-a-model.md
+    - Technology Mapping: getting-started/technology-mapping.md
+    - Downscaling Demand: getting-started/downscaling-demand.md
+    - Harmonising Capacities: getting-started/harmonising-capacities.md
+    - Sector Coupling: getting-started/sector-coupling.md
   - Architecture: architecture.md
-  - Plugging into a PyPSA workflow: workflow.md
-  - Reference:
-    - Reference.md
+  - Reference: docs/reference/

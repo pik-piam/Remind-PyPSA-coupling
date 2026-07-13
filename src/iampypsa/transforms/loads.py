@@ -1,7 +1,7 @@
 """Convert IAM sectoral electricity demand to annual PyPSA loads.
 
 Name-agnostic: operates on an already-loaded frame with ``[year, region, sector, value]``
-(the adapter handles the symbol choice + fallback via the loader).
+(the Coupler handles the symbol choice + fallback via the loader).
 """
 
 from __future__ import annotations

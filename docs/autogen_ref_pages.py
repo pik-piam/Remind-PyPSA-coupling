@@ -6,6 +6,8 @@ root = Path(__file__).parent.parent
 docu_dir = root / "docs"
 src_dir = root / "src" / "iampypsa/"
 
+nav_entries: list[tuple[str, Path]] = []
+
 # Loop through all Python files in the `src_dir` using rglob
 for path in sorted(src_dir.rglob("[!_]*.py")):
     # Generate the module path relative to the scripts directory, excluding the '.py' extension
@@ -34,35 +36,16 @@ for path in sorted(src_dir.rglob("[!_]*.py")):
     # Set the edit path to link the documentation back to the original Python file
     mkdocs_gen_files.set_edit_path(full_doc_path, path.relative_to(root))
 
+    # Dotted module path (e.g. "couplers.base") as the nav title — unique across the whole
+    # package, unlike the bare leaf filename (both couplers/base.py and downscale/base.py would
+    # otherwise collide on the title "base").
+    nav_entries.append((".".join(parts), doc_path))
 
-# # Create the navigation structure
-def make_yaml_nav():
-    """Create the navigation structure for MkDocs REFERENCE API.
-    Requires literate-nav pluggin
-
-    Returns:
-        mkdocs_gen_files.Nav: The navigation structure for MkDocs.
-    """
-    # Create the navigation structure
-    nav = mkdocs_gen_files.Nav()
-
-    for path in sorted(src_dir.rglob("[!_]*.py")):
-        module_path = path.relative_to(src_dir).with_suffix("")
-        doc_path = path.relative_to(src_dir).with_suffix(".md")
-
-        parts = tuple(module_path.parts)
-        if parts[-1] in {"__init__", "__main__"}:
-            continue
-
-        full_doc_path = doc_path  # Fix to remove 'reference' prefix
-        nav[parts] = full_doc_path
-
-    return nav
-
-
-nav = make_yaml_nav()
-with mkdocs_gen_files.open("reference_nav.yml", "w") as nav_file:
-    nav_file.write("Reference:\n")  # Start the "Reference" section
-    nav_items = {itm.title: itm.filename for itm in nav.items()}
-    for title, value in nav_items.items():
-        nav_file.write(f"- {value}\n")  # Write each file path
+# Scoped inside docs/reference/ (not the docs root!): a nav file at the docs root would make
+# literate-nav take over — and silently ignore — the *entire* site nav (see its "hybrid nav"
+# docs). mkdocs.yml references this subtree via `- Docs: docs/reference/`.
+with mkdocs_gen_files.open("docs/reference/reference_nav.yml", "w") as nav_file:
+    for title, doc_path in sorted(nav_entries):
+        # A proper Markdown link, not a bare filename — literate-nav requires link syntax
+        # (or a `*.md` glob) for a scoped/hybrid nav file.
+        nav_file.write(f"- [{title}]({doc_path.as_posix()})\n")

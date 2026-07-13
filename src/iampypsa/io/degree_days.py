@@ -3,7 +3,7 @@
 Degree-day CSVs carry columns ``[year, country, type, tlim_setpoint, rcp, ssp, value]`` with
 ``country`` as ISO3 and ``type`` one of ``CDD``/``HDD``. ``read_degree_days`` selects one
 ``(type, tlim_setpoint, rcp, ssp)`` combination and returns the tidy ``[iso2, year, value]`` frame
-used as a downscaling proxy — the same shape as :func:`rpycpl.io.ssp.read_ssp_data`, so callers do
+used as a downscaling proxy — the same shape as :func:`iampypsa.io.ssp.read_ssp_data`, so callers do
 ``.set_index(["iso2", "year"])`` and pass it in the ``proxies`` registry.
 """
 

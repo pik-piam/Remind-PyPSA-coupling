@@ -29,9 +29,7 @@ Currently supported PyPSA models (under active development) include:
 
 ## Installation (development)
 
-To be updated.
-
-We recommend using `uv`. 
+We recommend using `uv`.
 1. install uv
 2. make a venv `uv venv` at `project/.venv`
 3. Activate the venv with `source .venv/bin/activate`
@@ -43,15 +41,47 @@ We recommend using `uv`.
 > - run `uv pip install pip` after step 3
 > - run `pip install -e .` in the project worspace
 
+Optional extras: `gdx` (read REMIND `.gdx` output via `gamspy`), `ssp` (fetch SSP proxy data
+live from the IIASA API), `docu` (build these docs locally), `jupyter`. E.g.
+`uv pip install -e ".[gdx,ssp]"`.
+
 ## Documentation
 
-https://pik-piam.github.io/IAM-PyPSA-coupling/ (to be updated)
-
-TODO: Update documentation with concrete steps how to use coupling package, data types exchanged between models, examples.
+https://pik-piam.github.io/IAM-PyPSA-coupling/ — start at
+[Getting Started](https://pik-piam.github.io/IAM-PyPSA-coupling/getting-started/) for a
+tutorial walkthrough of what's exchanged and how to wire a model up, or
+[Architecture](https://pik-piam.github.io/IAM-PyPSA-coupling/architecture/) for the design
+rationale. Every module is documented in the Reference section.
 
 ## Usage
 
-To be updated.
+Construct the `Coupler` subclass matching your REMIND source's backend (`RemindGdxCoupler` for
+`.gdx`, `RemindIamcCoupler` for IAMC `.mif`/`.csv`), then call its methods from your model's
+Snakemake rules:
+
+```python
+from iampypsa import RemindGdxCoupler, RemindLoader, load_symbol_specs
+from iampypsa.couplers.remind import read_region_map
+
+loader = RemindLoader("REMIND2PyPSAEUR.gdx")
+coupler = RemindGdxCoupler(
+    loader=loader,
+    symbols=load_symbol_specs(backend=loader.backend),
+    region_map=read_region_map(),
+    config={
+        "planning_horizons": [2030, 2050],
+        "sector_weights": {"AC": {"gdp": 0.6, "population": 0.4}},
+        "countries": {"DE", "FR", "PL"},
+    },
+    reference_data={"population": population_df, "gdp": gdp_df},
+)
+
+demand = coupler.downscale_country_demand()   # country-level annual sectoral demand
+co2_prices = coupler.build_co2_prices()        # regional CO2 price pathway
+costs = coupler.extract_cost_parameters(2030)  # cost components for one year
+```
+
+See [Getting Started](https://pik-piam.github.io/IAM-PyPSA-coupling/getting-started/) for the full tutorial.
 
 ## Further information
 

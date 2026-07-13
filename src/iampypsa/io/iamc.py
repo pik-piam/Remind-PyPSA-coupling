@@ -7,7 +7,7 @@ column, which is dropped on read. All five id columns are lower-cased on import 
 reference them uniformly as ``model``, ``scenario``, ``region``, ``variable``, ``unit``.
 
 ``assemble_variable_set`` is the generic layer between the IAMC long frame and the
-token-labelled frames the coupling adapters consume. It knows nothing about REMIND — it
+token-labelled frames the ``Coupler`` classes consume. It knows nothing about REMIND — it
 receives a ``mapping`` dict (variable → token label) and an optional ``derived`` dict for
 linear combinations (e.g. ``pc = Coal|w/o CC − IGCC − CHP``).
 """

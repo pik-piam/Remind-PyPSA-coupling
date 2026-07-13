@@ -1,6 +1,6 @@
 """Centralized IAM→PyPSA unit conventions — one place for every conversion factor.
 
-Conversion numbers live here, never as literals in the transforms or the adapter, so that
+Conversion numbers live here, never as literals in the transforms or the Coupler, so that
 (a) a factor like ``1e6`` has a named, documented home, and (b) switching to another IAM means
 supplying a different table, not hunting through the code.
 
