@@ -3,8 +3,6 @@
 Ported from ``iampypsa.utils.read_gdx`` / PyPSA-Eur ``_helpers.read_remind_data``.
 """
 
-from __future__ import annotations
-
 import functools
 from collections.abc import Mapping
 from os import PathLike

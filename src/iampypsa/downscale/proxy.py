@@ -14,8 +14,6 @@ built by :func:`build_demand_proxy_from_dd`) — not raw degree-days — hence t
 degree-days are an intensity and would over-allocate to small hot/cold countries.
 """
 
-from __future__ import annotations
-
 import logging
 
 import pandas as pd

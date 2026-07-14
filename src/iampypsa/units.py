@@ -13,8 +13,6 @@ Naming note: molar masses use ``MOLAR_MASS_*`` (g/mol) — never ``MW``, which h
 megawatts.
 """
 
-from __future__ import annotations
-
 #: Molar masses (g/mol) used for carbon↔CO2 mass conversions.
 MOLAR_MASS_C = 12.0
 MOLAR_MASS_CO2 = MOLAR_MASS_C + 2 * 16.0  # 44 g/mol

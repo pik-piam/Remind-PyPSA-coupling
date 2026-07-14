@@ -4,8 +4,6 @@ Supports the config-declared invocation model: the user lists regions/years in c
 this fails loudly before any prep runs if they are not present in the IAM source.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from typing import Any
 

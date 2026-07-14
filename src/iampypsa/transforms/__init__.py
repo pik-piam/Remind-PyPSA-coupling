@@ -5,8 +5,6 @@ Transforms operate on already-loaded, tidy DataFrames (canonical columns such as
 that wiring lives in the loader and the per-model adapter config.
 """
 
-from __future__ import annotations
-
 from iampypsa.transforms.co2_prices import (
     TONNE_C_TO_TONNE_CO2,
     convert_co2_prices,
@@ -17,7 +15,7 @@ from iampypsa.transforms.costs import (
     add_discount_rate,
     build_pypsa_techdata,
     build_iam_techdata,
-    build_set_value_overrides,
+    build_fixed_value_overrides,
     convert_investment_to_input_capacity_basis,
     apply_overrides,
 )
@@ -43,7 +41,7 @@ __all__ = [
     "prepare_capacities",
     "build_iam_techdata",
     "build_pypsa_techdata",
-    "build_set_value_overrides",
+    "build_fixed_value_overrides",
     "convert_investment_to_input_capacity_basis",
     "add_discount_rate",
     "apply_overrides",

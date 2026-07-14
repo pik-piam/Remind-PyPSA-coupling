@@ -1,8 +1,6 @@
 """Tests for read_degree_days and CDD/HDD proxy weighting via the named-proxy registry."""
 
-from __future__ import annotations
-
-import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -16,10 +14,8 @@ from iampypsa.downscale import (
 )
 from iampypsa.io import read_degree_days
 
-_DD_DIR = "/workspace/remind_pypsa_coupling/Remind-PyPSA-coupling/data/development_data"
-CDD = f"{_DD_DIR}/cdd/climbed_cdd_2060_ssp2.csv"
-HDD = f"{_DD_DIR}/hdd/climbed_hdd_2060_ssp2.csv"
-HAVE_DD = os.path.exists(CDD) and os.path.exists(HDD)
+CDD = Path(__file__).parent / "data" / "cdd_filtered.csv"
+HDD = Path(__file__).parent / "data" / "hdd_filtered.csv"
 
 
 def _proxy(vals: dict[str, float], year: int = 2060) -> pd.DataFrame:
@@ -139,16 +135,14 @@ def test_build_demand_proxy_nearest_year_alignment():
 # -- read_degree_days ----------------------------------------------------------
 
 
-@pytest.mark.skipif(not HAVE_DD, reason="degree-day dev data not present")
 def test_read_degree_days_iso3_to_iso2_and_filter():
     df = read_degree_days(CDD, dd_type="CDD", tlim_setpoint=22, rcp="4_5", ssp="SSP2")
     assert list(df.columns) == ["iso2", "year", "value"]
     idx = df.set_index(["iso2", "year"]).index
-    assert ("CN", 2060) in idx and ("TW", 2060) in idx  # China + Taiwan both present
+    assert ("DE", 2060) in idx and ("AT", 2060) in idx  # Germany + Austria both present
     assert (df["value"] >= 0).all()
 
 
-@pytest.mark.skipif(not HAVE_DD, reason="degree-day dev data not present")
 def test_read_degree_days_bad_selector_raises():
     with pytest.raises(ValueError):  # out-of-range setpoint → no rows
         read_degree_days(CDD, dd_type="CDD", tlim_setpoint=99, rcp="4_5", ssp="SSP2")

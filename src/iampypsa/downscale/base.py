@@ -5,8 +5,6 @@ its finer members proportionally to *proxy* shares (population/GDP/SSP activity,
 The shares are built by :mod:`iampypsa.downscale.proxy`.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 
 import pandas as pd

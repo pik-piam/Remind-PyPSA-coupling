@@ -1,7 +1,5 @@
 """Tests for RemindGdxCoupler's sparse-GDX-reading helpers."""
 
-from __future__ import annotations
-
 import pandas as pd
 
 from iampypsa.couplers.remind import RemindGdxCoupler

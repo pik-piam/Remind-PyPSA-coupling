@@ -1,11 +1,8 @@
 """Load the technology-parameter map for cost sourcing.
 
-Schema is documented in the model's technology-mapping YAML header. An ``IAM``-declared
-(technology, parameter) pair must have matching adapter data — a gap raises, not a silent
-fallback; ``PyPSA`` pulls from the model's own baseline cost table.
-"""
+Schema: see docs/getting-started/technology-mapping.example.yaml.
 
-from __future__ import annotations
+"""
 
 from os import PathLike
 from typing import Any

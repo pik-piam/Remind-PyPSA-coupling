@@ -8,8 +8,6 @@ battery scaling — only exercised when the symbol config declares it, e.g. for 
 3. adjust link-like techs to input-capacity basis, and aggregate to PyPSA carriers.
 """
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Sequence
 

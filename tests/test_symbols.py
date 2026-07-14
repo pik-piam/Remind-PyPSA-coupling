@@ -1,9 +1,5 @@
 """Tests for the central REMIND symbol config (no hardcoded names)."""
 
-from __future__ import annotations
-
-import os
-
 import pandas as pd
 import pytest
 
@@ -17,7 +13,9 @@ from iampypsa.io.remind_symbols import (
     report_fallbacks,
 )
 
-EUR_GDX = "/workspace/remind_pypsa_coupling/development_data/REMIND2PyPSAEUR.gdx"
+from pathlib import Path
+
+EUR_GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
 
 
 class _FakeLoader:
@@ -39,7 +37,7 @@ class _FakeLoader:
 
 def test_load_specs_default():
     default = load_symbol_specs()
-    assert default["co2_price"]["symbol"] == ["p_priceCO2"]
+    assert default["co2_price"]["symbol"] == "p_priceCO2"
     assert default["demand_fe_sectors"]["rename"]["loadPy32"] == "sector"
 
 
@@ -264,7 +262,7 @@ def test_report_fallbacks_lists_all():
     fb = report_fallbacks(iamc)
     assert set(fb.columns) == {"logical_name", "token", "value", "reason"}
     # nuclear efficiency is no longer a declared fallback — it's computed directly from the
-    # mif's uranium mass-basis price/conversion-factor variables (see RemindIamcAdapter).
+    # mif's uranium mass-basis price/conversion-factor variables (see RemindIamcCoupler).
     efficiency_fb = fb[fb["logical_name"] == "efficiency"]
     assert "nuclear" not in set(efficiency_fb["token"])
     # CO2 intensity fallbacks: biomass techs (carbon-neutral) plus zero-emission technologies
@@ -314,13 +312,11 @@ def test_tech_fuel_map_is_keyed_by_the_canonical_vocabulary():
     assert set(tfm.values()) <= canonical_values
 
 
-@pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")
-def test_load_frame_resolves_candidate_against_real_gdx():
+def test_load_frame_against_real_gdx():
     from iampypsa.io import RemindLoader
 
-    loader = RemindLoader(EUR_GDX)
+    loader = RemindLoader(str(EUR_GDX))
     spec = load_symbol_specs()["co2_price"]
-    # v32_taxCO2eq is absent -> falls back to p_priceCO2; rename applied
     df = load_frame(loader, spec)
     assert {"year", "region", "value"} <= set(df.columns)
     assert "DEU" in set(df["region"])

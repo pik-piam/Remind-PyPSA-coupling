@@ -27,8 +27,6 @@ Loading layer:
 coverage gaps are inspectable without running a full coupling.
 """
 
-from __future__ import annotations
-
 import importlib.resources
 import logging
 import os
@@ -155,7 +153,9 @@ def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     resolved = loader.resolve_symbol(ref)
     df = loader.load_symbol(ref, rename_columns=spec.get("rename"))
     for col, value in spec.get("filter", {}).items():
-        df = df[df[col] == value]
+        # GAMS domain columns are categorical/string labels even for numeric-looking values
+        # (e.g. rlf: 1) -- compare as strings so a plain int in the spec still matches.
+        df = df[df[col].astype(str) == str(value)]
     to_unit = spec.get("to_unit")
     src_unit = _source_unit(spec, ref, resolved)
     if to_unit is not None and src_unit is not None and "value" in df.columns:

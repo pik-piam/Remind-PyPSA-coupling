@@ -1,39 +1,36 @@
 """Tests for config-vs-GDX scenario validation."""
 
-from __future__ import annotations
-
-import os
+from pathlib import Path
 
 import pytest
 
 from iampypsa.io.remind_symbols import load_symbol_specs
 from iampypsa.validate import validate_scenario_against_remind
 
-EUR_GDX = "/workspace/remind_pypsa_coupling/development_data/REMIND2PyPSAEUR.gdx"
-pytestmark = pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")
+GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
 
 
 def test_valid_scenario_passes():
     from iampypsa.io import RemindLoader
 
-    loader = RemindLoader(EUR_GDX)
+    loader = RemindLoader(str(GDX))
     sym = load_symbol_specs()
-    validate_scenario_against_remind(loader, sym, ["DEU", "FRA"], [2030, 2050])  # no raise
+    validate_scenario_against_remind(loader, sym, ["DEU", "EWN"], [2090, 2100])  # no raise
 
 
 def test_missing_region_raises():
     from iampypsa.io import RemindLoader
 
-    loader = RemindLoader(EUR_GDX)
+    loader = RemindLoader(str(GDX))
     sym = load_symbol_specs()
     with pytest.raises(ValueError, match="regions"):
-        validate_scenario_against_remind(loader, sym, ["DEU", "ATLANTIS"], [2030])
+        validate_scenario_against_remind(loader, sym, ["DEU", "ATLANTIS"], [2090])
 
 
 def test_missing_year_raises():
     from iampypsa.io import RemindLoader
 
-    loader = RemindLoader(EUR_GDX)
+    loader = RemindLoader(str(GDX))
     sym = load_symbol_specs()
     with pytest.raises(ValueError, match="years"):
         validate_scenario_against_remind(loader, sym, ["DEU"], [1999])

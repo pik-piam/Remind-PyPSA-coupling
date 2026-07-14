@@ -2,8 +2,6 @@
 extension point for further formats), plus the config-aware symbol layer (``remind_symbols``)
 that resolves logical names + units on top of the loader."""
 
-from __future__ import annotations
-
 from iampypsa.io.gdx import list_gdx_symbols, read_gdx_scalar, read_gdx_symbol
 from iampypsa.io.iamc import list_iamc_variables, read_iamc
 from iampypsa.io.loader import Backend, RemindLoader, SymbolRef
