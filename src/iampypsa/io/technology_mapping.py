@@ -1,6 +1,6 @@
 """Load the technology-parameter map for cost sourcing.
 
-Schema: see docs/getting-started/technology-mapping.example.yaml.
+Schema: see examples/technology-mapping.example.yaml.
 
 """
 

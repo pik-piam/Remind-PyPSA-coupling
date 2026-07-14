@@ -118,7 +118,7 @@ def add_discount_rate(
     return pd.concat([costs, dr], ignore_index=True)
 
 
-def _entries_by_source(technology_mapping: Mapping[str, Any]) -> pd.DataFrame:
+def _flatten_technology_mapping(technology_mapping: Mapping[str, Any]) -> pd.DataFrame:
     """Flatten a technology-mapping dict to long ``[technology, canonical, parameter, source_spec]``.
 
     ``source_spec`` holds the raw per-parameter spec: the strings ``"IAM"``/``"PyPSA"`` or a
@@ -166,7 +166,7 @@ def build_iam_techdata(
     Returns:
         Long frame ``[region, technology, parameter, value, unit, source, further description]``.
     """
-    entries = _entries_by_source(technology_mapping)
+    entries = _flatten_technology_mapping(technology_mapping)
     mapped = entries[entries["source_spec"] == "IAM"][["technology", "canonical", "parameter"]]
     merged = mapped.merge(
         iam_costs_long.rename(columns={"technology": "canonical"}),
@@ -214,7 +214,7 @@ def build_pypsa_techdata(
     Returns:
         Long frame ``[technology, parameter, value, unit, source, further description]``.
     """
-    entries = _entries_by_source(technology_mapping)
+    entries = _flatten_technology_mapping(technology_mapping)
     df = entries[entries["source_spec"] == "PyPSA"][["technology", "parameter"]]
     df = df.merge(
         pypsa_costs_long,
@@ -246,7 +246,7 @@ def build_fixed_value_overrides(
     Returns:
         Long frame ``[technology, parameter, value, unit, further description, source]``.
     """
-    entries = _entries_by_source(technology_mapping)
+    entries = _flatten_technology_mapping(technology_mapping)
     fixed = entries[entries["source_spec"].map(lambda s: isinstance(s, Mapping) and "value" in s)]
     set_df = fixed[["technology", "parameter"]].copy()
     set_df["value"] = pd.to_numeric(

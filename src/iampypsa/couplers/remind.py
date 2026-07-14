@@ -234,7 +234,7 @@ class RemindIamcCoupler(Coupler):
             eta_td = self._td_efficiency(se, losses)
 
             fe_slice = fe_df[(fe_df["region"] == region) & (fe_df["year"] == year)]
-            fe_rows, rebased_sum_mwh, has_se_h2 = self._rebase_fe_sectors(
+            fe_rows, rebased_sum_mwh, has_se_h2 = self._convert_fe_sectors_to_se(
                 fe_slice, eta_td, region, year
             )
             rows.extend(fe_rows)
@@ -289,7 +289,7 @@ class RemindIamcCoupler(Coupler):
         return (se - losses) / se if se > 0 else 1.0
 
     @staticmethod
-    def _rebase_fe_sectors(
+    def _convert_fe_sectors_to_se(
         fe_slice: pd.DataFrame, eta_td: float, region: str, year: int
     ) -> tuple[list[dict], float, bool]:
         """Return FE rows, rebased-electricity sum, and whether FE provided ``demand_h2``.

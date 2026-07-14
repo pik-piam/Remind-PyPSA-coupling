@@ -34,11 +34,11 @@ def test_adapter_is_directly_instantiable():
     assert isinstance(adapter, Coupler)
 
 
-def test_technology_mapping_example_matches_docs():
-    """tests/data's copy must stay byte-identical to the docs example it mirrors."""
-    docs_copy = Path(__file__).parents[1] / "docs" / "getting-started" / "technology-mapping.example.yaml"
-    assert TECH_MAPPING.read_text() == docs_copy.read_text(), (
-        f"{TECH_MAPPING} and {docs_copy} have diverged — update one to match the other."
+def test_technology_mapping_example_matches_examples_dir():
+    """tests/data's copy must stay byte-identical to the examples/ file it mirrors."""
+    examples_copy = Path(__file__).parents[1] / "examples" / "technology-mapping.example.yaml"
+    assert TECH_MAPPING.read_text() == examples_copy.read_text(), (
+        f"{TECH_MAPPING} and {examples_copy} have diverged — update one to match the other."
     )
 
 
