@@ -1,7 +1,8 @@
-"""iampypsa — shared IAM↔PyPSA coupling logic and the base coupling-adapter interface.
+"""iampypsa — shared IAM↔PyPSA coupling logic and the ``Coupler`` interface.
 
-Concrete per-model adapters live in each PyPSA model's own repository and subclass
-``Coupler``.
+Concrete ``Coupler`` subclasses are per-IAM-backend (``RemindGdxCoupler``, ``RemindIamcCoupler``
+for REMIND today); most PyPSA models construct one directly. A model may further subclass
+``Coupler`` in its own repository for tweaks that genuinely differ.
 """
 
 import importlib.metadata

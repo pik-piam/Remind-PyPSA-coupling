@@ -1,7 +1,7 @@
 """Extract and convert a CO2 price pathway.
 
 The transform is name-agnostic: it takes an already-loaded frame with canonical columns
-``[region, year, value]`` (the loader/adapter handles the GDX symbol + renames).
+``[region, year, value]`` (the loader/Coupler handles the GDX symbol + renames).
 """
 
 from collections.abc import Sequence

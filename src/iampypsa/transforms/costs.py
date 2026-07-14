@@ -101,7 +101,7 @@ def add_discount_rate(
 ) -> pd.DataFrame:
     """Add a ``discount rate`` row for every technology that does not already have one.
 
-    ``source``/``reference`` annotate provenance; pass them through from the adapter's config
+    ``source``/``reference`` annotate provenance; pass them through from the Coupler's config
     so the same transform serves any IAM without code edits.
     """
     have = costs.loc[costs["parameter"] == "discount rate", "technology"]

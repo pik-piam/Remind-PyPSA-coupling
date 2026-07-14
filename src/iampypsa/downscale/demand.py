@@ -23,7 +23,7 @@ def disaggregate_demand_to_country(
     sector_weights: dict,
     configured_countries: set[str],
 ) -> pd.DataFrame:
-    """Split each (year, region, sector) row into per-country rows; return a tidy frame.
+    """Split each (year, region, sector) row into per-country rows; return a long-format table.
 
     ``proxies`` is a name→frame registry (e.g. ``{"population": ..., "gdp": ...,
     "heating_demand": ..., "cooling_demand": ...}``); each sector's ``sector_weights`` entry names

@@ -423,7 +423,7 @@ class RemindIamcCoupler(Coupler):
             [f[keep] for f in frames if set(keep).issubset(f.columns)],
             ignore_index=True,
         )
-        # Output boundary (mirrors the GDX adapter): rename is a no-op here — mif labels are
+        # Output boundary (mirrors RemindGdxCoupler): rename is a no-op here — mif labels are
         # already canonical — then per-fuel price rows become one `fuel` row per technology.
         df = rename_technologies(df, self.symbols.get("technology_names"))
         df = broadcast_fuel_prices(df, self.symbols.get("tech_fuel_map"))

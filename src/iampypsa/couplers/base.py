@@ -1,12 +1,12 @@
-"""The IAM→PyPSA coupling adapter interface. This is exposed to pypsa models 
-and is the entry point for the coupling workflow. 
+"""The IAM→PyPSA coupling interface. This is exposed to pypsa models
+and is the entry point for the coupling workflow.
 
 - ``Coupler`` is the backend-neutral base: it holds the shared, concrete builders
 (``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
 - it consumes the IAM symbols (resolved via their config) and the region map, and it contains
  the reference data (population, GDP, etc.) for downscaling.
 
-Concrete adapters (instantiated directly by the caller, which selects on ``loader.backend``);
+Concrete subclasses are instantiated directly by the caller, which selects on ``loader.backend``;
 a new IAM or output format is added as a further ``Coupler`` subclass, not a branch here:
 - ``RemindGdxCoupler``  (``iampypsa.couplers.remind``)
 - ``RemindIamcCoupler`` (``iampypsa.couplers.remind``)
