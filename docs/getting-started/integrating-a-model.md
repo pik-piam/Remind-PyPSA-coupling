@@ -13,7 +13,7 @@ workflow, and turns it into files the rest of the workflow consumes like any oth
 The general approach is:
 
 1. **`iampypsa` does the IAM-side work**: reading the source file, converting units, and
-   producing tidy frames for demand, costs, capacities, and CO2 prices. This can be called
+   producing long-format tables for demand, costs, capacities, and CO2 prices. This can be called
    either through a `Coupler` subclass (`RemindGdxCoupler` / `RemindIamcCoupler` today), or
    through the `io`/`transforms` functions directly for a specific step.
 2. **PyPSA's Snakemake rules do everything model-specific**: file paths, model configuration, and
@@ -24,8 +24,7 @@ the pathway dimension across years.
 
 ## Additional wildcards
 
-A new wildcard is typically required for the year dimension, since the IAM's pathway now spans
-multiple years within a single PyPSA run — see e.g.
+A new wildcard may be required for the year dimension — see e.g.
 [`pypsa-eur-iam`](https://github.com/pik-piam/pypsa-eur-iam)'s `year_REMIND`.
 
 Further wildcards may be necessary for iterations once bidirectional/iterative coupling is
@@ -47,9 +46,10 @@ Regardless of the PyPSA model, the following steps should always be followed:
    this step is model-specific; see [Harmonising capacities](harmonising-capacities.md).
 7. **Create and solve the network**, binding together all IAM inputs from the previous steps.
 
-Typically, each step is a thin Snakemake rule. Keep the rule minimal — if a rule is doing more
-than "load, call, write", that logic likely belongs either in the model's own Snakemake/coupling
-code (if it's model-side) or in `iampypsa` (if it's genuinely IAM-side and shared).
+!!! tip "Keep rules thin"
+    Each step is typically a thin Snakemake rule. If a rule is doing more than "load, call,
+    write", that logic likely belongs either in the model's own Snakemake/coupling code (if
+    it's model-side) or in `iampypsa` (if it's genuinely IAM-side and shared).
 
 ## Reference implementation: `pypsa-eur-iam`
 

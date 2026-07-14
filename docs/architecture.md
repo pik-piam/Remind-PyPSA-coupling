@@ -79,7 +79,7 @@ or assembled step-by-step in the model's own Snakemake rules.
 | `io/` | `technology_mapping` | Parse the model's technology-mapping YAML into a `{parameter: source}` map per technology — see [Technology mapping](getting-started/technology-mapping.md). |
 | `io/` | `ssp` | Fetch / read the SSP population & GDP proxy datasets used by downscaling. |
 | `units` | `units.py` | Unit conversions `(from_unit, to_unit) → factor`. |
-| `transforms/` | `co2_prices`, `loads`, `capacities`, `costs` | Pure functions on already-loaded **tidy frames**. They never read files and never know IAM symbol names. |
+| `transforms/` | `co2_prices`, `loads`, `capacities`, `costs` | Pure functions on already-loaded long-format tables. They never read files and never know IAM symbol names. |
 | `downscale/` | `demand`, `proxy`, `base` | Region → country disaggregation via SSP/degree-day proxy shares. |
 | `couplers/` | `base.Coupler` | The interface + shared concrete builders (CO2 prices, country demand, discount rates). |
 | `couplers/` | `remind.RemindGdxCoupler`, `remind.RemindIamcCoupler`, `remind.read_region_map` | REMIND's two `Coupler` subclasses (GDX / IAMC backends), and the REMIND region↔country CSV reader. |
@@ -184,7 +184,7 @@ row to `UNIT_CONVERSIONS` in `units.py` — never as a literal in a transform or
 ## Transforms
 
 `transforms/` is the **stateless compute layer**. Each function takes an already-loaded,
-already-unit-converted tidy frame (canonical columns `region`, `year`, `value`, …) and
+already-unit-converted long-format table (canonical columns `region`, `year`, `value`, …) and
 returns one. They never touch the filesystem and never reference an IAM symbol name — that
 is the loader's job — which makes them trivially unit-testable and reusable across models.
 

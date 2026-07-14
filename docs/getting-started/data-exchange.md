@@ -15,7 +15,7 @@ Four pathway variables are exchanged from the IAM to PyPSA. Each has a distinct 
 
 A few things worth knowing about all four:
 
-- All data comes in **tidy frames** — long-format tables with key columns like `region`, `year`,
+- All data comes in long-format tables with key columns like `region`, `year`,
   ... and a `value` + `unit` column.
 - Units and the underlying IAM symbol names are declared in a YAML config
   (`remind_symbols_gdx.yaml` / `remind_symbols_mif.yaml` for the REMIND backends) and applied

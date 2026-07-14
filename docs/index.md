@@ -31,6 +31,9 @@ directly.
     - [PyPSA-Eur](https://pypsa-eur.readthedocs.io/en/latest/) (via [pypsa-eur-iam](https://github.com/pik-piam/pypsa-eur-iam))
     - [PyPSA-China](https://pik-piam.github.io/PyPSA-China-PIK/latest/)
 
+New IAM models can make extensive use of the package but will require their own specific coupling
+layer. See [Integrating a PyPSA model](getting-started/integrating-a-model.md).
+
 Get in touch if you'd like to couple another IAM or PyPSA model.
 
 ## Start here
