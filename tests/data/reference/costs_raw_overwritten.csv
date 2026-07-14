@@ -1,0 +1,103 @@
+region,technology,parameter,value,unit,source,further description
+EWN,gas-ocgt,investment,546090.6240290502,USD/MW,IAM,Extracted from IAM model output
+CHA,gas-ocgt,investment,546090.6240290502,USD/MW,IAM,Extracted from IAM model output
+DEU,gas-ocgt,investment,546090.6240290502,USD/MW,IAM,Extracted from IAM model output
+EWN,gas-ocgt,FOM,3.0,%/yr,IAM,Extracted from IAM model output
+CHA,gas-ocgt,FOM,3.0,%/yr,IAM,Extracted from IAM model output
+DEU,gas-ocgt,FOM,3.0,%/yr,IAM,Extracted from IAM model output
+EWN,gas-ocgt,VOM,2.81972602739726,$/MWh,IAM,Extracted from IAM model output
+CHA,gas-ocgt,VOM,2.81972602739726,$/MWh,IAM,Extracted from IAM model output
+DEU,gas-ocgt,VOM,2.81972602739726,$/MWh,IAM,Extracted from IAM model output
+EWN,gas-ocgt,efficiency,0.41,p.u.,IAM,Extracted from IAM model output
+CHA,gas-ocgt,efficiency,0.41,p.u.,IAM,Extracted from IAM model output
+DEU,gas-ocgt,efficiency,0.41,p.u.,IAM,Extracted from IAM model output
+EWN,gas-ocgt,lifetime,30.0,yr,IAM,Extracted from IAM model output
+CHA,gas-ocgt,lifetime,30.0,yr,IAM,Extracted from IAM model output
+DEU,gas-ocgt,lifetime,30.0,yr,IAM,Extracted from IAM model output
+EWN,gas-ocgt,fuel,28.05317050682941,USD/MWh_th,IAM,Extracted from IAM model output
+CHA,gas-ocgt,fuel,42.957486775899525,USD/MWh_th,IAM,Extracted from IAM model output
+DEU,gas-ocgt,fuel,32.50575208329045,USD/MWh_th,IAM,Extracted from IAM model output
+EWN,gas-ocgt,CO2 intensity,0.2019599489445249,t_CO2/MWh_th,IAM,Extracted from IAM model output
+CHA,gas-ocgt,CO2 intensity,0.2019599489445249,t_CO2/MWh_th,IAM,Extracted from IAM model output
+DEU,gas-ocgt,CO2 intensity,0.2019599489445249,t_CO2/MWh_th,IAM,Extracted from IAM model output
+EWN,nuclear,investment,6670081.588768562,USD/MW,IAM,Extracted from IAM model output
+CHA,nuclear,investment,6670081.588768562,USD/MW,IAM,Extracted from IAM model output
+DEU,nuclear,investment,6670081.588768562,USD/MW,IAM,Extracted from IAM model output
+EWN,nuclear,FOM,3.0,%/yr,IAM,Extracted from IAM model output
+CHA,nuclear,FOM,3.0,%/yr,IAM,Extracted from IAM model output
+DEU,nuclear,FOM,3.0,%/yr,IAM,Extracted from IAM model output
+EWN,nuclear,VOM,4.229589041095889,$/MWh,IAM,Extracted from IAM model output
+CHA,nuclear,VOM,4.229589041095889,$/MWh,IAM,Extracted from IAM model output
+DEU,nuclear,VOM,4.229589041095889,$/MWh,IAM,Extracted from IAM model output
+EWN,nuclear,efficiency,1.0,p.u.,IAM,Extracted from IAM model output
+CHA,nuclear,efficiency,1.0,p.u.,IAM,Extracted from IAM model output
+DEU,nuclear,efficiency,1.0,p.u.,IAM,Extracted from IAM model output
+EWN,nuclear,lifetime,50.0,yr,IAM,Extracted from IAM model output
+CHA,nuclear,lifetime,50.0,yr,IAM,Extracted from IAM model output
+DEU,nuclear,lifetime,50.0,yr,IAM,Extracted from IAM model output
+EWN,nuclear,fuel,1.5528294277419008,USD/MWh_el,IAM,Extracted from IAM model output
+CHA,nuclear,fuel,1.601269736176085,USD/MWh_el,IAM,Extracted from IAM model output
+DEU,nuclear,fuel,1.5539975442051412,USD/MWh_el,IAM,Extracted from IAM model output
+EWN,nuclear,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+CHA,nuclear,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+DEU,nuclear,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+EWN,electrolysis,investment,393565.0266923008,USD/MW,IAM,Extracted from IAM model output
+CHA,electrolysis,investment,343833.7815651251,USD/MW,IAM,Extracted from IAM model output
+DEU,electrolysis,investment,393251.4200562598,USD/MW,IAM,Extracted from IAM model output
+EWN,electrolysis,FOM,5.0,%/yr,IAM,Extracted from IAM model output
+CHA,electrolysis,FOM,5.0,%/yr,IAM,Extracted from IAM model output
+DEU,electrolysis,FOM,5.0,%/yr,IAM,Extracted from IAM model output
+EWN,electrolysis,VOM,0.3524657534246575,$/MWh,IAM,Extracted from IAM model output
+CHA,electrolysis,VOM,0.3524657534246575,$/MWh,IAM,Extracted from IAM model output
+DEU,electrolysis,VOM,0.3524657534246575,$/MWh,IAM,Extracted from IAM model output
+EWN,electrolysis,efficiency,0.75,p.u.,IAM,Extracted from IAM model output
+CHA,electrolysis,efficiency,0.75,p.u.,IAM,Extracted from IAM model output
+DEU,electrolysis,efficiency,0.75,p.u.,IAM,Extracted from IAM model output
+EWN,electrolysis,lifetime,30.0,yr,IAM,Extracted from IAM model output
+CHA,electrolysis,lifetime,30.0,yr,IAM,Extracted from IAM model output
+DEU,electrolysis,lifetime,30.0,yr,IAM,Extracted from IAM model output
+EWN,electrolysis,fuel,0.0,USD/MWh_th,IAM,Extracted from IAM model output
+CHA,electrolysis,fuel,0.0,USD/MWh_th,IAM,Extracted from IAM model output
+DEU,electrolysis,fuel,0.0,USD/MWh_th,IAM,Extracted from IAM model output
+EWN,electrolysis,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+CHA,electrolysis,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+DEU,electrolysis,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+EWN,solar,investment,151543.03504969622,USD/MW,IAM,Extracted from IAM model output
+CHA,solar,investment,100147.88592100237,USD/MW,IAM,Extracted from IAM model output
+DEU,solar,investment,151874.22044802204,USD/MW,IAM,Extracted from IAM model output
+EWN,solar,FOM,2.0,%/yr,IAM,Extracted from IAM model output
+CHA,solar,FOM,2.0,%/yr,IAM,Extracted from IAM model output
+DEU,solar,FOM,2.0,%/yr,IAM,Extracted from IAM model output
+EWN,solar,VOM,0.0,$/MWh,IAM,Extracted from IAM model output
+CHA,solar,VOM,0.0,$/MWh,IAM,Extracted from IAM model output
+DEU,solar,VOM,0.0,$/MWh,IAM,Extracted from IAM model output
+EWN,solar,efficiency,1.0,p.u.,IAM,Extracted from IAM model output
+CHA,solar,efficiency,1.0,p.u.,IAM,Extracted from IAM model output
+DEU,solar,efficiency,1.0,p.u.,IAM,Extracted from IAM model output
+EWN,solar,lifetime,30.0,yr,IAM,Extracted from IAM model output
+CHA,solar,lifetime,30.0,yr,IAM,Extracted from IAM model output
+DEU,solar,lifetime,30.0,yr,IAM,Extracted from IAM model output
+EWN,solar,fuel,0.0,USD/MWh_th,IAM,Extracted from IAM model output
+CHA,solar,fuel,0.0,USD/MWh_th,IAM,Extracted from IAM model output
+DEU,solar,fuel,0.0,USD/MWh_th,IAM,Extracted from IAM model output
+EWN,solar,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+CHA,solar,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+DEU,solar,CO2 intensity,0.0,t_CO2/MWh_th,IAM,Extracted from IAM model output
+EWN,biomass-igcc-ccs,investment,3626119.765004991,USD/MW,IAM,Extracted from IAM model output
+CHA,biomass-igcc-ccs,investment,3804241.455458906,USD/MW,IAM,Extracted from IAM model output
+DEU,biomass-igcc-ccs,investment,3626119.765004991,USD/MW,IAM,Extracted from IAM model output
+EWN,biomass-igcc-ccs,FOM,4.0,%/yr,IAM,Extracted from IAM model output
+CHA,biomass-igcc-ccs,FOM,4.0,%/yr,IAM,Extracted from IAM model output
+DEU,biomass-igcc-ccs,FOM,4.0,%/yr,IAM,Extracted from IAM model output
+EWN,biomass-igcc-ccs,VOM,5.933173515981735,$/MWh,IAM,Extracted from IAM model output
+CHA,biomass-igcc-ccs,VOM,5.933173515981735,$/MWh,IAM,Extracted from IAM model output
+DEU,biomass-igcc-ccs,VOM,5.933173515981735,$/MWh,IAM,Extracted from IAM model output
+EWN,biomass-igcc-ccs,efficiency,0.35,p.u.,IAM,Extracted from IAM model output
+CHA,biomass-igcc-ccs,efficiency,0.35,p.u.,IAM,Extracted from IAM model output
+DEU,biomass-igcc-ccs,efficiency,0.35,p.u.,IAM,Extracted from IAM model output
+EWN,biomass-igcc-ccs,lifetime,40.0,yr,IAM,Extracted from IAM model output
+CHA,biomass-igcc-ccs,lifetime,40.0,yr,IAM,Extracted from IAM model output
+DEU,biomass-igcc-ccs,lifetime,40.0,yr,IAM,Extracted from IAM model output
+EWN,biomass-igcc-ccs,fuel,121.88882489183034,USD/MWh_th,IAM,Extracted from IAM model output
+CHA,biomass-igcc-ccs,fuel,78.14815817557752,USD/MWh_th,IAM,Extracted from IAM model output
+DEU,biomass-igcc-ccs,fuel,88.77044700123678,USD/MWh_th,IAM,Extracted from IAM model output

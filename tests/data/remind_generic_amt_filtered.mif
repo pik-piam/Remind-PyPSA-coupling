@@ -1,0 +1,463 @@
+Model;Scenario;Region;Variable;Unit;2090;2100
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Geothermal;GW;0.3730588;0.3730588
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Geothermal;GW;0.4476706;0.4476706
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Geothermal;GW;0.3730588;0.3730588
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Hydro;GW;463.6597192;463.6597192
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Hydro;GW;8.48017;8.48017
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Hydro;GW;21.94333;21.94333
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Hydrogen;GW;810.9795907;769.4236451
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Hydrogen;GW;58.5824954;57.9611233
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Hydrogen;GW;33.6898935;32.4752583
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Nuclear;GW;58;58
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Nuclear;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Nuclear;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Biomass|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Biomass|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Biomass|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Biomass|w/ CC;GW;6.11e-05;4.3e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Biomass|w/ CC;GW;3.98e-05;3.14e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Biomass|w/ CC;GW;3.98e-05;3.14e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Biomass|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Biomass|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Biomass|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Coal|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Coal|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Coal|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Coal|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Coal|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Coal|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Coal|IGCC|w/ CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Coal|IGCC|w/ CC;GW;8.48e-05;6.02e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Coal|IGCC|w/ CC;GW;8.32e-05;5.91e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Coal|IGCC|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Coal|IGCC|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Coal|IGCC|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Gas|CC|w/ CC;GW;7.8e-05;4.5e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Gas|CC|w/ CC;GW;7.8e-05;4.5e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Gas|CC|w/ CC;GW;5.97e-05;2.28e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Gas|CC|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Gas|CC|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Gas|CC|w/o CC;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Gas|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Gas|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Gas|CHP;GW;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Gas|GT;GW;0.000132;5.02e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Gas|GT;GW;0.0001122;4.27e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Gas|GT;GW;0.000132;5.02e-05
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Oil|w/o CC;GW;7.76e-05;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Oil|w/o CC;GW;7.76e-05;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Oil|w/o CC;GW;7.76e-05;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Solar|CSP;GW;0.6954367;0.6640203
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Solar|CSP;GW;0.0921609;0.0913188
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Solar|CSP;GW;0.0604704;0.0586104
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Solar|PV;GW;6058.7157701;5804.201774
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Solar|PV;GW;503.3936187;497.5950031
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Solar|PV;GW;255.2096101;254.1095859
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Storage|Battery;GW;2187.37858;2089.4681147
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Storage|Battery;GW;147.7912869;146.0970266
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Storage|Battery;GW;73.5212677;72.5758378
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Wind|Offshore;GW;322.2787308;300.6892011
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Wind|Offshore;GW;67.19802;66.5821886
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Wind|Offshore;GW;41.3577663;40.3249094
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Electricity|Wind|Onshore;GW;3052.7157385;2848.2135765
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Electricity|Wind|Onshore;GW;191.9943429;190.2348247
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Electricity|Wind|Onshore;GW;149.2970149;139.8523137
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Cap|Hydrogen|Electricity;GW;738.1097789;747.9131914
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Cap|Hydrogen|Electricity;GW;57.6520408;56.9304744
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Cap|Hydrogen|Electricity;GW;59.7287387;57.0500691
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;FE|Buildings|Heating|Electricity|Heat pump;EJ/yr;1.2433393;1.2799482
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;FE|Buildings|Heating|Electricity|Heat pump;EJ/yr;0.1740808;0.1764699
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;FE|Buildings|Heating|Electricity|Heat pump;EJ/yr;0.127454;0.1262631
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;FE|Buildings|Heating|Electricity|Resistance;EJ/yr;2.9074934;2.601121
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;FE|Buildings|Heating|Electricity|Resistance;EJ/yr;0.2064903;0.1893042
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;FE|Buildings|Heating|Electricity|Resistance;EJ/yr;0.0933635;0.077027
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;FE|Buildings|non-Heating|Electricity|Space Cooling;EJ/yr;2.4893861;2.2533129
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;FE|Buildings|non-Heating|Electricity|Space Cooling;EJ/yr;0.0276147;0.0281324
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;FE|Buildings|non-Heating|Electricity|Space Cooling;EJ/yr;0.0225294;0.0226068
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;FE|Transport|Freight|Electricity;EJ/yr;2.7205617;2.7598423
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;FE|Transport|Freight|Electricity;EJ/yr;0.4472404;0.4493682
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;FE|Transport|Freight|Electricity;EJ/yr;0.1160868;0.1168445
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;FE|Transport|Pass|Electricity;EJ/yr;4.5418199;4.3232529
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;FE|Transport|Pass|Electricity;EJ/yr;0.4433897;0.4396961
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;FE|Transport|Pass|Electricity;EJ/yr;0.3110599;0.3107147
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Interest Rate t/(t-1)|Real;unitless;0.0470561;0.0420675
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Interest Rate t/(t-1)|Real;unitless;0.0470561;0.0420675
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Interest Rate t/(t-1)|Real;unitless;0.0470561;0.0420675
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Price|Carbon;US$2017/t CO2;583.6742926;583.6742926
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Price|Carbon;US$2017/t CO2;583.6742926;583.6742926
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Price|Carbon;US$2017/t CO2;583.6742926;583.6742926
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Price|Primary Energy|Biomass|Modern;US$2017/GJ;24.2456774;22.3039528
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Price|Primary Energy|Biomass|Modern;US$2017/GJ;26.3858649;21.0893282
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Price|Primary Energy|Biomass|Modern;US$2017/GJ;35.7682024;32.1109862
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Price|Primary Energy|Coal;US$2017/GJ;3.615782;3.6251797
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Price|Primary Energy|Coal;US$2017/GJ;2.4724168;2.2749564
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Price|Primary Energy|Coal;US$2017/GJ;2.2197279;2.2271866
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Price|Primary Energy|Gas;US$2017/GJ;11.6429154;11.7823793
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Price|Primary Energy|Gas;US$2017/GJ;8.7499943;8.8835695
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Price|Primary Energy|Gas;US$2017/GJ;7.6379955;7.4688742
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Price|Primary Energy|Nuclear;US$2017/kg_Ur;61.9694486;66.7540818
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Price|Primary Energy|Nuclear;US$2017/kg_Ur;60.1420292;64.7882717
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Price|Primary Energy|Nuclear;US$2017/kg_Ur;59.8070078;64.7895319
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Price|Primary Energy|Oil;US$2017/GJ;21.8467837;21.9099756
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Price|Primary Energy|Oil;US$2017/GJ;21.2471377;21.2930462
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Price|Primary Energy|Oil;US$2017/GJ;21.2581434;21.3001911
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;SE|Electricity;EJ/yr;67.3040017;64.2817037
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;SE|Electricity;EJ/yr;4.3165233;4.2798624
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;SE|Electricity;EJ/yr;3.0669122;2.971554
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;SE|Electricity|Hydro;EJ/yr;6.1519858;6.1519858
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;SE|Electricity|Hydro;EJ/yr;0.0900006;0.0900006
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;SE|Electricity|Hydro;EJ/yr;0.2310016;0.2310016
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;SE|Electricity|Transmission Losses;EJ/yr;2.6994582;2.5509301
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;SE|Electricity|Transmission Losses;EJ/yr;0.1627623;0.1621432
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;SE|Electricity|Transmission Losses;EJ/yr;0.1017743;0.0995094
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;SE|Hydrogen|Electricity;EJ/yr;8.8452714;8.9627524
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;SE|Hydrogen|Electricity;EJ/yr;0.6908836;0.6822366
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;SE|Hydrogen|Electricity;EJ/yr;0.7157701;0.6836698
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;SE|Input|Hydrogen|Electricity;EJ/yr;3.4526321;3.2757134
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;SE|Input|Hydrogen|Electricity;EJ/yr;0.2494068;0.2467614
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;SE|Input|Hydrogen|Electricity;EJ/yr;0.14343;0.1382589
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;3483.3395803;3483.3395803
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;3483.3395803;3483.3395803
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;3483.3395803;3483.3395803
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Efficiency;%;23.3872599;23.3872599
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Efficiency;%;21.3030511;21.3030511
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Efficiency;%;26.7959102;26.7959102
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;139.3335832;139.3335832
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;139.3335832;139.3335832
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;139.3335832;139.3335832
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;0.9772755;0.9772755
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;0.9772755;0.9772755
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;0.9772755;0.9772755
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;-256.1574885;-256.1574885
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;-256.1574885;-256.1574885
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;-256.1574885;-256.1574885
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Capital Costs;US$2017/kW;3804.2414555;3804.2414555
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Capital Costs;US$2017/kW;3626.119765;3626.119765
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Capital Costs;US$2017/kW;3626.119765;3626.119765
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Efficiency;%;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Efficiency;%;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Efficiency;%;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;152.1696582;152.1696582
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;145.0447906;145.0447906
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;145.0447906;145.0447906
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;1.6390706;1.6390706
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;1.6390706;1.6390706
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;1.6390706;1.6390706
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Capital Costs;US$2017/kW;2844.7273239;2844.7273239
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Capital Costs;US$2017/kW;2844.7273239;2844.7273239
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Capital Costs;US$2017/kW;2844.7273239;2844.7273239
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Efficiency;%;46;46
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Efficiency;%;46;46
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Efficiency;%;46;46
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;113.789093;113.789093
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;113.789093;113.789093
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;113.789093;113.789093
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;1.0223906;1.0223906
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;1.0223906;1.0223906
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Biomass|Gasification Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;1.0223906;1.0223906
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Combined Heat and Power w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Combined Heat and Power w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Combined Heat and Power w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;2922.203488;2922.203488
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;2813.1838955;2813.1838955
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;2813.1838955;2813.1838955
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Efficiency;%;27.9421093;27.9421093
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Efficiency;%;21.5939746;21.5939746
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Efficiency;%;34.5596223;34.5596223
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Combined Heat and Power w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;87.6661046;87.6661046
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;84.3955169;84.3955169
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;84.3955169;84.3955169
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;2.3368927;2.3368927
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;2.3368927;2.3368927
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;2.3368927;2.3368927
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;43.5330042;43.5330042
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;43.5330042;43.5330042
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;43.5330042;43.5330042
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Capital Costs;US$2017/kW;3474.0629099;3474.0629099
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Capital Costs;US$2017/kW;3474.0629099;3474.0629099
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Capital Costs;US$2017/kW;3474.0629099;3474.0629099
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Efficiency;%;43;43
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Efficiency;%;43;43
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Efficiency;%;43;43
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;104.2218873;104.2218873
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;104.2218873;104.2218873
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;104.2218873;104.2218873
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;1.9798674;1.9798674
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;1.9798674;1.9798674
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;1.9798674;1.9798674
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Capital Costs;US$2017/kW;2670.5603449;2670.5603449
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Capital Costs;US$2017/kW;2670.5603449;2670.5603449
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Capital Costs;US$2017/kW;2670.5603449;2670.5603449
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Efficiency;%;50;50
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Efficiency;%;50;50
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Efficiency;%;50;50
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;80.1168103;80.1168103
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;80.1168103;80.1168103
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;80.1168103;80.1168103
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;1.23336;1.23336
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;1.23336;1.23336
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Gasification Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;1.23336;1.23336
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Pulverised Coal w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Pulverised Coal w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Pulverised Coal w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;344.5180532;344.5180532
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Pulverised Coal w/o CC|Capital Costs;US$2017/kW;2322.2263868;2322.2263868
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Pulverised Coal w/o CC|Capital Costs;US$2017/kW;2322.2263868;2322.2263868
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Pulverised Coal w/o CC|Capital Costs;US$2017/kW;2322.2263868;2322.2263868
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Pulverised Coal w/o CC|Efficiency;%;46;46
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Pulverised Coal w/o CC|Efficiency;%;46;46
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Pulverised Coal w/o CC|Efficiency;%;46;46
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Pulverised Coal w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Pulverised Coal w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Pulverised Coal w/o CC|Lifetime;years;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Pulverised Coal w/o CC|OM Cost|fixed;US$2017/kW/yr;69.6667916;69.6667916
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Pulverised Coal w/o CC|OM Cost|fixed;US$2017/kW/yr;69.6667916;69.6667916
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Pulverised Coal w/o CC|OM Cost|fixed;US$2017/kW/yr;69.6667916;69.6667916
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Coal|Pulverised Coal w/o CC|OM Cost|variable;US$2017/GJ;0.9737053;0.9737053
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Coal|Pulverised Coal w/o CC|OM Cost|variable;US$2017/GJ;0.9737053;0.9737053
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Coal|Pulverised Coal w/o CC|OM Cost|variable;US$2017/GJ;0.9737053;0.9737053
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;25.2101917;25.2101917
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;25.2101917;25.2101917
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/ CC|CO2 emission factor thermal input;gCO2/kWh_th;25.2101917;25.2101917
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/ CC|Capital Costs;US$2017/kW;1519.9438671;1519.9438671
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/ CC|Capital Costs;US$2017/kW;1519.9438671;1519.9438671
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/ CC|Capital Costs;US$2017/kW;1519.9438671;1519.9438671
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/ CC|Efficiency;%;56;56
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/ CC|Efficiency;%;56;56
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/ CC|Efficiency;%;56;56
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/ CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/ CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/ CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;45.598316;45.598316
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;45.598316;45.598316
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/ CC|OM Cost|fixed;US$2017/kW/yr;45.598316;45.598316
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;0.9737053;0.9737053
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;0.9737053;0.9737053
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/ CC|OM Cost|variable;US$2017/GJ;0.9737053;0.9737053
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/o CC|Capital Costs;US$2017/kW;1069.5901287;1069.5901287
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/o CC|Capital Costs;US$2017/kW;1069.5901287;1069.5901287
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/o CC|Capital Costs;US$2017/kW;1069.5901287;1069.5901287
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/o CC|Efficiency;%;63;63
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/o CC|Efficiency;%;63;63
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/o CC|Efficiency;%;63;63
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/o CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/o CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/o CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;32.0877039;32.0877039
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;32.0877039;32.0877039
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/o CC|OM Cost|fixed;US$2017/kW/yr;32.0877039;32.0877039
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;0.4868526;0.4868526
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;0.4868526;0.4868526
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Cycle w/o CC|OM Cost|variable;US$2017/GJ;0.4868526;0.4868526
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Heat and Power w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Heat and Power w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Heat and Power w/o CC|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;1351.0612152;1351.0612152
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;1351.0612152;1351.0612152
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Capital Costs;US$2017/kW;1351.0612152;1351.0612152
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Efficiency;%;21.6729906;21.6729906
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Efficiency;%;26.7273268;26.7273268
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Efficiency;%;42.1217097;42.1217097
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Heat and Power w/o CC|Lifetime;years;35;35
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;40.5318365;40.5318365
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;40.5318365;40.5318365
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Heat and Power w/o CC|OM Cost|fixed;US$2017/kW/yr;40.5318365;40.5318365
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;1.3631874;1.3631874
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;1.3631874;1.3631874
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Combined Heat and Power w/o CC|OM Cost|variable;US$2017/GJ;1.3631874;1.3631874
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Gas Turbine|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Gas Turbine|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Gas Turbine|CO2 emission factor thermal input;gCO2/kWh_th;201.9588587;201.9588587
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Gas Turbine|Capital Costs;US$2017/kW;546.090624;546.090624
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Gas Turbine|Capital Costs;US$2017/kW;546.090624;546.090624
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Gas Turbine|Capital Costs;US$2017/kW;546.090624;546.090624
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Gas Turbine|Efficiency;%;41;41
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Gas Turbine|Efficiency;%;41;41
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Gas Turbine|Efficiency;%;41;41
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Gas Turbine|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Gas Turbine|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Gas Turbine|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Gas Turbine|OM Cost|fixed;US$2017/kW/yr;16.3827187;16.3827187
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Gas Turbine|OM Cost|fixed;US$2017/kW/yr;16.3827187;16.3827187
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Gas Turbine|OM Cost|fixed;US$2017/kW/yr;16.3827187;16.3827187
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Gas|Gas Turbine|OM Cost|variable;US$2017/GJ;0.7789642;0.7789642
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Gas|Gas Turbine|OM Cost|variable;US$2017/GJ;0.7789642;0.7789642
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Gas|Gas Turbine|OM Cost|variable;US$2017/GJ;0.7789642;0.7789642
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Geothermal|Capital Costs;US$2017/kW;4180.0074963;4180.0074963
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Geothermal|Capital Costs;US$2017/kW;4180.0074963;4180.0074963
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Geothermal|Capital Costs;US$2017/kW;4180.0074963;4180.0074963
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Geothermal|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Geothermal|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Geothermal|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Geothermal|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Geothermal|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Geothermal|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Geothermal|OM Cost|fixed;US$2017/kW/yr;167.2002999;167.2002999
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Geothermal|OM Cost|fixed;US$2017/kW/yr;167.2002999;167.2002999
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Geothermal|OM Cost|fixed;US$2017/kW/yr;167.2002999;167.2002999
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Geothermal|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Geothermal|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Geothermal|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydrogen|Capital Costs;US$2017/kW;558.9697598;558.9697598
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydrogen|Capital Costs;US$2017/kW;548.6449872;548.6449872
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydrogen|Capital Costs;US$2017/kW;548.6449872;548.6449872
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydrogen|Efficiency;%;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydrogen|Efficiency;%;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydrogen|Efficiency;%;40;40
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydrogen|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydrogen|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydrogen|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydrogen|OM Cost|fixed;US$2017/kW/yr;16.7690928;16.7690928
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydrogen|OM Cost|fixed;US$2017/kW/yr;16.4593496;16.4593496
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydrogen|OM Cost|fixed;US$2017/kW/yr;16.4593496;16.4593496
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydrogen|OM Cost|variable;US$2017/GJ;0.7789642;0.7789642
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydrogen|OM Cost|variable;US$2017/GJ;0.7789642;0.7789642
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydrogen|OM Cost|variable;US$2017/GJ;0.7789642;0.7789642
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydro|Capital Costs;US$2017/kW;3234.4723644;3234.4723644
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydro|Capital Costs;US$2017/kW;3234.4723644;3234.4723644
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydro|Capital Costs;US$2017/kW;3234.4723644;3234.4723644
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydro|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydro|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydro|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydro|Lifetime;years;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydro|Lifetime;years;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydro|Lifetime;years;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydro|OM Cost|fixed;US$2017/kW/yr;80.8618091;80.8618091
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydro|OM Cost|fixed;US$2017/kW/yr;80.8618091;80.8618091
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydro|OM Cost|fixed;US$2017/kW/yr;80.8618091;80.8618091
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Hydro|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Hydro|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Hydro|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Nuclear|Capital Costs;US$2017/kW;6670.0815888;6670.0815888
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Nuclear|Capital Costs;US$2017/kW;6670.0815888;6670.0815888
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Nuclear|Capital Costs;US$2017/kW;6670.0815888;6670.0815888
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Nuclear|Efficiency|Conversion factor;GJ_el/kg_Ur;139.07376;139.07376
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Nuclear|Efficiency|Conversion factor;GJ_el/kg_Ur;139.07376;139.07376
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Nuclear|Efficiency|Conversion factor;GJ_el/kg_Ur;139.07376;139.07376
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Nuclear|Lifetime;years;50;50
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Nuclear|Lifetime;years;50;50
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Nuclear|Lifetime;years;50;50
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Nuclear|OM Cost|fixed;US$2017/kW/yr;200.1024477;200.1024477
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Nuclear|OM Cost|fixed;US$2017/kW/yr;200.1024477;200.1024477
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Nuclear|OM Cost|fixed;US$2017/kW/yr;200.1024477;200.1024477
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Nuclear|OM Cost|variable;US$2017/GJ;1.1684463;1.1684463
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Nuclear|OM Cost|variable;US$2017/GJ;1.1684463;1.1684463
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Nuclear|OM Cost|variable;US$2017/GJ;1.1684463;1.1684463
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Oil|DOT|CO2 emission factor thermal input;gCO2/kWh_th;263.9985082;263.9985082
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Oil|DOT|CO2 emission factor thermal input;gCO2/kWh_th;263.9985082;263.9985082
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Oil|DOT|CO2 emission factor thermal input;gCO2/kWh_th;263.9985082;263.9985082
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Oil|DOT|Capital Costs;US$2017/kW;526.0891857;526.0891857
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Oil|DOT|Capital Costs;US$2017/kW;516.3717527;516.3717527
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Oil|DOT|Capital Costs;US$2017/kW;516.3717527;516.3717527
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Oil|DOT|Efficiency;%;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Oil|DOT|Efficiency;%;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Oil|DOT|Efficiency;%;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Oil|DOT|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Oil|DOT|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Oil|DOT|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Oil|DOT|OM Cost|fixed;US$2017/kW/yr;15.7826756;15.7826756
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Oil|DOT|OM Cost|fixed;US$2017/kW/yr;15.4911526;15.4911526
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Oil|DOT|OM Cost|fixed;US$2017/kW/yr;15.4911526;15.4911526
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Oil|DOT|OM Cost|variable;US$2017/GJ;0.3894821;0.3894821
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Oil|DOT|OM Cost|variable;US$2017/GJ;0.3894821;0.3894821
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Oil|DOT|OM Cost|variable;US$2017/GJ;0.3894821;0.3894821
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|CSP|Capital Costs;US$2017/kW;2756.1849001;2645.1986038
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|CSP|Capital Costs;US$2017/kW;3407.9745482;3296.438537
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|CSP|Capital Costs;US$2017/kW;3395.3370157;3284.6780958
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|CSP|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|CSP|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|CSP|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|CSP|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|CSP|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|CSP|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|CSP|OM Cost|fixed;US$2017/kW/yr;68.9046225;66.1299651
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|CSP|OM Cost|fixed;US$2017/kW/yr;85.1993637;82.4109634
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|CSP|OM Cost|fixed;US$2017/kW/yr;84.8834254;82.1169524
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|CSP|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|CSP|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|CSP|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|PV|Capital Costs;US$2017/kW;100.1478859;94.1615165
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|PV|Capital Costs;US$2017/kW;151.8742204;144.5980793
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|PV|Capital Costs;US$2017/kW;151.543035;144.3152683
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|PV|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|PV|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|PV|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|PV|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|PV|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|PV|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|PV|OM Cost|fixed;US$2017/kW/yr;2.0029577;1.8832303
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|PV|OM Cost|fixed;US$2017/kW/yr;3.0374844;2.8919616
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|PV|OM Cost|fixed;US$2017/kW/yr;3.0308607;2.8863054
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Solar|PV|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Solar|PV|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Solar|PV|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Offshore|Capital Costs;US$2017/kW;1507.0233994;1455.6609753
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Offshore|Capital Costs;US$2017/kW;1815.4491232;1777.4509401
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Offshore|Capital Costs;US$2017/kW;1817.6172264;1779.6817226
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Offshore|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Offshore|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Offshore|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Offshore|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Offshore|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Offshore|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Offshore|OM Cost|fixed;US$2017/kW/yr;45.210702;43.6698293
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Offshore|OM Cost|fixed;US$2017/kW/yr;54.4634737;53.3235282
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Offshore|OM Cost|fixed;US$2017/kW/yr;54.5285168;53.3904517
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Offshore|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Offshore|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Offshore|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Onshore|Capital Costs;US$2017/kW;523.8623635;511.8187846
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Onshore|Capital Costs;US$2017/kW;938.9213112;924.267772
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Onshore|Capital Costs;US$2017/kW;937.8402678;923.3955272
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Onshore|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Onshore|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Onshore|Efficiency;%;100;100
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Onshore|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Onshore|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Onshore|Lifetime;years;25;25
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Onshore|OM Cost|fixed;US$2017/kW/yr;10.4772473;10.2363757
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Onshore|OM Cost|fixed;US$2017/kW/yr;18.7784262;18.4853554
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Onshore|OM Cost|fixed;US$2017/kW/yr;18.7568054;18.4679105
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Electricity|Wind|Onshore|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Electricity|Wind|Onshore|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Electricity|Wind|Onshore|OM Cost|variable;US$2017/GJ;0;0
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Hydrogen|Electricity|Capital Costs;US$2017/kW;458.4450421;435.0808517
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Hydrogen|Electricity|Capital Costs;US$2017/kW;524.3352267;502.975377
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Hydrogen|Electricity|Capital Costs;US$2017/kW;524.7533689;503.4026186
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Hydrogen|Electricity|Efficiency;%;75;75
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Hydrogen|Electricity|Efficiency;%;75;75
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Hydrogen|Electricity|Efficiency;%;75;75
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Hydrogen|Electricity|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Hydrogen|Electricity|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Hydrogen|Electricity|Lifetime;years;30;30
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Hydrogen|Electricity|OM Cost|fixed;US$2017/kW/yr;22.9222521;21.7540426
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Hydrogen|Electricity|OM Cost|fixed;US$2017/kW/yr;26.2167613;25.1487688
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Hydrogen|Electricity|OM Cost|fixed;US$2017/kW/yr;26.2376684;25.1701309
+REMIND;SSP2-EU21-PkBudg1000-AMT;CHA;Tech|Hydrogen|Electricity|OM Cost|variable;US$2017/GJ;0.0973705;0.0973705
+REMIND;SSP2-EU21-PkBudg1000-AMT;DEU;Tech|Hydrogen|Electricity|OM Cost|variable;US$2017/GJ;0.0973705;0.0973705
+REMIND;SSP2-EU21-PkBudg1000-AMT;EWN;Tech|Hydrogen|Electricity|OM Cost|variable;US$2017/GJ;0.0973705;0.0973705

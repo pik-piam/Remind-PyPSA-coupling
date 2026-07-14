@@ -1,0 +1,33 @@
+year,region,carrier,value,unit
+2090,EWN,battery inverter,73521.27,MW
+2090,EWN,biomass-igcc-ccs,0.04,MW
+2090,EWN,electrolysis,66365.27,MW
+2090,EWN,gas-ocgt,0.13,MW
+2090,EWN,solar,255209.61,MW
+2090,CHA,battery inverter,2187378.58,MW
+2090,CHA,biomass-igcc-ccs,0.06,MW
+2090,CHA,electrolysis,820121.98,MW
+2090,CHA,gas-ocgt,0.13,MW
+2090,CHA,nuclear,58000.0,MW
+2090,CHA,solar,6058715.77,MW
+2090,DEU,battery inverter,147791.29,MW
+2090,DEU,biomass-igcc-ccs,0.04,MW
+2090,DEU,electrolysis,64057.82,MW
+2090,DEU,gas-ocgt,0.11,MW
+2090,DEU,solar,503393.62,MW
+2100,EWN,battery inverter,72575.84,MW
+2100,EWN,biomass-igcc-ccs,0.03,MW
+2100,EWN,electrolysis,63388.97,MW
+2100,EWN,gas-ocgt,0.05,MW
+2100,EWN,solar,254109.59,MW
+2100,CHA,battery inverter,2089468.11,MW
+2100,CHA,biomass-igcc-ccs,0.04,MW
+2100,CHA,electrolysis,831014.66,MW
+2100,CHA,gas-ocgt,0.05,MW
+2100,CHA,nuclear,58000.0,MW
+2100,CHA,solar,5804201.77,MW
+2100,DEU,battery inverter,146097.03,MW
+2100,DEU,biomass-igcc-ccs,0.03,MW
+2100,DEU,electrolysis,63256.08,MW
+2100,DEU,gas-ocgt,0.04,MW
+2100,DEU,solar,497595.0,MW

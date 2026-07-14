@@ -5,8 +5,6 @@ REST API (no auth/pyam needed); ``read_ssp_data`` reads a saved snapshot. Ported
 PyPSA-Eur ``retrieve_ssp_data.py``. Output columns: ``[iso2, year, value]``.
 """
 
-from __future__ import annotations
-
 import logging
 import os
 from collections.abc import Sequence

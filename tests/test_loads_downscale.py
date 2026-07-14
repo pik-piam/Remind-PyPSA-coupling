@@ -1,8 +1,6 @@
-"""Tests for load conversion and region→country downscaling (synthetic + real EUR data)."""
+"""Tests for load conversion and region→country downscaling (synthetic + real AMT data)."""
 
-from __future__ import annotations
-
-import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -14,10 +12,19 @@ from iampypsa.downscale import (
 )
 from iampypsa.transforms.loads import TWA_TO_MWH, convert_loads
 
-DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1"
-EUR_GDX = f"{DEV}/REMIND2PyPSAEUR.gdx"
-SECT_LOAD = f"{DEV}/sectoral_load.csv"
-SECT_LOAD_COUNTRY = f"{DEV}/sectoral_load_country.csv"
+DATA = Path(__file__).parent / "data"
+GDX = DATA / "remind2pypsa_amt_filtered.gdx"
+SECT_LOAD = DATA / "reference" / "sectoral_load.csv"
+SECT_LOAD_COUNTRY = DATA / "reference" / "sectoral_load_country.csv"
+REGION_MAP = DATA / "region_mapping_filtered.csv"
+SECTOR_WEIGHTS = {
+    "AC": {"gdp": 0.6, "population": 0.4},
+    "electrolysis": {"gdp": 0.7, "population": 0.3},
+    "EV_pass": {"gdp": 0.3, "population": 0.7},
+    "EV_freight": {"gdp": 0.5, "population": 0.5},
+    "heatpump": {"gdp": 0.3, "population": 0.7},
+}
+COUNTRIES = {"DE", "AT", "BE", "LU", "NL", "CN", "HK", "MO", "TW"}
 
 
 def test_convert_loads_unit_and_grouping():
@@ -46,49 +53,30 @@ def test_proportional_downscaler_splits_by_share():
     assert out["FR"] == pytest.approx(30.0)
 
 
-@pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")
 def test_convert_loads_matches_reference_regional():
     from iampypsa.io import read_gdx_symbol as read_gdx
 
-    raw = read_gdx(EUR_GDX, "p32_load_sector",
+    raw = read_gdx(str(GDX), "p32_load_sector",
                    rename_columns={"ttot": "year", "all_regi": "region", "loadPy32": "sector"})
     raw["year"] = raw["year"].astype(int)
     got = convert_loads(raw, regions=["DEU"]).query(
-        "region == 'DEU' and year == 2030 and sector == 'AC'"
+        "region == 'DEU' and year == 2090 and sector == 'AC'"
     )["value"].iloc[0]
-    ref = pd.read_csv(SECT_LOAD).query("region=='DEU' and year==2030 and sector=='AC'")["value"].iloc[0]
+    ref = pd.read_csv(SECT_LOAD).query("region=='DEU' and year==2090 and sector=='AC'")["value"].iloc[0]
     assert got == pytest.approx(ref, rel=1e-9)
 
 
-SSP_DIR = "/workspace/remind_pypsa_coupling/development_data/ssp"
-REGION_MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/regionmapping_21_EU11.csv"
-CONFIG = (
-    "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1/"
-    "config.remind_europe_without_NES_fixed.yaml"
-)
-
-
-@pytest.mark.skipif(
-    not (os.path.exists(f"{SSP_DIR}/population.csv") and os.path.exists(REGION_MAP)
-         and os.path.exists(SECT_LOAD_COUNTRY) and os.path.exists(CONFIG)),
-    reason="SSP/region-map/reference data not present",
-)
 def test_full_ssp_downscaling_matches_reference():
-    import yaml
-
     from iampypsa.couplers.remind import read_region_map
 
-    cfg = yaml.safe_load(open(CONFIG))
-    sector_weights = cfg["remind_coupling"]["demand_downscaling"]["sector_weights"]
-    configured = set(cfg["countries"])
-    region_to_countries = read_region_map(source="model_region", target="country")
-    pop = pd.read_csv(f"{SSP_DIR}/population.csv").set_index(["iso2", "year"])
-    gdp = pd.read_csv(f"{SSP_DIR}/gdp.csv").set_index(["iso2", "year"])
+    region_to_countries = read_region_map(source="model_region", target="country", file_path=str(REGION_MAP))
+    pop = pd.read_csv(DATA / "ssp_population_filtered.csv").set_index(["iso2", "year"])
+    gdp = pd.read_csv(DATA / "ssp_gdp_filtered.csv").set_index(["iso2", "year"])
 
     ref = pd.read_csv(SECT_LOAD_COUNTRY)
     load_in = pd.read_csv(SECT_LOAD).query("year in @ref.year.unique()")
     got = disaggregate_demand_to_country(
-        load_in, region_to_countries, {"population": pop, "gdp": gdp}, sector_weights, configured
+        load_in, region_to_countries, {"population": pop, "gdp": gdp}, SECTOR_WEIGHTS, COUNTRIES
     )
     g = got.set_index(["year", "region", "sector"])["value"].sort_index()
     r = ref.set_index(["year", "region", "sector"])["value"].sort_index()
@@ -96,10 +84,9 @@ def test_full_ssp_downscaling_matches_reference():
     pd.testing.assert_series_equal(g, r, check_names=False, rtol=1e-9)
 
 
-@pytest.mark.skipif(not os.path.exists(SECT_LOAD_COUNTRY), reason="reference not present")
 def test_disaggregate_single_country_is_noop_vs_reference():
     # DEU -> DE is single-member: disaggregation must copy values unchanged.
-    sectoral_load = pd.read_csv(SECT_LOAD).query("region == 'DEU' and year == 2030")
+    sectoral_load = pd.read_csv(SECT_LOAD).query("region == 'DEU' and year == 2090")
     out = disaggregate_demand_to_country(
         sectoral_load,
         region_to_countries={"DEU": ["DE"]},
@@ -110,7 +97,7 @@ def test_disaggregate_single_country_is_noop_vs_reference():
 
     ref = (
         pd.read_csv(SECT_LOAD_COUNTRY)
-        .query("region == 'DE' and year == 2030")
+        .query("region == 'DE' and year == 2090")
         .set_index("sector")["value"]
         .sort_index()
     )

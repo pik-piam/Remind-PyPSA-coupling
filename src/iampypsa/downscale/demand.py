@@ -5,8 +5,6 @@ shares. Demand attributed to unconfigured countries is dropped (with a warning a
 regional demand).
 """
 
-from __future__ import annotations
-
 import logging
 
 import pandas as pd
@@ -71,5 +69,6 @@ def disaggregate_demand_to_country(
         result.groupby(["year", "region", "sector", "unit"], as_index=False)["value"]
         .sum()
         .sort_values(["year", "region", "sector"])
+        [["year", "region", "sector", "value", "unit"]]
         .reset_index(drop=True)
     )

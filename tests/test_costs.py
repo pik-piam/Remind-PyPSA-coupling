@@ -1,8 +1,6 @@
 """Tests for shared cost-override mechanics (synthetic + real EUR GDX/reference)."""
 
-from __future__ import annotations
-
-import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -16,10 +14,9 @@ from iampypsa.transforms.costs import (
     apply_overrides,
 )
 
-DEV = "/workspace/remind_pypsa_coupling/development_data"
-EUR_GDX = f"{DEV}/PkBudg1000_Europe_without_NES_fixed/i1/REMIND2PyPSAEUR.gdx"
-REF_RAW = f"{DEV}/PkBudg1000_Europe_without_NES_fixed/i1/y2050/costs_raw_overwritten.csv"
-MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/technology_cost_mapping.csv"
+DATA = Path(__file__).parent / "data"
+GDX = DATA / "remind2pypsa_amt_filtered.gdx"
+REF_RAW = DATA / "reference" / "costs_raw_overwritten.csv"
 
 
 def test_build_overrides_maps_and_dedups():
@@ -35,7 +32,7 @@ def test_build_overrides_maps_and_dedups():
             "unit": ["USD/MW", "p.u."],
         }
     )
-    out = build_iam_techdata(technologies, remind_long, out_source="TEST")
+    out = build_iam_techdata(technologies, remind_long, source="TEST")
     assert set(out["technology"]) == {"electrolysis"}
     assert len(out) == 2
 
@@ -48,7 +45,7 @@ def test_build_overrides_raises_on_missing_iam_data():
          "value": [1.0], "unit": ["USD/MW"]}
     )
     with pytest.raises(ValueError, match="no matching data"):
-        build_iam_techdata(technologies, remind_long, out_source="TEST")
+        build_iam_techdata(technologies, remind_long, source="TEST")
 
 
 def test_build_baseline_overrides_drops_parameters_missing_from_baseline():
@@ -171,20 +168,18 @@ def test_convert_investment_basis_synthetic():
     assert inv == pytest.approx(500.0)  # 1000 * 0.5**1
 
 
-@pytest.mark.skipif(not (os.path.exists(EUR_GDX) and os.path.exists(REF_RAW)),
-                    reason="EUR development data not present")
 def test_investment_basis_matches_reference_for_electrolysis():
-    from iampypsa.io import read_gdx_symbol as read_gdx
+    from iampypsa.couplers.remind import RemindGdxCoupler
+    from iampypsa.io import RemindLoader
+    from iampypsa.io.remind_symbols import load_symbol_specs
 
-    capcost = read_gdx(
-        EUR_GDX, "p32_capCost",
-        rename_columns={"ttot": "year", "all_regi": "region", "all_te": "technology"},
-    ).query("region=='DEU' and year=='2050' and technology=='elh2'")["value"].iloc[0]
+    loader = RemindLoader(str(GDX))
+    symbols = load_symbol_specs(backend=loader.backend)
+    coupler = RemindGdxCoupler(loader, symbols, region_map={}, config={}, model_regions=["DEU"])
+    remind_long = coupler.extract_cost_parameters(2090)
+    electrolysis = remind_long.query("region=='DEU' and technology=='electrolysis'")
 
-    costs = pd.DataFrame(
-        {"technology": ["electrolysis", "electrolysis"], "parameter": ["investment", "efficiency"],
-         "value": [capcost * 1e6, 0.73], "unit": ["USD/MW", "p.u."]}
-    )
+    costs = electrolysis.query("parameter in ('investment', 'efficiency')")[["technology", "parameter", "value", "unit"]]
     got = convert_investment_to_input_capacity_basis(costs)
     got_inv = got.query("parameter=='investment'")["value"].iloc[0]
 

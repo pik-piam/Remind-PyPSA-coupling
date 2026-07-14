@@ -1,0 +1,49 @@
+# Example technology-mapping YAML — companion to technology-mapping.md.
+#
+# Every top-level key is a PyPSA-model carrier name, mapped to a dict with:
+#   source      (required) "IAM" or "PyPSA" — where this technology's parameters come from.
+#   iam_name    (optional) the IAM's own technology name; needed only when it differs from this
+#               entry's own key.
+#   overrides   (optional) {parameter: source} per-parameter exceptions to source:, where source
+#               is "IAM", "PyPSA", or a fixed {value: <number>, unit: <str>, comment: <str>}.
+# The 7 standard parameters every entry resolves to: investment, FOM, VOM, efficiency, lifetime,
+# fuel, CO2 intensity.
+
+# Plain IAM entry: all 7 parameters come from the IAM output, under this same carrier name.
+gas-ocgt: {source: IAM}
+nuclear: {source: IAM}
+
+# IAM entry for a link-like tech: investment is reported on an output-capacity basis and needs
+# converting to input-capacity (see transforms.costs.convert_investment_to_input_capacity_basis).
+electrolysis: {source: IAM}
+
+# iam_name remap: PyPSA's own carrier name ("solar") differs from what the IAM calls it
+# ("solar-pv") — every parameter still comes from the IAM, just looked up under iam_name.
+solar: {source: IAM, iam_name: solar-pv}
+
+# Plain PyPSA entry: all 7 parameters come from the PyPSA model's own baseline cost table
+# instead (e.g. a storage technology the IAM doesn't represent at all).
+PHS: {source: PyPSA}
+
+# PyPSA entry + iam_name: baseline-sourced, but iam_name still matters if this carrier also
+# participates in capacity-target mapping (build_capacity_targets), which uses the same key.
+battery inverter: {source: PyPSA, iam_name: battery-inverter}
+
+# Partial override: sourced from the IAM overall, but one parameter is fixed to a constant
+# instead — e.g. because the IAM's raw value would make the model unbounded.
+biomass-igcc-ccs:
+  source: IAM
+  overrides:
+    CO2 intensity: {value: 0, unit: "tCO2/MWh_th", comment: "Carbon-negative in the IAM, but that makes the LP unbounded"}
+
+# Full fixed-value entry: every relevant parameter is a constant set directly in this file,
+# bypassing both the IAM and the PyPSA baseline (e.g. a cost component the IAM double-counts).
+offwind-ac-connection-submarine:
+  source: PyPSA
+  overrides:
+    investment: {value: 0, unit: "USD/MW/km", comment: "Connection costs already included in the IAM's offshore-wind investment"}
+    FOM: {value: 0, unit: "%/year", comment: "Connection costs already included in the IAM's offshore-wind investment"}
+
+# Grid infrastructure the IAM doesn't represent at all: falls back entirely to the PyPSA model's
+# own baseline, with no IAM-side counterpart.
+HVAC overhead: {source: PyPSA}

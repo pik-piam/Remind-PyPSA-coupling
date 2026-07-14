@@ -1,0 +1,6 @@
+year,country,type,tlim_setpoint,rcp,ssp,value
+2060,DEU,CDD,22,4_5,SSP2,45.2
+2060,AUT,CDD,22,4_5,SSP2,12.1
+2060,BEL,CDD,22,4_5,SSP2,30.4
+2060,LUX,CDD,22,4_5,SSP2,28.9
+2060,NLD,CDD,22,4_5,SSP2,33.7

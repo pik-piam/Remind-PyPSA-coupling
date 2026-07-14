@@ -14,8 +14,6 @@ a new IAM or output format is added as a further ``Coupler`` subclass, not a bra
 config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``planning_horizons``.
 """
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Sequence
 from typing import Any

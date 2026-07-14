@@ -12,8 +12,6 @@ receives a ``mapping`` dict (variable → token label) and an optional ``derived
 linear combinations (e.g. ``pc = Coal|w/o CC − IGCC − CHP``).
 """
 
-from __future__ import annotations
-
 import logging
 import re
 from collections.abc import Sequence

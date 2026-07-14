@@ -7,8 +7,6 @@ used as a downscaling proxy — the same shape as :func:`iampypsa.io.ssp.read_ss
 ``.set_index(["iso2", "year"])`` and pass it in the ``proxies`` registry.
 """
 
-from __future__ import annotations
-
 import logging
 from os import PathLike
 

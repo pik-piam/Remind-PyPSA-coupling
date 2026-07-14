@@ -1,7 +1,5 @@
 """Tests for the central unit-conversion table and resolver."""
 
-from __future__ import annotations
-
 import pytest
 
 from iampypsa.units import (

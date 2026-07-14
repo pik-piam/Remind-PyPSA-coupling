@@ -4,8 +4,6 @@ No PyPSA-China reference outputs exist in the dev set, so this only checks that 
 resolves the CHA symbols and produces CO2 prices + config overrides from the real GDX.
 """
 
-from __future__ import annotations
-
 import importlib.util
 import os
 
