@@ -1,15 +1,13 @@
 """Tests for the iampypsa.io loader (GDX + .mif backends, candidate resolution)."""
 
-from __future__ import annotations
-
-import os
+from pathlib import Path
 
 import pytest
 
 from iampypsa.io import RemindLoader, read_iamc
 from iampypsa.io.iamc import parse_currency_year
 
-EUR_GDX = "/workspace/remind_pypsa_coupling/development_data/REMIND2PyPSAEUR.gdx"
+GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
 
 
 def test_detect_backend():
@@ -47,9 +45,8 @@ def test_parse_currency_year():
     assert parse_currency_year("EUR2020/MWh") is None
 
 
-@pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")
 def test_gdx_candidate_resolution_and_load():
-    loader = RemindLoader(EUR_GDX)
+    loader = RemindLoader(str(GDX))
     assert loader.backend == "gdx"
     # first candidate absent (run/version rename), falls back to the present name
     assert loader.resolve_symbol(["v32_taxCO2eq", "p_priceCO2"]) == "p_priceCO2"

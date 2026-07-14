@@ -13,8 +13,6 @@ Naming note: molar masses use ``MOLAR_MASS_*`` (g/mol) — never ``MW``, which h
 megawatts.
 """
 
-from __future__ import annotations
-
 #: Molar masses (g/mol) used for carbon↔CO2 mass conversions.
 MOLAR_MASS_C = 12.0
 MOLAR_MASS_CO2 = MOLAR_MASS_C + 2 * 16.0  # 44 g/mol
@@ -49,6 +47,8 @@ UNIT_CONVERSIONS: dict[tuple[str, str], float] = {
     ("years", "yr"): 1.0,
     # efficiency reported as a percentage, convert to per-unit for a canonical basis
     ("%", "p.u."): 0.01,
+    # CO2 emission factor, thermal-input basis: g/kWh -> t/MWh (1 g/kWh = 1e-3 t/MWh)
+    ("gCO2/kWh_th", "t_CO2/MWh_th"): 0.001,
 }
 
 

@@ -5,9 +5,7 @@ need spec-driven consolidation (VRE merge, battery scaling, link η-adjustment) 
 in the consolidation tests below.
 """
 
-from __future__ import annotations
-
-import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -18,13 +16,13 @@ from iampypsa.transforms.capacities import (
     apply_consolidation,
 )
 
-DEV = "/workspace/remind_pypsa_coupling/development_data/PkBudg1000_Europe_without_NES_fixed/i1"
-EUR_GDX = f"{DEV}/REMIND2PyPSAEUR.gdx"
-INSTALLED = f"{DEV}/installed_capacities.csv"
-MAP = "/workspace/pypsa-eur-aod/pypsa-eur/config/technology_cost_mapping.csv"
+DATA = Path(__file__).parent / "data"
+GDX = DATA / "remind2pypsa_amt_filtered.gdx"
+INSTALLED = DATA / "reference" / "installed_capacities.csv"
+TECH_MAPPING = DATA / "technology_mapping_example.yaml"
 
-# Pure generators whose target = p32_capAvg*1e6 mapped 1:1 (no VRE/battery/link prep).
-GENERATOR_CARRIERS = ["ccgt", "ocgt", "onwind", "offwind", "solar", "nuclear"]
+# Carriers present in both the example technology mapping and installed_capacities.csv.
+GENERATOR_CARRIERS = ["gas-ocgt", "solar", "biomass-igcc-ccs"]
 
 
 def test_adjust_link_capacities_divides_by_efficiency():
@@ -108,27 +106,34 @@ def test_build_capacity_targets_reads_consolidation_from_symbols():
     assert out.query("carrier == 'battery charger'")["value"].iloc[0] == pytest.approx(5.0 * 4.0)
 
 
-@pytest.mark.skipif(not (os.path.exists(EUR_GDX) and os.path.exists(INSTALLED) and os.path.exists(MAP)),
-                    reason="EUR development data not present")
 def test_generator_targets_match_reference():
-    from iampypsa.io import read_gdx_symbol as read_gdx
+    from iampypsa.io import RemindLoader, build_capacity_reporting_technologies, load_technology_parameters
+    from iampypsa.io.remind_symbols import load_symbol_specs
+    from iampypsa.io.technology_mapping import iam_name
+    from iampypsa.transforms.capacities import prepare_capacities
 
-    raw = read_gdx(EUR_GDX, "p32_capAvg",
-                   rename_columns={"ttot": "year", "all_regi": "region", "all_te": "technology"})
+    from iampypsa.io.remind_symbols import rename_technologies
+
+    loader = RemindLoader(str(GDX))
+    symbols = load_symbol_specs(backend=loader.backend)
+    raw = prepare_capacities(loader, symbols)
+    raw = rename_technologies(raw, symbols.get("technology_names"))
     raw["year"] = raw["year"].astype(int)
-    # Unit conversion (TW→MW) is declared in the GDX symbol spec; apply here directly.
-    raw = raw[["year", "region", "technology", "value"]].copy()
-    raw["value"] *= 1e6
 
-    mapping = pd.read_csv(MAP).query("parameter == 'investment' and source == 'REMIND'")
-    tmap = mapping[["PyPSA-Eur technology", "reference"]].rename(
-        columns={"PyPSA-Eur technology": "PyPSA-Eur", "reference": "REMIND-EU"}
+    technology_mapping = load_technology_parameters(str(TECH_MAPPING))["technologies"]
+    reports_capacity = build_capacity_reporting_technologies()
+    tmap = pd.DataFrame(
+        [
+            {"PyPSA": tech, "IAM": iam_name(tech, spec)}
+            for tech, spec in technology_mapping.items()
+            if iam_name(tech, spec) in reports_capacity
+        ]
     )
 
     got = aggregate_capacities_to_carriers(
-        raw, tmap, map_tech_col="REMIND-EU", map_carrier_col="PyPSA-Eur"
-    ).query("region == 'DEU' and year == 2050")
-    ref = pd.read_csv(INSTALLED).query("region_REMIND == 'DEU' and year == 2050")
+        raw, tmap, map_tech_col="IAM", map_carrier_col="PyPSA"
+    ).query("region == 'DEU' and year == 2090")
+    ref = pd.read_csv(INSTALLED).query("region == 'DEU' and year == 2090")
 
     got_s = got.set_index("carrier")["value"]
     ref_s = ref.set_index("carrier")["value"]

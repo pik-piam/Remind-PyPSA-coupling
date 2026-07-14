@@ -1,7 +1,5 @@
 """Unify the GDX and ``.mif`` backends behind one loader with candidate resolution."""
 
-from __future__ import annotations
-
 from collections.abc import Mapping, Sequence
 from os import PathLike
 from pathlib import Path

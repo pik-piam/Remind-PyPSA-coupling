@@ -4,8 +4,6 @@ The transform is name-agnostic: it takes an already-loaded frame with canonical 
 ``[region, year, value]`` (the loader/adapter handles the GDX symbol + renames).
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 import pandas as pd

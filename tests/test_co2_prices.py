@@ -1,8 +1,6 @@
 """Tests for the CO2 price transform, against synthetic data and the real EUR GDX."""
 
-from __future__ import annotations
-
-import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -13,7 +11,7 @@ from iampypsa.transforms.co2_prices import (
     extract_co2_prices,
 )
 
-EUR_GDX = "/workspace/remind_pypsa_coupling/development_data/REMIND2PyPSAEUR.gdx"
+GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
 
 
 def _raw() -> pd.DataFrame:
@@ -47,20 +45,19 @@ def test_convert_applies_carbon_and_currency_factor():
     assert out["value"].iloc[0] == pytest.approx(expected)
 
 
-@pytest.mark.skipif(not os.path.exists(EUR_GDX), reason="EUR development GDX not present")
-def test_against_real_eur_gdx():
+def test_against_real_amt_gdx():
     from iampypsa.io import read_gdx_symbol as read_gdx
 
-    raw = read_gdx(EUR_GDX, "p_priceCO2", rename_columns={"tall": "year", "all_regi": "region"})
+    raw = read_gdx(str(GDX), "p_priceCO2", rename_columns={"tall": "year", "all_regi": "region"})
     prices = convert_co2_prices(
-        extract_co2_prices(raw, regions=["DEU", "FRA"], years=[2030, 2040, 2050]),
+        extract_co2_prices(raw, regions=["DEU", "EWN"], years=[2090, 2100]),
         currency_factor=1.0,
     )
-    assert len(prices) == 6  # 2 regions x 3 years
+    assert len(prices) == 4  # 2 regions x 2 years
     assert (prices["value"] >= 0).all()
     # converted prices are the carbon-price values scaled by the molar factor
     assert prices["value"].max() == pytest.approx(
         raw.assign(year=raw.year.astype(int))
-        .query("region in ['DEU','FRA'] and year in [2030,2040,2050]")["value"].max()
+        .query("region in ['DEU','EWN'] and year in [2090,2100]")["value"].max()
         * TONNE_C_TO_TONNE_CO2
     )

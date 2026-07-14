@@ -4,8 +4,6 @@ Name-agnostic: operates on an already-loaded frame with ``[year, region, sector,
 (the adapter handles the symbol choice + fallback via the loader).
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 import pandas as pd
@@ -39,5 +37,6 @@ def convert_loads(
         ]
         .sum()
         .sort_values([year_col, region_col, sector_col])
+        [[year_col, region_col, sector_col, value_col, "unit"]]
         .reset_index(drop=True)
     )

@@ -1,0 +1,10 @@
+X;CountryCode;RegionCode;missingH12
+Austria;AUT;EWN;EUR
+Belgium;BEL;EWN;EUR
+China;CHN;CHA;rest
+Germany;DEU;DEU;EUR
+Hong Kong;HKG;CHA;rest
+Luxembourg;LUX;EWN;EUR
+Macao;MAC;CHA;rest
+Netherlands;NLD;EWN;EUR
+Taiwan, Province of China;TWN;CHA;rest
