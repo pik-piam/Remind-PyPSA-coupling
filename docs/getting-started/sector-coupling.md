@@ -4,8 +4,8 @@ Sector coupling is represented using a simplified structure of buses, links, and
 loads are in electricity, with no other energy carriers involved. See the REMIND-PyPSA-Eur paper
 (linked on the [home page](../index.md#further-reading)) for the methodology behind this choice.
 
-!!! note "Still under discussion"
-    This representation of sector coupling is still under discussion — for example,
+!!! note "Under development"
+    This representation of sector coupling is still under development — for example,
     [`PyPSA-China`](https://github.com/pik-piam/PyPSA-China-PIK) handles heat differently.
 
 REMIND currently provides sectoral electricity demand for the following sectors (see

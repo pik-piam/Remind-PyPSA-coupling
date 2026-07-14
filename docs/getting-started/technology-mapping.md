@@ -43,6 +43,13 @@ offwind-ac-connection-submarine:
     investment: {value: 0, unit: "USD/MW/km", comment: "Connection costs already included in REMIND offwind investment"}
 ```
 
+See [`examples/technology-mapping.example.yaml`](https://github.com/pik-piam/IAM-PyPSA-coupling/blob/main/examples/technology-mapping.example.yaml)
+for a complete, annotated example covering every case above (IAM-sourced, PyPSA-sourced,
+`iam_name` remaps, partial and full overrides).
+
+See [`pypsa-eur-iam`](https://github.com/pik-piam/pypsa-eur-iam)'s
+`config/technology_mapping_REMIND.yaml` for a working example used in the PyPSA-Eur coupling.
+
 ## Where it's used
 
 The same mapping serves two different consumers:
@@ -54,7 +61,7 @@ The same mapping serves two different consumers:
 - **Capacity-target technology selection** — `transforms/capacities.py`:
   `build_capacity_targets` and `build_capacity_reporting_technologies` use the mapping to decide
   which of the IAM's reported technologies should be summed into which of the model's carriers
-  when building capacity targets (see [Harmonising Capacities](harmonising-capacities.md) for how
+  when building capacity targets (see [Harmonising capacities](harmonising-capacities.md) for how
   those targets then get applied).
 
 If a technology declares `source: IAM` (directly or via an override) for a parameter, but the
@@ -62,6 +69,6 @@ IAM's own output has no matching data for it, `build_iam_techdata` raises an err
 
 ## Next
 
-- [Downscaling Demand](downscaling-demand.md)
-- [Harmonising Capacities](harmonising-capacities.md) — the mapping's other consumer, capacity
+- [Downscaling demand](downscaling-demand.md)
+- [Harmonising capacities](harmonising-capacities.md) — the mapping's other consumer, capacity
   reconciliation.

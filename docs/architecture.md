@@ -60,7 +60,7 @@ Everything in `iampypsa` is public — `io`, `transforms`, and `downscale` are n
 implementation details. `Coupler` is the recommended entry point for a full pipeline step (it
 orchestrates loading, converting, and transforming in one call), but real integrations also
 import `io`/`transforms`/`downscale` functions directly for a single step — see
-[How the Package Works](getting-started/integrating-a-model.md)'s step list, or
+[Integrating a PyPSA model](getting-started/integrating-a-model.md)'s step list, or
 `pypsa-eur-iam`'s `downscale_REMIND_demand.py`, which calls `iampypsa.downscale` functions
 directly rather than going through a `Coupler`. Data generally flows **load → convert →
 transform → (downscale) → hand to the model**, whether that's orchestrated by a `Coupler` call
@@ -76,7 +76,7 @@ or assembled step-by-step in the model's own Snakemake rules.
 |---|---|---|
 | `io/` | `loader.RemindLoader` | Open an IAM source and resolve/read symbols. Backend (`gdx` via `gamspy`, or `iamc` `.mif`/`.csv`) is auto-detected; `lru`-cached. |
 | `io/` | `remind_symbols` (+ `data/remind_symbols_gdx.yaml` / `data/remind_symbols_mif.yaml`) | Map **coupling names** — iampypsa's own stable names for a quantity (`co2_price`, `capacity`, `tech_data`, …) → the actual IAM symbol name(s), plus the unit each carries. `load_frame()` / `load_set()` read a symbol and apply the declared unit conversion. |
-| `io/` | `technology_mapping` | Parse the model's technology-mapping YAML into a `{parameter: source}` map per technology — see [Technology Mapping](getting-started/technology-mapping.md). |
+| `io/` | `technology_mapping` | Parse the model's technology-mapping YAML into a `{parameter: source}` map per technology — see [Technology mapping](getting-started/technology-mapping.md). |
 | `io/` | `ssp` | Fetch / read the SSP population & GDP proxy datasets used by downscaling. |
 | `units` | `units.py` | Unit conversions `(from_unit, to_unit) → factor`. |
 | `transforms/` | `co2_prices`, `loads`, `capacities`, `costs` | Pure functions on already-loaded **tidy frames**. They never read files and never know IAM symbol names. |
@@ -208,11 +208,11 @@ documented individually in the **Reference** section of the nav.
 
 `downscale/` turns the IAM's **regional** demand into **country-level** demand — spatial
 downscaling only; capacities aren't downscaled this way (see
-[Harmonising Capacities](getting-started/harmonising-capacities.md) for how those are handled
+[Harmonising capacities](getting-started/harmonising-capacities.md) for how those are handled
 instead). The split uses SSP population/GDP proxy shares (and degree-day-weighted proxies for
 heating-sensitive sectors), applied per `(region, year, sector)` row via
 `Coupler.downscale_country_demand()`.
 
-See **[Downscaling Demand](getting-started/downscaling-demand.md)** for the full walkthrough —
+See **[Downscaling demand](getting-started/downscaling-demand.md)** for the full walkthrough —
 why it's needed, the proxy mechanism, edge cases, and how it relates to the *temporal*
 downscaling (annual → hourly) that happens on the model side, outside this package.

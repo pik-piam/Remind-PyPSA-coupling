@@ -1,6 +1,6 @@
 # Data exchange between IAMs and PyPSA
 
-This page documents what data is exchanged between IAMs and PyPSA in principle.
+This page documents what data can be exchanged between IAMs and PyPSA.
 
 ## IAM → PyPSA (in active use)
 
@@ -17,21 +17,21 @@ A few things worth knowing about all four:
 
 - All data comes in **tidy frames** — long-format tables with key columns like `region`, `year`,
   ... and a `value` + `unit` column.
-- Units and the underlying IAM symbol names are never hardcoded in the transform functions —
-  they're declared in a small YAML config (`remind_symbols_gdx.yaml` / `remind_symbols_mif.yaml`
-  for the REMIND backends) and applied once, at load time.
+- Units and the underlying IAM symbol names are declared in a YAML config
+  (`remind_symbols_gdx.yaml` / `remind_symbols_mif.yaml` for the REMIND backends) and applied
+  once, at load time.
+- **Costs** can be set by the IAM, by the PyPSA default, or to a fixed value (see
+  [Technology mapping](technology-mapping.md)). A separate `Coupler.discount_rates(year)` method
+  supplies the per-region discount rate, merged into the cost table alongside these components.
+  For consistency with the IAM, additional technologies may need to be added on the PyPSA side.
 - **Demand** is supplied as an *annual* total per sector and IAM region. This is then downscaled
-  to country level (see [Downscaling Demand](downscaling-demand.md)), based on SSP projections
+  to country level (see [Downscaling demand](downscaling-demand.md)), based on SSP projections
   for GDP and population as well as heating degree days (HDDs) and cooling degree days (CDDs).
   The temporal downscaling into an hourly demand profile happens on the PyPSA side, such that the
   profile's annual sum matches the IAM's annual sectoral total.
-- **Costs** can be set by the IAM, by the PyPSA default, or to a fixed value (see
-  [Technology Mapping](technology-mapping.md)). A separate `Coupler.discount_rates(year)` method
-  supplies the per-region discount rate, merged into the cost table alongside these components.
-  For consistency with the IAM, additional technologies may need to be added on the PyPSA side.
 - **Capacities** aren't downscaled the way demand is — see the scope note at the top of
-  [Downscaling Demand](downscaling-demand.md). Reconciling them with a model's existing plant
-  database is its own step, [Harmonising Capacities](harmonising-capacities.md).
+  [Downscaling demand](downscaling-demand.md). Reconciling them with a model's existing plant
+  database is its own step, see [Harmonising capacities](harmonising-capacities.md).
 
 ## PyPSA → IAM (**not currently in use**)
 
@@ -44,4 +44,4 @@ firm-capacity constraints.
 
 ## Next
 
-- [How the Package Works](integrating-a-model.md) — the general pattern for wiring IAM variables into the PyPSA workflow.
+- [Integrating a PyPSA model](integrating-a-model.md) — the general pattern for wiring IAM variables into the PyPSA workflow.

@@ -1,32 +1,41 @@
 # IAM-PyPSA Coupling
 
-Welcome to the `iampypsa` docu! `iampypsa` is a package to support the soft-coupling of Integrated Assessment Models (IAMs) and the [PyPSA](https://github.com/PyPSA) power system model family, such as [PyPSA-Eur](https://pypsa-eur.readthedocs.io/en/latest/) or [PyPSA-China](https://pik-piam.github.io/PyPSA-China-PIK/latest/). The package is written and maintained by the Potsdam Institute for Climate Impact Research's [Energy Transition Lab](https://www.pik-potsdam.de/en/institute/labs/energy-transition/energy-transition-lab).
+Welcome to the `iampypsa` docu! `iampypsa` is a package to support the soft-coupling of
+Integrated Assessment Models (IAMs) and the [PyPSA](https://github.com/PyPSA) power system model
+family, such as [PyPSA-Eur](https://pypsa-eur.readthedocs.io/en/latest/) or
+[PyPSA-China](https://pik-piam.github.io/PyPSA-China-PIK/latest/). The package is written and
+maintained by the Potsdam Institute for Climate Impact Research's
+[Energy Transition Lab](https://www.pik-potsdam.de/en/institute/labs/energy-transition/energy-transition-lab).
 
 !!! warning "Documentation under development"
     This documentation is preliminary and under active development.
 
-The `iampypsa` package contains all logic that is identical for all PyPSA models that couple to IAMs. These include:
+The `iampypsa` package contains all logic that is identical for all PyPSA models that couple to
+IAMs. These include:
 
 - Reading IAM output
 - Unit conversions
 - Translation of demand, costs, capacities, CO2 prices
 - Downscaling of demand from IAM region to countries
 
-The interface to the PSM models' snakemake workflow is exposed via a small `Coupler` class.
+The interface to the PyPSA models' snakemake workflow is exposed via a small `Coupler` class.
 Each snakemake workflow constructs one of its concrete subclasses (`RemindGdxCoupler` /
-`RemindIamcCoupler` today) and calls its methods.
+`RemindIamcCoupler` today) and calls its methods. Alternatively, functions can also be called
+directly.
 
-## Supported models
+## Currently supported models
 
-- **IAM**: [REMIND](https://www.pik-potsdam.de/en/institute/departments/transformation-pathways/models/remind).
-- **PyPSA models**: [PyPSA-Eur](https://pypsa-eur.readthedocs.io/en/latest/) (via
-  [pypsa-eur-iam](https://github.com/pik-piam/pypsa-eur-iam)) and
-  [PyPSA-China](https://pik-piam.github.io/PyPSA-China-PIK/latest/). Get in touch if you'd like
-  to couple another IAM or PyPSA model.
+- **Integrated Assessment Models**
+    - [REMIND](https://www.pik-potsdam.de/en/institute/departments/transformation-pathways/models/remind)
+- **PyPSA models**
+    - [PyPSA-Eur](https://pypsa-eur.readthedocs.io/en/latest/) (via [pypsa-eur-iam](https://github.com/pik-piam/pypsa-eur-iam))
+    - [PyPSA-China](https://pik-piam.github.io/PyPSA-China-PIK/latest/)
+
+Get in touch if you'd like to couple another IAM or PyPSA model.
 
 ## Start here
 
-- **[Getting Started](getting-started/index.md)**: A brief tutorial covering data exchange between IAMs and PyPSA and how to set up a new PyPSA model.
+- **[Getting started](getting-started/index.md)**: A brief tutorial covering data exchange between IAMs and PyPSA and how to set up a new PyPSA model.
 - **[Architecture](architecture.md)**: A deeper explanation of how the components fit together, what belongs in the package versus the model, the full `Coupler` interface, and the symbol/unit config.
 - **[Reference](docs/reference/couplers/base.md)**: The auto-generated API reference for every module (also in the nav).
 

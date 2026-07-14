@@ -21,7 +21,7 @@ Documentation = "https://pik-piam.github.io/IAM-PyPSA-coupling/"
 jupyter = ["ipykernel","ipython"]
 gdx = ["gamspy"]
 ssp = ["httpx"]   # live SSP fetch from the IIASA API (iampypsa.io.ssp.fetch_ssp_data)
-docu= ["mkdocs", "mkdocs_gen_files", "mkdocstrings[python]", "mkdocs-literate-nav", "mkdocs-material", "mkdocs-include-dir-to-nav"]
+docu= ["mkdocs<2", "mkdocs_gen_files", "mkdocstrings[python]", "mkdocs-literate-nav", "mkdocs-material", "mkdocs-include-dir-to-nav"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
