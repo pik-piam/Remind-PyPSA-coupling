@@ -2,54 +2,23 @@
 
 
 def test_import_main_package():
-    """Test that the main package imports correctly."""
-    import rpycpl
-    assert rpycpl is not None
+    """The main package imports and exposes the public API."""
+    import iampypsa
+
+    assert iampypsa is not None
+    for name in ("Coupler", "RemindLoader", "load_symbol_specs"):
+        assert hasattr(iampypsa, name), name
 
 
-def test_import_utils():
-    """Test that utils module imports correctly."""
-    from rpycpl import utils
-    assert utils is not None
+def test_import_subpackages():
+    """The current sub-packages import correctly."""
+    from iampypsa import couplers, downscale, io, transforms  # noqa: F401
+    from iampypsa import units, validate  # noqa: F401
+    from iampypsa.io import remind_symbols  # noqa: F401
 
 
-def test_import_etl():
-    """Test that etl module imports correctly."""
-    from rpycpl import etl
-    assert etl is not None
+def test_loader_importable():
+    """The unified loader + symbol layer are importable from io."""
+    from iampypsa.io import RemindLoader, load_frame, load_symbol_specs  # noqa: F401
 
-
-def test_import_capacities_etl():
-    """Test that capacities_etl module imports correctly."""
-    from rpycpl import capacities_etl
-    assert capacities_etl is not None
-
-
-def test_import_technoecon_etl():
-    """Test that technoecon_etl module imports correctly."""
-    from rpycpl import technoecon_etl
-    assert technoecon_etl is not None
-
-
-def test_import_disagg():
-    """Test that disagg module imports correctly."""
-    from rpycpl import disagg
-    assert disagg is not None
-
-
-def test_import_coupled_cfg():
-    """Test that coupled_cfg module imports correctly."""
-    from rpycpl import coupled_cfg
-    assert coupled_cfg is not None
-
-
-def test_etl_registry_exists():
-    """Test that the ETL registry is accessible."""
-    from rpycpl.etl import ETL_REGISTRY
-    assert isinstance(ETL_REGISTRY, dict)
-
-
-def test_readers_registry_exists():
-    """Test that the readers registry is accessible."""
-    from rpycpl.utils import READERS_REGISTRY
-    assert isinstance(READERS_REGISTRY, dict)
+    assert RemindLoader is not None

@@ -1,36 +1,41 @@
 [project]
-name = "REMIND-PyPSA-coupling"
-version = "0.1.3"
-description = "Tools to couple the REMIND IAM and PyPSA power models"
+name = "IAM-PyPSA-coupling"
+version = "0.3.0"
+description = "Tools to couple IAMs and PyPSA power models"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "numpy>1.9", 
     "pandas>2", 
-    "pyyaml", 
+    "pyyaml",
     "country_converter",
+    "typing_extensions",
     "pytest"]
 
 [project.urls]
-Homepage = "https://github.com/pik-piam/Remind-PyPSA-coupling/"
-Documentation = "https://pik-piam.github.io/Remind-PyPSA-coupling/"
+Homepage = "https://github.com/pik-piam/IAM-PyPSA-coupling/"
+Documentation = "https://pik-piam.github.io/IAM-PyPSA-coupling/"
 
 # eg `uv pip install -r pyproject.toml --extra release`
 [project.optional-dependencies]
 jupyter = ["ipykernel","ipython"]
 gdx = ["gamspy"]
-docu= ["mkdocs", "mkdocs_gen_files", "mkdocstrings[python]", "mkdocs-literate-nav", "mkdocs-material", "mkdocs-include-dir-to-nav"]
+ssp = ["httpx"]   # live SSP fetch from the IIASA API (iampypsa.io.ssp.fetch_ssp_data)
+docu= ["mkdocs<2", "mkdocs_gen_files", "mkdocstrings[python]", "mkdocs-literate-nav", "mkdocs-material", "mkdocs-include-dir-to-nav"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+iampypsa = ["data/*.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [build-system]
-requires = [    
-    "setuptools", "wheel", "numpy", "cython", "twine"
-]
+# Pure-Python package: no compiled extensions, so no numpy/cython; twine is a publish tool,
+# not a build requirement. A bloated requires list slows/poisons the isolated build env.
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 

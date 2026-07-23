@@ -62,5 +62,12 @@ jobs:
           name: dist
           path: dist/
 
+      # Trusted publishing (OIDC): no token needed, but the PyPI project must have a
+      # trusted publisher configured for (owner, repo, workflow=release.yml, environment=pypi).
+      # skip-existing makes re-triggers (tag push + release published for the same version)
+      # idempotent instead of failing with "File already exists".
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
