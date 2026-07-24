@@ -124,13 +124,25 @@ def _get_symbol_ref(spec: dict[str, Any]):
     return ref
 
 
-def _source_unit(spec: dict[str, Any], ref, resolved_name: str) -> str | None:
+def _source_unit(spec: dict[str, Any], ref, resolved_name: str, df: pd.DataFrame) -> str | None:
     """Resolve the source unit for a single-quantity spec.
 
-    Supports a per-candidate ``units:`` list (parallel to the ``symbol:`` candidate list — the
-    unit of whichever candidate actually resolved) or a scalar ``unit:``. Returns None if no
-    unit is declared.
+    Prefers a live ``unit`` column on ``df`` (mif); raises on heterogeneous live values or a
+    stale declared ``unit:``. Falls back to a declared ``units:``/``unit:`` when no live column
+    exists (GDX). Returns None if neither is available.
     """
+    if "unit" in df.columns:
+        live = df["unit"].dropna().unique()
+        if len(live) > 1:
+            raise ValueError(f"Heterogeneous units for {resolved_name!r}: {sorted(live)}.")
+        if len(live) == 1:
+            declared = spec.get("unit")
+            if declared is not None and declared != live[0]:
+                raise ValueError(
+                    f"Declared unit {declared!r} for {resolved_name!r} does not match "
+                    f"the live mif unit {live[0]!r} — update the yaml's ``unit:``."
+                )
+            return live[0]
     if "units" in spec:
         candidates = [ref] if isinstance(ref, str) else list(ref)
         return spec["units"][candidates.index(resolved_name)]
@@ -141,10 +153,11 @@ def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Load the frame for one single-quantity symbol spec, applying its unit conversion.
 
     Resolves ``symbol`` (falls back to legacy ``gdx``), then scales ``value`` via the central
-    ``iampypsa.units`` factor when both a source unit (``unit:``/``units:``) and ``to_unit:``
-    are declared (a legacy ``unit_factor:`` scalar is also honoured). Stamps the resolved unit
-    onto a ``unit`` column, matching ``load_set``/``load_variable_set``, unless no unit is
-    declared at all. Use ``load_set`` for mixed-unit symbols.
+    ``iampypsa.units`` factor when both a source unit and ``to_unit:`` are declared. The source
+    unit is read live from the data when available (mif's own ``Unit`` column), else from the
+    spec's ``unit:``/``units:`` (GDX has no per-row unit info). Stamps the resolved unit onto a
+    ``unit`` column, matching ``load_set``/``load_variable_set``, unless no unit is available at
+    all. Use ``load_set`` for mixed-unit symbols.
 
     An optional ``filter: {column: value}`` drops rows that don't match — e.g. selecting a
     single GAMS domain slice (``rlf: 1``) out of a symbol that carries extra dimensions.
@@ -157,13 +170,10 @@ def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
         # (e.g. rlf: 1) -- compare as strings so a plain int in the spec still matches.
         df = df[df[col].astype(str) == str(value)]
     to_unit = spec.get("to_unit")
-    src_unit = _source_unit(spec, ref, resolved)
+    src_unit = _source_unit(spec, ref, resolved, df)
     if to_unit is not None and src_unit is not None and "value" in df.columns:
         df = df.copy()
         df["value"] = df["value"] * unit_factor(src_unit, to_unit)
-    if "unit_factor" in spec and "value" in df.columns:
-        df = df.copy()
-        df["value"] = df["value"] * spec["unit_factor"]
     unit = to_unit if to_unit is not None else src_unit
     if unit is not None and "value" in df.columns:
         df = df.copy()

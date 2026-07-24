@@ -2,7 +2,7 @@
 and is the entry point for the coupling workflow.
 
 - ``Coupler`` is the backend-neutral base: it holds the shared, concrete builders
-(``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
+(``build_co2_prices``, ``build_discount_rates``, ``downscale_country_demand``)
 - it consumes the IAM symbols (resolved via their config) and the region map, and it contains
  the reference data (population, GDP, etc.) for downscaling.
 
@@ -12,6 +12,11 @@ a new IAM or output format is added as a further ``Coupler`` subclass, not a bra
 - ``RemindIamcCoupler`` (``iampypsa.couplers.remind``)
 
 config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``planning_horizons``.
+
+``currency_factor`` (default ``1.0``, a no-op) is a flat multiplier the caller supplies to
+convert IAM-sourced (REMIND: USD) monetary values into the target PyPSA baseline's currency —
+it is not looked up or computed here. It converts between currencies only, not between
+currency *years* (e.g. REMIND's US$2017 vs the baseline's own reporting year).
 """
 
 import logging
@@ -25,10 +30,7 @@ logger = logging.getLogger(__name__)
 from iampypsa.downscale.demand import disaggregate_demand_to_country
 from iampypsa.io.remind_symbols import load_frame
 from iampypsa.transforms.co2_prices import convert_co2_prices, extract_co2_prices
-from iampypsa.transforms.costs import (
-    convert_investment_to_input_capacity_basis,
-    apply_overrides,
-)
+from iampypsa.transforms.costs import select_discount_rate
 
 
 class Coupler:
@@ -43,8 +45,6 @@ class Coupler:
         *,
         model_regions: list[str] | None = None,
         reference_data: dict[str, pd.DataFrame] | None = None,
-        ssp_population: pd.DataFrame | None = None,
-        ssp_gdp: pd.DataFrame | None = None,
     ) -> None:
         """Bind the loader, resolved symbol map, region map, config, and reference data."""
         self.loader = loader
@@ -53,18 +53,6 @@ class Coupler:
         self.config = config
         self.model_regions = model_regions or list(region_map)
         self.reference_data: dict[str, pd.DataFrame] = dict(reference_data or {})
-        if ssp_population is not None:
-            self.reference_data.setdefault("population", ssp_population)
-        if ssp_gdp is not None:
-            self.reference_data.setdefault("gdp", ssp_gdp)
-
-    @property
-    def ssp_population(self) -> pd.DataFrame | None:
-        return self.reference_data.get("population")
-
-    @property
-    def ssp_gdp(self) -> pd.DataFrame | None:
-        return self.reference_data.get("gdp")
 
     # -- Source-specific hooks (must be overridden by subclasses) -----------
 
@@ -93,15 +81,9 @@ class Coupler:
     # -- Shared concrete builders -------------------------------------------
 
     def build_co2_prices(self, years: Sequence[int] | None = None) -> pd.DataFrame:
-        """Build the per-(region, year) CO2 price pathway.
+        """Build the per-(region, year) CO2 price pathway, converted to the runtime currency.
 
-        Conversion is spec-driven: applies whatever ``(unit, to_unit)`` factor the resolved
-        ``co2_price`` symbol's config declares (a no-op when the source already reports t CO2).
-        The runtime ``currency_factor`` is always applied.
-
-        ``years`` selects the year set to reindex to (missing filled with 0); when ``None``
-        it falls back to ``config["planning_horizons"]``. Callers that derive the coupled-year
-        set from the IAM source (e.g. the GDX ``t`` symbol) pass it explicitly.
+        ``years`` reindexes the result (missing filled with 0); defaults to ``config["planning_horizons"]``.
         """
         raw = load_frame(self.loader, self.symbols["co2_price"])
         years = years if years is not None else self.config.get("planning_horizons")
@@ -129,29 +111,8 @@ class Coupler:
             set(self.config["countries"]),
         )
 
-    def discount_rates(self, year: int) -> pd.Series:
-        """Return the discount rate per region for ``year``, indexed by region.
-
-        When a region has no value for ``year`` (e.g. a trailing NaN in the source), the
-        most recent earlier year's value is used with a warning.
-        """
-        p_r = (
-            load_frame(self.loader, self.symbols["discount_rate"])
-            .pipe(lambda df: df[df["region"].isin(self.model_regions)])
-        )
-        # Last-value per region: covers both the requested year and any forward-fill fallback.
-        last = p_r.sort_values("year").groupby("region")["value"].last()
-        missing = set(self.model_regions) - set(last.index)
-        if missing:
-            raise ValueError(
-                f"No discount rate for year {year} or any earlier year, "
-                f"regions: {sorted(missing)}"
-            )
-        exact = p_r[p_r["year"].astype(str) == str(year)].set_index("region")["value"]
-        filled = last.index.difference(exact.index)
-        if len(filled):
-            logger.warning(
-                "Discount rate absent for year %d in regions %s; using most-recent value.",
-                year, sorted(filled),
-            )
-        return exact.combine_first(last)
+    def build_discount_rates(self, year: int) -> pd.Series:
+        """Return the discount rate per region for ``year``, indexed by region."""
+        rates = load_frame(self.loader, self.symbols["discount_rate"])
+        rates = rates[rates["region"].isin(self.model_regions)]
+        return select_discount_rate(rates, year, self.model_regions)

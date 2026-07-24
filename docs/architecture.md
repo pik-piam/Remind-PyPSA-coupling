@@ -120,7 +120,7 @@ Methods, grouped by whether they're IAM-specific or shared:
 | `extract_cost_parameters(year)` | **hook** — must implement per IAM backend | always, for a new IAM/backend. Same as above. |
 | `build_co2_prices(years=None)` | concrete, inherited | rarely — only if the model's CO2 handling diverges. |
 | `downscale_country_demand(regional=None)` | concrete, inherited | the model needs extra steps (e.g. a historical-calibration adjustment). |
-| `discount_rates(year)` | concrete, inherited | rarely. |
+| `build_discount_rates(year)` | concrete, inherited | rarely. |
 
 ---
 

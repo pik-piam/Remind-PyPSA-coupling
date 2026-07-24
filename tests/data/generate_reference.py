@@ -49,8 +49,7 @@ def _coupler() -> RemindGdxCoupler:
             "planning_horizons": YEARS,
         },
         model_regions=["DEU", "EWN", "CHA"],
-        ssp_population=pop,
-        ssp_gdp=gdp,
+        reference_data={"population": pop, "gdp": gdp},
     )
 
 

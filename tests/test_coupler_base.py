@@ -42,7 +42,7 @@ def test_technology_mapping_example_matches_examples_dir():
     )
 
 
-def _coupler() -> RemindGdxCoupler:
+def _coupler(currency_factor: float = 1.0) -> RemindGdxCoupler:
     from iampypsa.io import RemindLoader
     from iampypsa.io.remind_symbols import load_symbol_specs
 
@@ -55,10 +55,13 @@ def _coupler() -> RemindGdxCoupler:
             "sector_weights": SECTOR_WEIGHTS,
             "countries": COUNTRIES,
             "planning_horizons": YEARS,
+            "currency_factor": currency_factor,
         },
         model_regions=["DEU", "EWN", "CHA"],
-        ssp_population=pd.read_csv(DATA / "ssp_population_filtered.csv").set_index(["iso2", "year"]),
-        ssp_gdp=pd.read_csv(DATA / "ssp_gdp_filtered.csv").set_index(["iso2", "year"]),
+        reference_data={
+            "population": pd.read_csv(DATA / "ssp_population_filtered.csv").set_index(["iso2", "year"]),
+            "gdp": pd.read_csv(DATA / "ssp_gdp_filtered.csv").set_index(["iso2", "year"]),
+        },
     )
 
 
@@ -109,6 +112,25 @@ def test_cost_overrides_match_reference_remind_rows():
     )
     assert got.index.equals(ref.index)
     pd.testing.assert_series_equal(got, ref, check_names=False, rtol=1e-6)
+
+
+def test_currency_factor_scales_gdx_cost_parameters():
+    """currency_factor scales investment/VOM/fuel only, on the GDX path."""
+    base = _coupler().extract_cost_parameters(2090).set_index(["region", "technology", "parameter"])["value"]
+    scaled = (
+        _coupler(currency_factor=0.9)
+        .extract_cost_parameters(2090)
+        .set_index(["region", "technology", "parameter"])["value"]
+    )
+    assert base.index.equals(scaled.index)
+
+    currency_params = base.index.get_level_values("parameter").isin({"investment", "VOM", "fuel"})
+    pd.testing.assert_series_equal(
+        scaled[currency_params], base[currency_params] * 0.9, check_names=False, rtol=1e-9
+    )
+    pd.testing.assert_series_equal(
+        scaled[~currency_params], base[~currency_params], check_names=False, rtol=1e-9
+    )
 
 
 def test_full_capacity_targets_match_reference():

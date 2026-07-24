@@ -11,7 +11,7 @@ for convenience) so any IAM or PyPSA coupler can swap the conversion table witho
 """
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import pandas as pd
@@ -28,14 +28,35 @@ def annotate_cost_rows(
     *,
     parameter: str,
     unit: str,
-    factor: float = 1.0,
 ) -> pd.DataFrame:
-    """Annotate ``parameter``/``unit`` onto a cost-row frame, optionally scaling ``value`` by ``factor``."""
+    """Annotate ``parameter``/``unit`` onto a cost-row frame."""
     costs = costs.copy()
     costs["parameter"] = parameter
     costs["unit"] = unit
-    if factor != 1.0:
-        costs["value"] = costs["value"] * factor
+    return costs
+
+
+#: Currency-denominated parameters — the only rows ``apply_currency_factor`` scales.
+#: Excludes physical units (lifetime/efficiency/CO2 intensity) and FOM (a ratio; factor cancels).
+CURRENCY_PARAMETERS = {"investment", "VOM", "fuel"}
+
+
+# TODO: Implement more generic deflator for different currency years
+def apply_currency_factor(
+    costs: pd.DataFrame,
+    currency_factor: float,
+    parameters: Iterable[str] = CURRENCY_PARAMETERS,
+) -> pd.DataFrame:
+    """Scale ``value`` by ``currency_factor`` for currency-denominated ``parameter`` rows.
+
+    One-directional (IAM USD -> PyPSA baseline currency); converts between currencies, not
+    between currency years (e.g. REMIND's US$2017 vs the baseline's own reporting year).
+    """
+    if currency_factor == 1.0:
+        return costs
+    costs = costs.copy()
+    mask = costs["parameter"].isin(set(parameters))
+    costs.loc[mask, "value"] *= currency_factor
     return costs
 
 
@@ -92,12 +113,34 @@ def convert_investment_to_input_capacity_basis(
     return costs
 
 
+def select_discount_rate(rates: pd.DataFrame, year: int, regions: Iterable[str]) -> pd.Series:
+    """Return the discount rate per region for ``year``, indexed by region.
+
+    Falls back to the most recent earlier year's value when a region has no value for
+    ``year`` (e.g. a trailing NaN in the source), logging a warning for those regions.
+    """
+    last = rates.sort_values("year").groupby("region")["value"].last()
+    missing = set(regions) - set(last.index)
+    if missing:
+        raise ValueError(
+            f"No discount rate for year {year} or any earlier year, regions: {sorted(missing)}"
+        )
+    exact = rates[rates["year"].astype(str) == str(year)].set_index("region")["value"]
+    filled = last.index.difference(exact.index)
+    if len(filled):
+        logger.warning(
+            "Discount rate absent for year %d in regions %s; using most-recent value.",
+            year, sorted(filled),
+        )
+    return exact.combine_first(last)
+
+
 def add_discount_rate(
     costs: pd.DataFrame,
     discount_rate: float,
     *,
     source: str = "IAM",
-    reference: str = "p_r",
+    reference: str = "",
 ) -> pd.DataFrame:
     """Add a ``discount rate`` row for every technology that does not already have one.
 

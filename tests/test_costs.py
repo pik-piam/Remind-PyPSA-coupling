@@ -7,6 +7,7 @@ import pytest
 
 from iampypsa.transforms.costs import (
     add_discount_rate,
+    apply_currency_factor,
     broadcast_fuel_prices,
     build_pypsa_techdata,
     build_iam_techdata,
@@ -156,6 +157,25 @@ def test_add_discount_rate_only_where_missing():
     # 'a' already had a discount rate; only 'b' gets the new 0.07 row
     added = out.query("parameter=='discount rate' and value==0.07")
     assert set(added["technology"]) == {"b"}
+
+
+def test_apply_currency_factor_scales_only_currency_parameters():
+    costs = pd.DataFrame(
+        {
+            "technology": ["a", "a", "a", "a"],
+            "parameter": ["investment", "VOM", "fuel", "efficiency"],
+            "value": [1.0, 2.0, 3.0, 0.4],
+            "unit": ["USD/MW", "USD/MWh", "USD/MWh_th", "p.u."],
+        }
+    )
+    out = apply_currency_factor(costs, 2.0)
+    scaled = out.set_index("parameter")["value"]
+    assert scaled[["investment", "VOM", "fuel"]].tolist() == [2.0, 4.0, 6.0]
+    assert scaled["efficiency"] == 0.4
+
+    # default factor is a no-op
+    noop = apply_currency_factor(costs, 1.0)
+    pd.testing.assert_frame_equal(noop, costs)
 
 
 def test_convert_investment_basis_synthetic():

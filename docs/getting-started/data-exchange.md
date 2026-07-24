@@ -21,9 +21,12 @@ A few things worth knowing about all four:
   (`remind_symbols_gdx.yaml` / `remind_symbols_mif.yaml` for the REMIND backends) and applied
   once, at load time.
 - **Costs** can be set by the IAM, by the PyPSA default, or to a fixed value (see
-  [Technology mapping](technology-mapping.md)). A separate `Coupler.discount_rates(year)` method
+  [Technology mapping](technology-mapping.md)). A separate `Coupler.build_discount_rates(year)` method
   supplies the per-region discount rate, merged into the cost table alongside these components.
   For consistency with the IAM, additional technologies may need to be added on the PyPSA side.
+  IAM-sourced monetary values (investment/VOM/fuel) are scaled by the config's `currency_factor`
+  (default `1.0`, a no-op) to convert REMIND's USD output into the PyPSA baseline's currency —
+  between currencies only, not between currency years.
 - **Demand** is supplied as an *annual* total per sector and IAM region. This is then downscaled
   to country level (see [Downscaling demand](downscaling-demand.md)), based on SSP projections
   for GDP and population as well as heating degree days (HDDs) and cooling degree days (CDDs).

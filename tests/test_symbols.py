@@ -16,6 +16,7 @@ from iampypsa.io.remind_symbols import (
 from pathlib import Path
 
 EUR_GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
+GENERIC_MIF = Path(__file__).parent / "data" / "remind_generic_amt_filtered.mif"
 
 
 class _FakeLoader:
@@ -125,6 +126,28 @@ def test_load_frame_no_unit_column_when_unit_undeclared():
     loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0]})})
     out = load_frame(loader, {"symbol": "sym"})  # no unit/to_unit declared at all
     assert "unit" not in out.columns
+
+
+def test_load_frame_uses_live_unit_when_declared_unit_matches():
+    # Simulates the mif case: read_iamc already stamped a real 'unit' column onto the frame.
+    loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0], "unit": ["GW"]})})
+    out = load_frame(loader, {"symbol": "sym", "unit": "GW", "to_unit": "MW"})
+    assert out["value"].iloc[0] == pytest.approx(5.0 * 1e3)  # GW->MW
+    assert out["unit"].iloc[0] == "MW"
+
+
+def test_load_frame_raises_on_declared_unit_mismatch():
+    # A declared `unit:` that disagrees with the live mif value is stale documentation —
+    # must fail loud rather than be silently overridden.
+    loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0], "unit": ["GW"]})})
+    with pytest.raises(ValueError, match="does not match"):
+        load_frame(loader, {"symbol": "sym", "unit": "T$/TWa", "to_unit": "MW"})
+
+
+def test_load_frame_raises_on_heterogeneous_live_units():
+    loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0, 6.0], "unit": ["GW", "MW"]})})
+    with pytest.raises(ValueError, match="Heterogeneous units"):
+        load_frame(loader, {"symbol": "sym"})
 
 
 def test_load_set_splits_mixed_units_via_schema():
@@ -293,11 +316,15 @@ def test_mif_vocabulary_matches_gdx_technology_names():
     gdx = read_symbol_config(backend="gdx")["default"]
     canonical_values = set(gdx["technology_names"].values())
     mif_names = _mif_canonical_names()
-    # mif also carries demand-sector labels (EV_pass, heatpump, ...) which have no gdx-token
-    # counterpart in technology_names (they're sector labels, not technology tokens).
-    demand_sectors = {"EV_pass", "EV_freight", "heatpump", "resistive", "space_cooling"}
-    assert mif_names - demand_sectors <= canonical_values
-    assert (mif_names - demand_sectors) & canonical_values  # sanity: not vacuously true
+    # mif also carries demand-sector labels (EV_pass, heatpump, ...) and energy-balance
+    # quantity labels (se, losses, ...), neither of which have a gdx-token counterpart in
+    # technology_names — they're not technology tokens.
+    non_technology_labels = {
+        "EV_pass", "EV_freight", "heatpump", "resistive", "space_cooling",
+        "se", "losses", "h2_prod", "h2_turb",
+    }
+    assert mif_names - non_technology_labels <= canonical_values
+    assert (mif_names - non_technology_labels) & canonical_values  # sanity: not vacuously true
 
 
 def test_tech_fuel_map_is_keyed_by_the_canonical_vocabulary():
@@ -320,3 +347,69 @@ def test_load_frame_against_real_gdx():
     df = load_frame(loader, spec)
     assert {"year", "region", "value"} <= set(df.columns)
     assert "DEU" in set(df["region"])
+
+
+def test_load_frame_against_real_mif_uses_live_unit():
+    """hydro_capacity's GW->MW conversion uses the live mif unit; a stale declared unit: raises."""
+    from iampypsa.io import RemindLoader
+
+    loader = RemindLoader(str(GENERIC_MIF))
+    spec = dict(load_symbol_specs(backend="iamc")["hydro_capacity"])
+    assert spec["unit"] == "GW"  # matches the live mif value -- documentation is accurate
+    live_df = load_frame(loader, spec)
+    assert (live_df["unit"] == "MW").all()
+
+    spec["unit"] = "kW"  # now stale/wrong
+    with pytest.raises(ValueError, match="does not match"):
+        load_frame(loader, spec)
+    assert not live_df.empty
+
+
+def test_demand_energy_balance_variable_set_converts_ej_to_mwh():
+    from iampypsa.io import RemindLoader
+
+    loader = RemindLoader(str(GENERIC_MIF))
+    spec = load_symbol_specs(backend="iamc")["demand_energy_balance"]
+    df = load_variable_set(loader, spec)
+    assert set(df["quantity"]) == {"se", "losses", "h2_prod", "h2_turb"}
+    assert (df["unit"] == "MWh").all()
+    assert not df.empty
+
+
+def test_demand_electrolysis_efficiency_converts_percent_to_pu():
+    from iampypsa.io import RemindLoader
+
+    loader = RemindLoader(str(GENERIC_MIF))
+    spec = load_symbol_specs(backend="iamc")["demand_electrolysis_efficiency"]
+    df = load_frame(loader, spec)
+    assert (df["unit"] == "p.u.").all()
+    assert (df["value"] <= 1.0).all()  # a genuine p.u. fraction, not a raw percent
+
+
+def test_build_regional_demand_matches_hand_computed_electrolysis():
+    """End-to-end: RemindIamcCoupler.build_regional_demand's electrolysis figure, computed via
+    config-driven to_unit conversion, matches the formula applied by hand to raw mif EJ/% values."""
+    from iampypsa.io import RemindLoader
+    from iampypsa.couplers.remind import RemindIamcCoupler
+    from iampypsa.units import unit_factor
+
+    loader = RemindLoader(str(GENERIC_MIF))
+    symbols = load_symbol_specs(backend="iamc")
+    coupler = RemindIamcCoupler(
+        loader, symbols,
+        region_map={"DEU": ["DE"], "EWN": ["AT"], "CHA": ["CN"]},
+        config={}, model_regions=["DEU", "EWN", "CHA"],
+    )
+    out = coupler.build_regional_demand()
+
+    raw = pd.read_csv(GENERIC_MIF, sep=";", dtype=str)
+    raw.columns = [c.strip() for c in raw.columns]
+    row = lambda v: float(raw.loc[(raw["Variable"].str.strip() == v) & (raw["Region"] == "DEU"), "2090"].iloc[0])
+    ej_to_mwh = unit_factor("EJ/yr", "MWh")
+    h2_prod_mwh = row("SE|Hydrogen|Electricity") * ej_to_mwh
+    h2_turb_mwh = row("SE|Input|Hydrogen|Electricity") * ej_to_mwh
+    eta_pu = row("Tech|Hydrogen|Electricity|Efficiency") / 100.0
+    expected_electrolysis = max(h2_prod_mwh - h2_turb_mwh, 0.0) / eta_pu
+
+    got = out.query("region=='DEU' and year==2090 and sector=='electrolysis'")["value"].iloc[0]
+    assert got == pytest.approx(expected_electrolysis, rel=1e-9)

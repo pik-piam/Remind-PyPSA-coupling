@@ -1,32 +1,22 @@
-# Central REMIND symbol map — one place for all GDX/.mif variable names AND their units.
+# gdx symbol map for the REMIND→PyPSA coupling
 #
-# A logical name is one of two shapes:
+# Spec shapes:
 #
-# (1) Single-quantity symbol — maps a name (or candidate list) to one quantity:
+# (1) Single-quantity symbol:
 #       symbol:  a source-symbol name OR an ordered candidate list (first present wins —
-#                absorbs run/version renames, e.g. v32_* with p32_* fallback). Backend-neutral:
-#                the same key addresses a GDX symbol or an IAMC `.mif` variable.
+#                absorbs run/version renames). Backend-neutral: the same key can address
+#                a GDX symbol or an IAMC `.mif` variable.
 #       rename:  source domain column -> canonical column ({year, region, technology, ...})
-#       unit / units / to_unit:  OPTIONAL unit conversion (see below). Resolved via the central
-#                (from_unit, to_unit) -> factor table in iampypsa.units. Applied by `load_frame`.
-#         - unit:    a single source unit for the whole entry, OR
-#         - units:   a list parallel to the `symbol:` candidates (unit of whichever resolves) —
-#                    use when a fallback symbol reports in a different unit than the primary.
-#         - to_unit: the PyPSA target unit. Conversion is applied only when both are present;
-#                    identical units (or no `to_unit`) leave values untouched.
-#       unit_factor: OPTIONAL legacy scalar multiplier (kept for simple ad-hoc conversions).
+#       unit / units / to_unit: optional unit conversion, resolved via the central table
+#                in iampypsa.units and applied by `load_frame`.
 #
 # (2) Mixed-unit set symbol — ONE symbol whose `index` column selects several quantities with
 #     different units (e.g. pm_data indexed by `char` -> lifetime/FOM/VOM). Loaded by `load_set`:
 #       index:   the (renamed) column whose value selects the quantity
-#       schema:  index-value -> {parameter, unit, to_unit}; each row is converted independently.
+#       schema:  index-value -> {parameter, unit, to_unit}
 #
-# Schema: a single `default` section plus per-REMIND-region `overrides`.
-#   overrides: keyed by REMIND region name; each region lists ONLY the logical names whose spec
-#              DIFFERS from `default` (everything else, including units/schema, is inherited).
-# iampypsa ships these as defaults; a model may overlay its own YAML via load_symbol_specs(path=...)
-# or the IAMPYPSA_SYMBOLS env var (deep-merged on top).
-#
+# `overrides` (keyed by REMIND region) lists only the logical names that differ from `default`.
+# A model may overlay its own YAML via load_symbol_specs(path=...) or IAMPYPSA_SYMBOLS (deep-merged).
 
 default:
   # --- Canonical technology vocabulary --------------------------------------
@@ -66,6 +56,7 @@ default:
   # The tech->fuel map is derived from the `pe2se` set
   pe2se:
     symbol: pe2se
+    filter: {all_enty_1: seel}
 
   co2_price:
     symbol: p_priceCO2
@@ -120,6 +111,7 @@ default:
       all_enty_3: to_carrier
       all_te_4: technology
       all_enty_5: emission_type
+    filter: {to_carrier: seel, emission_type: co2}
     unit: Gt_C/TWa
     to_unit: t_CO2/MWh
   fuel_price:
