@@ -39,7 +39,7 @@ class RemindGdxCoupler(Coupler):
     """
 
     def build_regional_demand(self) -> pd.DataFrame:
-        """Read REMIND regional sectoral demand as tidy ``[year, region, sector, value]`` (MWh/yr).
+        """Read REMIND regional sectoral demand as long ``[year, region, sector, value]`` (MWh/yr).
 
         Reads ``demand_fe_sectors`` (``p32_load_sector``), with TWa→MWh conversion applied by
         ``load_frame``, and restricts to the configured REMIND regions. All available years are
@@ -47,7 +47,7 @@ class RemindGdxCoupler(Coupler):
         """
         raw = load_frame(self.loader, self.symbols["demand_fe_sectors"])
         raw["year"] = raw["year"].astype(int)
-        return convert_loads(raw, regions=self.model_regions, unit_factor=1.0)
+        return convert_loads(raw, regions=self.model_regions)
 
     def extract_cost_parameters(self, year: int) -> pd.DataFrame:
         """Extract REMIND GDX cost parameters as long

@@ -29,7 +29,7 @@ def adjust_link_capacities_to_input(
     eff_col: str = "efficiency",
 ) -> pd.DataFrame:
     """Divide output-based capacities by efficiency for link-like techs (→ input basis).
-    (PyPSA links are defined by input capacity, but some IAMs report output capacity.)
+    (PyPSA links are defined by input capacity, but IAMs report output capacity.)
 
     Rows with missing or zero efficiency are left unchanged (with a warning).
     """
@@ -61,13 +61,12 @@ def aggregate_capacities_to_carriers(
 ) -> pd.DataFrame:
     """Map model tech tokens to target carrier names, sum per (group, carrier).
 
-    Returns ``[year, region, carrier, value, unit]``.
-    Rows whose tech token is absent from ``tech_to_carrier`` are dropped with a warning.
-    Aggregation is needed when the mapping is not 1:1 (several tokens share a carrier).
+    Returns ``[year, region, carrier, value, unit]``. ``tech_to_carrier`` may be many-to-many:
+    several tokens sharing a carrier are summed; one token feeding several carriers is
+    preserved (not deduped), each carrier getting the full value. Rows whose tech token is
+    absent from ``tech_to_carrier`` are dropped with a warning.
     """
-    carrier_map = tech_to_carrier[[map_tech_col, map_carrier_col]].drop_duplicates(
-        subset=map_tech_col, keep="first"
-    )
+    carrier_map = tech_to_carrier[[map_tech_col, map_carrier_col]].drop_duplicates()
     mapped = capacities.merge(carrier_map, left_on=tech_col, right_on=map_tech_col, how="left")
     unmapped = mapped[map_carrier_col].isna().sum()
     if unmapped:
@@ -97,41 +96,37 @@ def apply_consolidation(
     Two steps, both driven by config — no-op when params are absent (e.g. IAMC configs
     that have no ``consolidation`` block):
 
-    1. **VRE-variant merge**: rename coupled VRE tech tokens to their primary token
-       (e.g. ``elh2VRE`` → ``elh2``).
-    2. **Battery scaling**: fold storage tech rows into the charger token (``btin``) by
-       multiplying each storage row by its scaling factor. If a ``btin`` row already carries
-       a positive value, the storage rows are dropped instead (bidirectional-coupling guard).
+    1. **Token rename**: rename coupled variant tokens to their primary token via
+       ``vre_to_primary`` (e.g. ``elh2VRE`` → ``elh2``; also used for battery-scaling targets
+       below, e.g. ``storspv`` → ``btin``).
+    2. **Battery scaling**: multiply each ``battery_scaling`` source row by its scaling factor
+       before it's renamed to its ``vre_to_primary`` target. If that target already carries a
+       positive value on its own, the source rows are dropped instead of scaled (bidirectional-
+       coupling guard).
     """
     caps = caps.copy()
     vre_to_primary = vre_to_primary or {}
     battery_scaling = battery_scaling or {}
 
     tech = caps[tech_col].astype(str)
+
+    if battery_scaling:
+        targets = {src: vre_to_primary.get(src, src) for src in battery_scaling}
+        is_target_present = tech.isin(set(targets.values())) & (caps[value_col] > 0)
+        is_stor = tech.isin(battery_scaling)
+        if is_target_present.any():
+            caps = caps[~is_stor].copy()
+            tech = caps[tech_col].astype(str)
+        else:
+            scale = tech.map(battery_scaling)
+            caps.loc[scale.notna(), value_col] *= scale[scale.notna()]
+
     caps[tech_col] = tech.map(lambda t: vre_to_primary.get(t, t))
-
-    if not battery_scaling:
-        return caps
-
-    tech = caps[tech_col].astype(str)
-    is_btin_present = ((tech == "btin") & (caps[value_col] > 0)).any()
-    is_stor = tech.isin(battery_scaling)
-    if is_btin_present:
-        return caps[~is_stor].copy()
-    scale = tech.map(battery_scaling)
-    caps.loc[scale.notna(), value_col] *= scale[scale.notna()]
-    caps[tech_col] = tech.map(lambda t: "btin" if t in battery_scaling else t)
     return caps
 
 
 def prepare_capacities(loader, symbols: dict) -> pd.DataFrame:
     """Read capacities at model-tech resolution, before any carrier aggregation.
-
-    Shared preparation for every consumer:
-    1. Read the ``capacity`` spec via ``load_spec`` (dispatches on spec shape; unit conversion
-       applied by the spec's ``to_unit``).
-    2. Apply the ``consolidation`` block if present (VRE-variant merge, battery scaling).
-    3. Adjust link-like techs to input-capacity basis (requires ``efficiency_conv`` symbol).
 
     Returns ``[year, region, technology, value, unit]``. Callers that need PyPSA carriers pass
     this to :func:`aggregate_capacities_to_carriers`; callers that need model-tech resolution

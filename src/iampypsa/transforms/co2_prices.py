@@ -8,7 +8,6 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-# Centralized in iampypsa.units (GDX backend reports per tonne carbon; PyPSA wants per tonne CO2).
 from iampypsa.units import TONNE_C_TO_TONNE_CO2
 
 
@@ -24,7 +23,7 @@ def extract_co2_prices(
     """Extract the per-(region, year) CO2 price pathway, filtered and reindexed.
 
     Filters to ``regions`` if given and, if ``years`` is given, reindexes to the full
-    ``regions × years`` grid (missing entries filled with 0, matching the Eur rule).
+    ``regions × years`` grid (missing entries filled with 0).
     """
     df = raw[[region_col, year_col, value_col]].copy()
     df[year_col] = df[year_col].astype(int)

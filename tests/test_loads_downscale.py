@@ -10,7 +10,7 @@ from iampypsa.downscale import (
     build_ssp_shares,
     disaggregate_demand_to_country,
 )
-from iampypsa.transforms.loads import TWA_TO_MWH, convert_loads
+from iampypsa.transforms.loads import convert_loads
 
 DATA = Path(__file__).parent / "data"
 GDX = DATA / "remind2pypsa_amt_filtered.gdx"
@@ -27,12 +27,12 @@ SECTOR_WEIGHTS = {
 COUNTRIES = {"DE", "AT", "BE", "LU", "NL", "CN", "HK", "MO", "TW"}
 
 
-def test_convert_loads_unit_and_grouping():
+def test_convert_loads_labels_and_groups():
     raw = pd.DataFrame(
         {"year": [2030, 2030], "region": ["DEU", "DEU"], "sector": ["AC", "AC"], "value": [1.0, 0.5]}
     )
     out = convert_loads(raw)
-    assert out["value"].iloc[0] == pytest.approx(1.5 * TWA_TO_MWH)  # summed then converted
+    assert out["value"].iloc[0] == pytest.approx(1.5)
     assert out["unit"].iloc[0] == "MWh_el"
 
 
@@ -54,10 +54,12 @@ def test_proportional_downscaler_splits_by_share():
 
 
 def test_convert_loads_matches_reference_regional():
-    from iampypsa.io import read_gdx_symbol as read_gdx
+    from iampypsa.io import RemindLoader
+    from iampypsa.io.remind_symbols import load_frame, load_symbol_specs
 
-    raw = read_gdx(str(GDX), "p32_load_sector",
-                   rename_columns={"ttot": "year", "all_regi": "region", "loadPy32": "sector"})
+    loader = RemindLoader(str(GDX))
+    symbols = load_symbol_specs(backend=loader.backend)
+    raw = load_frame(loader, symbols["demand_fe_sectors"])
     raw["year"] = raw["year"].astype(int)
     got = convert_loads(raw, regions=["DEU"]).query(
         "region == 'DEU' and year == 2090 and sector == 'AC'"

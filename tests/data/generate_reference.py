@@ -76,7 +76,7 @@ if __name__ == "__main__":
     is_eff = (remind_long["parameter"] == "efficiency") & (remind_long["technology"] == "battery-inverter")
     remind_long.loc[is_eff, "value"] **= 2
     costs_raw = convert_investment_to_input_capacity_basis(
-        build_iam_techdata(tech_mapping, remind_long)
+        build_iam_techdata(tech_mapping, remind_long), ["electrolysis"]
     )
     costs_raw.to_csv(REF / "costs_raw_overwritten.csv", index=False)
     print(f"costs_raw_overwritten.csv: {len(costs_raw)} rows")

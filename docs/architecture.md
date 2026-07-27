@@ -194,8 +194,8 @@ already applied — they don't re-scale a quantity.
 | Module | Key functions | Does |
 |---|---|---|
 | `co2_prices` | `extract_co2_prices`, `convert_co2_prices` | Filter/reindex the CO2 price pathway to the coupled `regions × years` grid (missing → 0); apply the currency factor. |
-| `loads` | `convert_loads` | Reduce IAM demand to one tidy row per `(year, region, sector)` in annual MWh. |
-| `capacities` | `prepare_capacities`, `apply_consolidation`, `adjust_link_capacities_to_input`, `aggregate_capacities_to_carriers`, `build_capacity_targets` | Read + consolidate (VRE-variant merge, battery scaling) tidy capacities; divide link-like techs by efficiency (output→input basis); map IAM techs to PyPSA carriers and sum to capacity targets. |
+| `loads` | `convert_loads` | Reduce IAM demand to one row per `(year, region, sector)` in annual MWh. |
+| `capacities` | `prepare_capacities`, `apply_consolidation`, `adjust_link_capacities_to_input`, `aggregate_capacities_to_carriers`, `build_capacity_targets` | Read + consolidate (VRE-variant merge, battery scaling) capacities; divide link-like techs by efficiency (output→input basis); map IAM techs to PyPSA carriers and sum to capacity targets. |
 | `costs` | `build_iam_techdata`, `build_pypsa_techdata`, `build_set_value_overrides`, `apply_overrides`, `add_discount_rate`, `convert_investment_to_input_capacity_basis` | Split cost values by [technology-mapping](getting-started/technology-mapping.md) source, merge IAM values onto the PyPSA baseline, convert investment from per-output to per-input capacity (`× efficiency ** exp`), add discount-rate rows. |
 
 The `Coupler`'s `build_*` / `extract_*` methods and the `transforms/capacities` entry point

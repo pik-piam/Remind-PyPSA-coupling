@@ -1,8 +1,9 @@
 """Disaggregate IAM regional demand to country level (region→country, Stage 1).
 
-Single-member regions are a no-op; multi-member regions are split by SSP GDP/population
-shares. Demand attributed to unconfigured countries is dropped (with a warning above 1% of
-regional demand).
+Single-member regions are a no-op; multi-member regions are split by proxy shares — a
+sector-specific blend of registered proxies (e.g. GDP/population for AC, heating/cooling
+degree-day demand for heating/cooling; see ``downscale.proxy.build_proxy_shares``). Demand
+attributed to unconfigured countries is dropped, with a warning naming them and their share.
 """
 
 import logging

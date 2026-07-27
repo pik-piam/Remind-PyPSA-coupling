@@ -1,27 +1,19 @@
 """Central REMIND symbol configuration: load logical→GDX/IAMC symbol maps and load frames.
 
-Symbol definitions evolve, so they live in YAML (not code) and are *layered*:
-
 1. the package default ships at ``iampypsa/data/remind_symbols_gdx.yaml`` (or ``…_mif.yaml``),
-   selected by ``backend`` — neither is the implicit default when an explicit backend is given;
+   selected by ``backend``.
 2. a model/run may overlay its own YAML — passed as ``path=`` or via the ``IAMPYPSA_SYMBOLS``
    environment variable — which is **deep-merged on top** of the default, so the overlay only
    needs to list what differs (a new symbol, a renamed candidate, a region override).
 
-``load_symbol_specs`` is split into debuggable steps: ``read_symbol_config`` (I/O + overlay →
-raw ``{default, overrides}`` dict) and ``merge_region_overrides`` (pure per-logical-name merge
-→ the flat map). Inspect either on its own when debugging.
-
 Loading layer:
 
-* ``load_frame``     — single-quantity symbol, addressed via ``symbol:`` key.
-* ``load_set``       — mixed-unit set symbol (``index:``/``schema:`` shape).
-* ``load_variable_set`` — many-variables-to-one-frame assembly (``variables:`` shape);
-  only satisfiable by a loader whose source format exposes named-variable lookup (IAMC today).
+* ``load_frame``     — single-quantity symbol, addressed via ``symbol:`` key. GDX and IAMC.
+* ``load_set``       — mixed-unit set symbol (``index:``/``schema:`` shape). GDX only.
+* ``load_variable_set`` — many-variables-to-one-frame assembly (``variables:`` shape).
+  IAMC only — raises if given a GDX-backed loader.
 * ``load_spec``      — dispatcher: picks by spec shape (``variables:`` →
   ``load_variable_set``; ``index:``/``schema:`` → ``load_set``; else → ``load_frame``).
-  A ``variables:`` spec still requires an IAMC-backed loader; the dispatch is on spec shape,
-  not a guarantee that every spec shape works with every backend.
 
 ``report_fallbacks`` returns a summary of all fallback declarations in a symbol map so
 coverage gaps are inspectable without running a full coupling.
@@ -213,7 +205,7 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
     linear combinations. Fallback tokens in ``spec['fallback']`` (``{token: {value, unit,
     reason}}``) are synthesised for every ``(year, region)`` when absent from the data.
     """
-    from iampypsa.io.iamc import assemble_variable_set, read_iamc
+    from iampypsa.io.iamc import build_variable_set, read_iamc
 
     if loader.backend != "iamc":
         raise ValueError(
@@ -235,7 +227,7 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
     all_vars = list(direct_vars | derived_vars)
 
     df = read_iamc(loader.source, variables=all_vars)
-    result = assemble_variable_set(df, mapping, label_col=label_col, derived=derived, to_unit=to_unit)
+    result = build_variable_set(df, mapping, label_col=label_col, derived=derived, to_unit=to_unit)
 
     # Synthesise rows for any fallback tokens absent from the loaded data.
     # A fallback entry must declare a ``value``; ``unit`` defaults to ``to_unit`` if omitted.

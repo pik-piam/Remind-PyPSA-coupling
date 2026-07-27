@@ -46,6 +46,20 @@ def test_aggregate_sums_and_filters():
     assert out.query("carrier=='solar'")["unit"].iloc[0] == "MW"
 
 
+def test_aggregate_preserves_one_tech_feeding_several_carriers():
+    """A REMIND tech mapped to several carriers (e.g. wind-offshore -> offwind, offwind-ac)
+    must feed each carrier the full value, not just the first-listed one."""
+    caps = pd.DataFrame({"year": [2050], "region": ["DEU"],
+                         "technology": ["wind-offshore"], "value": [12.0]})
+    tmap = pd.DataFrame({"model_tech": ["wind-offshore", "wind-offshore"],
+                         "target_carrier": ["offwind", "offwind-ac"]})
+    out = aggregate_capacities_to_carriers(
+        caps, tmap, map_tech_col="model_tech", map_carrier_col="target_carrier"
+    ).set_index("carrier")["value"]
+    assert out["offwind"] == pytest.approx(12.0)
+    assert out["offwind-ac"] == pytest.approx(12.0)
+
+
 def test_apply_consolidation_noop_without_params():
     """A config with no consolidation block (e.g. IAMC) leaves capacities untouched."""
     caps = pd.DataFrame({"year": [2050, 2050], "region": ["DEU", "DEU"],
@@ -61,7 +75,7 @@ def test_apply_consolidation_merges_vre_and_scales_battery():
          "technology": ["elh2VRE", "storspv", "storwindon"], "value": [10.0, 5.0, 2.0]})
     out = apply_consolidation(
         caps,
-        vre_to_primary={"elh2VRE": "elh2"},
+        vre_to_primary={"elh2VRE": "elh2", "storspv": "btin", "storwindon": "btin"},
         battery_scaling={"storspv": 4.0, "storwindon": 1.2},
     ).set_index("technology")["value"]
     assert out.loc["elh2"] == pytest.approx(10.0)
@@ -73,7 +87,9 @@ def test_apply_consolidation_uses_btin_directly_when_present():
     caps = pd.DataFrame(
         {"year": [2050, 2050], "region": ["DEU", "DEU"],
          "technology": ["btin", "storspv"], "value": [7.0, 5.0]})
-    out = apply_consolidation(caps, battery_scaling={"storspv": 4.0}).set_index("technology")["value"]
+    out = apply_consolidation(
+        caps, vre_to_primary={"storspv": "btin"}, battery_scaling={"storspv": 4.0}
+    ).set_index("technology")["value"]
     assert out["btin"] == pytest.approx(7.0)
     assert "storspv" not in out.index
 
@@ -95,7 +111,11 @@ def test_build_capacity_targets_reads_consolidation_from_symbols():
     symbols = {
         "capacity": {
             "symbol": "p32_capAvg",
-            "consolidation": {"battery_scaling": {"storspv": 4.0}, "link_techs": []},
+            "consolidation": {
+                "vre_to_primary": {"storspv": "btin"},
+                "battery_scaling": {"storspv": 4.0},
+                "link_techs": [],
+            },
         },
     }
     tmap = pd.DataFrame({"model_tech": ["btin"], "target_carrier": ["battery charger"]})

@@ -77,8 +77,9 @@ default:
     to_unit: MW
     # Electrolysis, hydrogen turbine and battery need postprocessing from gdx
     consolidation:
-      vre_to_primary: {elh2VRE: elh2, h2turbVRE: h2turb}   # merge VRE-coupled variants
-      battery_scaling: {storspv: 4.0, storwindon: 1.2, storwindoff: 1.2}  # storX -> btin (battery charger)
+      # merge VRE-coupled variants; storX -> btin is the battery-scaling target below
+      vre_to_primary: {elh2VRE: elh2, h2turbVRE: h2turb, storspv: btin, storwindon: btin, storwindoff: btin}
+      battery_scaling: {storspv: 4.0, storwindon: 1.2, storwindoff: 1.2}  # scale factor per source
       link_techs: [elh2, h2turb, btin, elh2VRE, h2turbVRE]  # output->input capacity adjustment
   cost_investment:
     symbol: vm_costTeCapital

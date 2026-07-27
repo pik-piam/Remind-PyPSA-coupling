@@ -5,9 +5,6 @@ or directly set them from values specified in the mapping.
 
 The *extraction* of individual cost parameters is source-specific and lives in each ``Coupler`` subclass.
 The shared functions (which live here) — provide the conversion/mapping and merging tools.
-
-Unit factors are centrally defined in ``iampypsa.units`` (re-exported below
-for convenience) so any IAM or PyPSA coupler can swap the conversion table without touching transforms.
 """
 
 import logging
@@ -17,8 +14,6 @@ from typing import Any
 import pandas as pd
 
 from iampypsa.io.technology_mapping import build_technology_sources, iam_name
-# Unit conventions are centralized in iampypsa.units; re-exported here for convenient imports.
-from iampypsa.units import DEFAULT_ETA_EXPONENTS
 
 logger = logging.getLogger(__name__)
 
@@ -95,21 +90,22 @@ def broadcast_fuel_prices(
 
 def convert_investment_to_input_capacity_basis(
     costs: pd.DataFrame,
-    eta_exponents: Mapping[str, float] = DEFAULT_ETA_EXPONENTS,
+    link_techs: Iterable[str],
 ) -> pd.DataFrame:
-    """Convert per-output-kW investment to per-input-kW by multiplying by efficiency**exp.
+    """Convert per-output-kW investment to per-input-kW by multiplying by efficiency.
 
-    Some IAMs report investment per kW of output capacity; PyPSA needs per kW of input
-    (``p_nom``). For each technology in ``eta_exponents``, ``investment`` is multiplied by
-    ``efficiency ** exp`` (exp=1 uses eta directly; exp=0.5 takes the one-way value out of a
-    pre-squared round-trip efficiency).
+    IAMs report investment per kW of output capacity; PyPSA needs per kW of input (``p_nom``)
+    for link-like technologies — ordinary generators need no adjustment and must not be listed
+    in ``link_techs``. Which techs need this is specific to how the calling model's own
+    network-building code consumes the result — see the caller for the reasoning per
+    technology.
     """
     costs = costs.copy()
-    for tech, exp in eta_exponents.items():
+    for tech in link_techs:
         inv = (costs["technology"] == tech) & (costs["parameter"] == "investment")
         eff = (costs["technology"] == tech) & (costs["parameter"] == "efficiency")
         if inv.any() and eff.any():
-            costs.loc[inv, "value"] *= costs.loc[eff, "value"].values ** exp
+            costs.loc[inv, "value"] *= costs.loc[eff, "value"].values
     return costs
 
 

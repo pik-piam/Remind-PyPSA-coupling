@@ -97,7 +97,7 @@ def test_cost_overrides_match_reference_remind_rows():
 
     technology_mapping = load_technology_parameters(str(TECH_MAPPING))["technologies"]
     overrides = convert_investment_to_input_capacity_basis(
-        build_iam_techdata(technology_mapping, remind_long)
+        build_iam_techdata(technology_mapping, remind_long), ["electrolysis"]
     )
     got = (
         overrides.query("region == 'DEU'")

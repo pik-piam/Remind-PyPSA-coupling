@@ -1,8 +1,8 @@
 """Fetch / read SSP population & GDP proxy datasets used to weight downscaling.
 
 ``fetch_ssp_variable`` pulls a country-level IAMC variable directly from the IIASA SSP
-REST API (no auth/pyam needed); ``read_ssp_data`` reads a saved snapshot. Ported from
-PyPSA-Eur ``retrieve_ssp_data.py``. Output columns: ``[iso2, year, value]``.
+REST API (no auth/pyam needed); ``read_ssp_data`` reads a saved snapshot.
+Output columns: ``[iso2, year, value]``.
 """
 
 import logging

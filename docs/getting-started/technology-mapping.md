@@ -64,6 +64,13 @@ The same mapping serves two different consumers:
   when building capacity targets (see [Harmonising capacities](harmonising-capacities.md) for how
   those targets then get applied).
 
+`transforms/costs.py`'s `convert_investment_to_input_capacity_basis` (output→input capacity-basis
+conversion for link-like technologies) is *not* driven by this mapping — which technologies need
+it depends on how the specific PyPSA model's own network-building code consumes the result, not
+on anything the mapping declares, so each model's coupling script lists them explicitly (see
+`pypsa-eur-iam/scripts/remind/import_REMIND_costs.py`'s `LINK_TECHS` for a worked example and the
+reasoning behind it).
+
 If a technology declares `source: IAM` (directly or via an override) for a parameter, but the
 IAM's own output has no matching data for it, `build_iam_techdata` raises an error.
 
