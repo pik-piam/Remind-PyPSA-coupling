@@ -13,13 +13,15 @@ are inherited from ``Coupler`` unchanged — they work for both backends via
 spec-shape dispatch.
 """
 
+import importlib.resources
 import logging
+from os import PathLike
 
 import pandas as pd
 import country_converter as coco
-import os.path
+
 from iampypsa.couplers.base import Coupler
-from iampypsa.io.remind_symbols import PathLike, load_frame, load_set, load_spec, load_variable_set, rename_technologies
+from iampypsa.io.remind_symbols import load_frame, load_set, load_spec, load_variable_set, rename_technologies
 from iampypsa.transforms.costs import broadcast_fuel_prices, annotate_cost_rows, apply_currency_factor
 from iampypsa.transforms.loads import convert_loads
 from iampypsa.units import HOURS_PER_YEAR, unit_factor
@@ -455,8 +457,9 @@ def read_region_map(
     ``"model_region"`` or ``"country"`` to select the groupby direction.
     """
     if file_path is None:
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        file_path = os.path.join(base_path, "data/remind", "regions.csv")
+        # importlib.resources, not a path walk from __file__: the CSV is package data and must
+        # resolve the same way for an editable checkout and an installed wheel.
+        file_path = importlib.resources.files("iampypsa.data").joinpath("remind", "regions.csv")
     region_mapping = pd.read_csv(file_path, sep=";").rename(columns={"RegionCode": "model_region"})
     region_mapping["country"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")
     region_mapping = region_mapping[["country", "model_region"]]
