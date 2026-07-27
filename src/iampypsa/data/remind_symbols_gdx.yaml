@@ -61,8 +61,8 @@ default:
   co2_price:
     symbol: p_priceCO2
     rename: {tall: year, all_regi: region}
-    unit: $/tC
-    to_unit: $/tCO2
+    unit: USD/tC
+    to_unit: USD/tCO2
   # TODO: gdx currently doesn't have space cooling demand yet
   demand_fe_sectors:
     symbol: p32_load_sector
@@ -84,8 +84,8 @@ default:
   cost_investment:
     symbol: vm_costTeCapital
     rename: {ttot: year, all_regi: region, all_te: technology, level: value}
-    unit: T$/TW
-    to_unit: $/MW
+    unit: TUSD/TW
+    to_unit: USD/MW
   efficiency_conv:
     symbol: pm_eta_conv
     rename: {tall: year, all_regi: region, all_te: technology}
@@ -102,7 +102,7 @@ default:
     schema:
       lifetime: {parameter: lifetime, unit: yr,     to_unit: yr}
       omf:      {parameter: FOM,      unit: p.u.,   to_unit: "%/yr"}
-      omv:      {parameter: VOM,      unit: T$/TWa, to_unit: $/MWh}
+      omv:      {parameter: VOM,      unit: TUSD/TWa, to_unit: USD/MWh}
   emission_factor:
     symbol: pm_emifac
     rename:
@@ -114,12 +114,12 @@ default:
       all_enty_5: emission_type
     filter: {to_carrier: seel, emission_type: co2}
     unit: Gt_C/TWa
-    to_unit: t_CO2/MWh
+    to_unit: t_CO2/MWh_th
   fuel_price:
     symbol: pm_PEPrice
     rename: {ttot: year, all_regi: region, all_enty: technology}
-    # T$/TWa holds for every fuel except peur (raw T$/Mt_Ur) — handled in the coupler.
-    unit: T$/TWa
+    # TUSD/TWa holds for every fuel except peur (raw TUSD/Mt_Ur) — handled in the coupler.
+    unit: TUSD/TWa
   discount_rate:
     symbol: p_r
     rename: {ttot: year, all_regi: region}

@@ -34,7 +34,7 @@ class RemindGdxCoupler(Coupler):
     Implements:
     - ``build_regional_demand``: reads ``load_sector`` GDX symbol (TWa→MWh via spec).
     - ``extract_cost_parameters``: reads all cost symbols from GDX, applies REMIND-GDX
-      tech-facts (tnrs/peur nuclear mass-basis → USD/MWh_el, storage $/MWh label,
+      tech-facts (tnrs/peur nuclear mass-basis → USD/MWh_el, storage USD/MWh label,
       GAMS-dropped zeros filled).
     """
 
@@ -56,10 +56,10 @@ class RemindGdxCoupler(Coupler):
         Unit conversions are config-declared (applied by ``load_frame``/``load_set``). The
         REMIND-GDX-specific tech-facts encoded here are:
         - ``tnrs`` (nuclear) efficiency is mass-basis (TWa_elec/Mt_Ur); combined with ``peur``'s
-          $/g_U fuel price into a true USD/MWh_el cost + 1.0 p.u. efficiency (see
+          USD/g_U fuel price into a true USD/MWh_el cost + 1.0 p.u. efficiency (see
           ``_nuclear_fuel_cost``).
-        - Storage techs (``h2stor``, ``btstor``) share the $/MW capex factor but are
-          relabelled $/MWh.
+        - Storage techs (``h2stor``, ``btstor``) share the USD/MW capex factor but are
+          relabelled USD/MWh.
         - GDX/GAMS drops explicit zeros, so entries missing for a modeled technology are
           true zeros (filled via ``_fill_missing_with_zero``).
         - ``currency_factor`` (config) scales ``investment``/``VOM``/``fuel`` (REMIND reports
@@ -68,25 +68,26 @@ class RemindGdxCoupler(Coupler):
         year_str = str(year)
         load = lambda name: load_frame(self.loader, self.symbols[name])  # noqa: E731
 
-        # Investment: T$/TW->$/MW applied in load_frame; storage techs relabelled $/MWh.
+        # Investment: unit conversion applied in load_frame. Storage capex is per MWh of store,
+        # not per MW of converter, but shares the same GDX symbol — so relabel only.
         costs = load("cost_investment")
         costs = costs.loc[costs["year"].astype(str) == year_str].copy()
-        costs = annotate_cost_rows(costs, parameter="investment", unit="USD/MW")
+        costs = annotate_cost_rows(costs, parameter="investment")
         costs.loc[costs["technology"].isin(["h2stor", "btstor"]), "unit"] = "USD/MWh"
 
         # tech_data: mixed-unit set (lifetime/FOM/VOM) - split + converted per YAML schema.
         techd = load_set(self.loader, self.symbols["tech_data"])
 
-        # CO2 intensity: Gt_C/TWa->t_CO2/MWh and carrier/emission-type slice applied in load_frame.
+        # CO2 intensity: unit conversion and the carrier/emission-type slice applied in load_frame.
         co2i = load("emission_factor")
         co2i = co2i.loc[co2i["year"].astype(str) == year_str].copy()
-        co2i = annotate_cost_rows(co2i, parameter="CO2 intensity", unit="t_CO2/MWh_th")
+        co2i = annotate_cost_rows(co2i, parameter="CO2 intensity")
 
         # GDX/GAMS drops explicit zeros, so missing entries for modeled technologies are true zeros.
         modeled_techs = costs[["region", "technology"]].drop_duplicates()
-        co2i = self._fill_missing_with_zero(co2i, modeled_techs, "CO2 intensity", "t_CO2/MWh_th")
+        co2i = self._fill_missing_with_zero(co2i, modeled_techs, "CO2 intensity")
         vom = techd[techd["parameter"] == "VOM"]
-        vom_filled = self._fill_missing_with_zero(vom, modeled_techs, "VOM", "$/MWh")
+        vom_filled = self._fill_missing_with_zero(vom, modeled_techs, "VOM")
         techd = pd.concat([techd[techd["parameter"] != "VOM"], vom_filled], ignore_index=True)
 
         # Efficiency
@@ -98,16 +99,18 @@ class RemindGdxCoupler(Coupler):
         fallback = eta[
             ~pd.MultiIndex.from_arrays([eta["region"], eta["technology"]]).isin(keys)
         ]
-        eff = annotate_cost_rows(pd.concat([dataeta, fallback]), parameter="efficiency", unit="p.u.")
-        # GDX nuclear efficiency is raw TWa_elec/Mt_Ur (mass basis, not thermal %). Convert to
-        # MWh/g_U via the TWa->MWh, Mt->g factor (HOURS_PER_YEAR/1e6 = 8.76e9/1e12).
+        eff = annotate_cost_rows(pd.concat([dataeta, fallback]), parameter="efficiency")
+        # GDX nuclear efficiency is raw TWa_elec/Mt_Ur (mass basis, not thermal %), so the spec's
+        # p.u. does not hold for it. Convert to MWh/g_U via TWa->MWh, Mt->g (8.76e9/1e12).
         eff.loc[eff["technology"] == "tnrs", "value"] *= HOURS_PER_YEAR / 1e6
         eff.loc[eff["technology"] == "tnrs", "unit"] = "MWh/g_U"
 
-        # Fuel: T$/TWa->$/MWh for all except peur (already $/g_U in GDX).
+        # Fuel: the spec cannot declare to_unit here because peur is already USD/g_U in GDX while
+        # every other carrier is TUSD/TWa — so the conversion and the thermal-basis label are set
+        # per-carrier below rather than at the load seam.
         fuel = load("fuel_price")
         fuel = fuel.loc[fuel["year"].astype(str) == year_str].copy()
-        fuel.loc[fuel["technology"] != "peur", "value"] *= unit_factor("T$/TWa", "$/MWh")
+        fuel.loc[fuel["technology"] != "peur", "value"] *= unit_factor("TUSD/TWa", "USD/MWh")
         fuel = annotate_cost_rows(fuel, parameter="fuel", unit="USD/MWh_th")
         fuel.loc[fuel["technology"] == "peur", "unit"] = "USD/g_U"
 
@@ -137,16 +140,26 @@ class RemindGdxCoupler(Coupler):
 
     @staticmethod
     def _fill_missing_with_zero(
-        sparse: pd.DataFrame, modeled_techs: pd.DataFrame, parameter: str, unit: str,
+        sparse: pd.DataFrame, modeled_techs: pd.DataFrame, parameter: str,
     ) -> pd.DataFrame:
         """Reindex against modeled technologies (from investment data), filling gaps with 0 —
-        GDX/GAMS drops explicit zeros, so a missing entry there is a true zero, not a gap."""
+        GDX/GAMS drops explicit zeros, so a missing entry there is a true zero, not a gap.
+
+        The unit is carried over from ``sparse`` so the filled rows keep whatever the symbol
+        spec declared.
+
+        Args:
+            sparse: The loaded frame, with explicit zeros already dropped by GAMS.
+            modeled_techs: The ``[region, technology]`` pairs to reindex against.
+            parameter: Canonical parameter name for the resulting rows.
+        """
+        units = sparse["unit"].dropna().unique() if "unit" in sparse.columns else []
         merged = modeled_techs.merge(
             sparse[["region", "technology", "value"]], on=["region", "technology"], how="left",
         )
         merged["value"] = merged["value"].fillna(0.0)
         merged["parameter"] = parameter
-        merged["unit"] = unit
+        merged["unit"] = units[0] if len(units) else None
         return merged
 
     @staticmethod
@@ -341,23 +354,18 @@ class RemindIamcCoupler(Coupler):
             df = load_variable_set(self.loader, self.symbols[name])
             return df[df["year"].astype(str) == y].copy()
 
-        # --- investment (USD/MW) ---
-        capex = annotate_cost_rows(load("cost_investment"), parameter="investment", unit="USD/MW")
-
-        # --- lifetime (yr) ---
-        lifetime = annotate_cost_rows(load("tech_lifetime"), parameter="lifetime", unit="yr")
+        # Units below come from each spec's to_unit:, stamped at the load seam.
+        capex = annotate_cost_rows(load("cost_investment"), parameter="investment")
+        lifetime = annotate_cost_rows(load("tech_lifetime"), parameter="lifetime")
+        vom = annotate_cost_rows(load("cost_omv"), parameter="VOM")
+        eff = annotate_cost_rows(load("efficiency"), parameter="efficiency")
 
         # --- FOM: compute %/yr = absolute / capex × 100 ---
         fom_abs = load("cost_omf")
         fom_pct = self._compute_fom_pct(capex, fom_abs)
 
-        # --- VOM (USD/MWh) ---
-        vom = annotate_cost_rows(load("cost_omv"), parameter="VOM", unit="USD/MWh")
-
-        # --- efficiency (p.u.) ---
-        eff = annotate_cost_rows(load("efficiency"), parameter="efficiency", unit="p.u.")
-
-        # --- fuel price (USD/MWh_th) ---
+        # Fuel prices are per unit of thermal input; the mif's unit string does not say so, and
+        # downstream marginal_cost = fuel / efficiency depends on that basis.
         fuel = annotate_cost_rows(load("fuel_price"), parameter="fuel", unit="USD/MWh_th")
 
         # --- nuclear: fuel cost (USD/MWh_el) + efficiency (1.0 p.u.), computed from the
@@ -367,8 +375,8 @@ class RemindIamcCoupler(Coupler):
         fuel = pd.concat([fuel, nuclear_fuel], ignore_index=True)
         eff = pd.concat([eff, nuclear_eff], ignore_index=True)
 
-        # --- CO2 intensity (t_CO2/MWh_th) — biomass techs fall back to 0.0 (carbon-neutral) ---
-        co2i = annotate_cost_rows(load("emission_factor"), parameter="CO2 intensity", unit="t_CO2/MWh_th")
+        # --- CO2 intensity — biomass techs fall back to 0.0 (carbon-neutral) ---
+        co2i = annotate_cost_rows(load("emission_factor"), parameter="CO2 intensity")
 
         # --- assemble ---
         frames = [capex, lifetime, fom_pct, vom, eff, fuel, co2i]

@@ -22,12 +22,23 @@ def annotate_cost_rows(
     costs: pd.DataFrame,
     *,
     parameter: str,
-    unit: str,
+    unit: str | None = None,
 ) -> pd.DataFrame:
-    """Annotate ``parameter``/``unit`` onto a cost-row frame."""
+    """Annotate ``parameter`` (and optionally ``unit``) onto a cost-row frame.
+
+    Omit ``unit`` to keep the one the load layer already stamped from the spec's ``to_unit:``.
+    Pass it only to override a declared unit — hardcoding a unit that merely restates the YAML
+    lets the two drift apart.
+
+    Args:
+        costs: Cost rows to annotate.
+        parameter: Canonical parameter name to write into the ``parameter`` column.
+        unit: Unit to force onto the ``unit`` column, overriding the loaded one.
+    """
     costs = costs.copy()
     costs["parameter"] = parameter
-    costs["unit"] = unit
+    if unit is not None:
+        costs["unit"] = unit
     return costs
 
 

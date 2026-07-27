@@ -103,23 +103,23 @@ def test_default_symbol_config_path_exists():
 
 
 def test_load_frame_applies_per_candidate_unit():
-    # Primary missing → resolves the fallback whose unit ($/tC) triggers the 12/44 conversion.
+    # Primary missing → resolves the fallback whose unit (USD/tC) triggers the 12/44 conversion.
     loader = _FakeLoader({"p_priceCO2": pd.DataFrame({"region": ["DEU"], "value": [100.0]})})
     spec = {
         "symbol": ["v32_taxCO2eq", "p_priceCO2"],
-        "units": ["$/tC", "$/tC"],
-        "to_unit": "$/tCO2",
+        "units": ["USD/tC", "USD/tC"],
+        "to_unit": "USD/tCO2",
     }
     out = load_frame(loader, spec)
     assert out["value"].iloc[0] == pytest.approx(100.0 * 12 / 44)
-    assert out["unit"].iloc[0] == "$/tCO2"  # stamped from to_unit
+    assert out["unit"].iloc[0] == "USD/tCO2"  # stamped from to_unit
 
 
 def test_load_frame_no_conversion_without_to_unit():
     loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0]})})
-    out = load_frame(loader, {"symbol": "sym", "unit": "T$/TWa"})  # no to_unit → untouched
+    out = load_frame(loader, {"symbol": "sym", "unit": "TUSD/TWa"})  # no to_unit → untouched
     assert out["value"].iloc[0] == 5.0
-    assert out["unit"].iloc[0] == "T$/TWa"  # stamped from the declared source unit
+    assert out["unit"].iloc[0] == "TUSD/TWa"  # stamped from the declared source unit
 
 
 def test_load_frame_no_unit_column_when_unit_undeclared():
@@ -141,7 +141,7 @@ def test_load_frame_raises_on_declared_unit_mismatch():
     # must fail loud rather than be silently overridden.
     loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0], "unit": ["GW"]})})
     with pytest.raises(ValueError, match="does not match"):
-        load_frame(loader, {"symbol": "sym", "unit": "T$/TWa", "to_unit": "MW"})
+        load_frame(loader, {"symbol": "sym", "unit": "TUSD/TWa", "to_unit": "MW"})
 
 
 def test_load_frame_raises_on_heterogeneous_live_units():
@@ -165,14 +165,14 @@ def test_load_set_splits_mixed_units_via_schema():
         "schema": {
             "lifetime": {"parameter": "lifetime", "unit": "yr", "to_unit": "yr"},
             "omf": {"parameter": "FOM", "unit": "p.u.", "to_unit": "%/yr"},
-            "omv": {"parameter": "VOM", "unit": "T$/TWa", "to_unit": "$/MWh"},
+            "omv": {"parameter": "VOM", "unit": "TUSD/TWa", "to_unit": "USD/MWh"},
         },
     }
     out = load_set(loader, spec).set_index("parameter")
     assert out.loc["lifetime", "value"] == 30.0          # factor 1
     assert out.loc["FOM", "value"] == pytest.approx(5.0)  # 0.05 * 100
     assert out.loc["VOM", "value"] == pytest.approx(2.0 * 1e6 / 8760)
-    assert out.loc["VOM", "unit"] == "$/MWh"
+    assert out.loc["VOM", "unit"] == "USD/MWh"
 
 
 def test_load_symbol_specs_iamc_backend():

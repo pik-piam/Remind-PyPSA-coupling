@@ -146,8 +146,8 @@ unit(s) and target unit:
 co2_price:
   symbol: [v32_taxCO2eq, p_priceCO2]   # try v32_… first, fall back to p_priceCO2
   rename: {tall: year, all_regi: region}
-  units: [$/tC, $/tC]                  # per-candidate source unit
-  to_unit: $/tCO2                      # load_frame() applies the (units, to_unit) factor
+  units: [USD/tC, USD/tC]              # per-candidate source unit
+  to_unit: USD/tCO2                    # load_frame() applies the (units, to_unit) factor
 ```
 
 A **mixed-unit set** — one IAM symbol whose `index` column selects several quantities
@@ -161,7 +161,7 @@ tech_data:
   schema:
     lifetime: {parameter: lifetime, unit: yr,     to_unit: yr}
     omf:      {parameter: FOM,      unit: p.u.,   to_unit: "%/yr"}
-    omv:      {parameter: VOM,      unit: T$/TWa, to_unit: $/MWh}
+    omv:      {parameter: VOM,      unit: TUSD/TWa, to_unit: USD/MWh}
 ```
 
 Per-region differences go under `overrides:` (e.g. `CHA:`) and need to list **only the entries
@@ -174,10 +174,10 @@ Two layering mechanisms let a model adjust symbols without forking the package:
   on top of the packaged default.
 - the `overrides:` block — per-IAM-region deltas inside one config.
 
-**The unit conversion contract:** `load_frame`/`load_set` apply the declared conversion *at
-the moment of loading* (the "Coupler seam"). The downstream transforms are therefore called
-with conversion disabled so units are never applied twice. Add a new conversion by adding one
-row to `UNIT_CONVERSIONS` in `units.py` — never as a literal in a transform or a rule.
+**Unit conversions:** `load_frame`/`load_set` apply the declared conversion *at
+the moment of loading* (the "Coupler seam") and stamp the resulting unit onto a `unit` column.
+The downstream transforms are therefore called with conversion disabled so units are never
+applied twice. Add a new conversion by adding one row to `UNIT_CONVERSIONS` in `units.py`.
 
 ---
 

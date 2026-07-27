@@ -41,6 +41,7 @@ default:
   co2_price:
     symbol: "Price|Carbon"
     unit: "US$2017/t CO2"
+    to_unit: "USD/tCO2"
 
   # --- Discount rate -------------------------------------------------------
   discount_rate:
