@@ -28,7 +28,7 @@ from typing import Any
 import pandas as pd
 import yaml
 
-from iampypsa.io.loader import RemindLoader
+from iampypsa.io.loader import RemindLoader, SymbolRef
 from iampypsa.units import unit_factor
 
 logger = logging.getLogger(__name__)
@@ -108,11 +108,11 @@ def load_symbol_specs(
     return merge_region_overrides(read_symbol_config(path, backend=backend), region)
 
 
-def _get_symbol_ref(spec: dict[str, Any]):
-    """Return the spec's source-symbol reference (``symbol``, falling back to legacy ``gdx``)."""
-    ref = spec.get("symbol", spec.get("gdx"))
+def _derive_symbol_ref(spec: dict[str, Any]) -> SymbolRef:
+    """Return the spec's source-symbol reference."""
+    ref = spec.get("symbol")
     if ref is None:
-        raise KeyError(f"Symbol spec has neither 'symbol' nor 'gdx': {spec}")
+        raise KeyError(f"Symbol spec has no 'symbol': {spec}")
     return ref
 
 
@@ -144,7 +144,7 @@ def _source_unit(spec: dict[str, Any], ref, resolved_name: str, df: pd.DataFrame
 def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Load the frame for one single-quantity symbol spec, applying its unit conversion.
 
-    Resolves ``symbol`` (falls back to legacy ``gdx``), then scales ``value`` via the central
+    Resolves ``symbol``, then scales ``value`` via the central
     ``iampypsa.units`` factor when both a source unit and ``to_unit:`` are declared. The source
     unit is read live from the data when available (mif's own ``Unit`` column), else from the
     spec's ``unit:``/``units:`` (GDX has no per-row unit info). Stamps the resolved unit onto a
@@ -154,7 +154,7 @@ def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     An optional ``filter: {column: value}`` drops rows that don't match — e.g. selecting a
     single GAMS domain slice (``rlf: 1``) out of a symbol that carries extra dimensions.
     """
-    ref = _get_symbol_ref(spec)
+    ref = _derive_symbol_ref(spec)
     resolved = loader.resolve_symbol(ref)
     df = loader.load_symbol(ref, rename_columns=spec.get("rename"))
     for col, value in spec.get("filter", {}).items():
@@ -181,7 +181,7 @@ def load_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     frame with a ``parameter`` column, ``value`` converted per row via the central units table,
     and a ``unit`` column set to the target unit. Index values not in the schema are dropped.
     """
-    ref = _get_symbol_ref(spec)
+    ref = _derive_symbol_ref(spec)
     raw = loader.load_symbol(ref, rename_columns=spec.get("rename"))
     index = spec["index"]
     frames = []
