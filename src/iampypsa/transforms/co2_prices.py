@@ -1,14 +1,14 @@
-"""Extract and convert a CO2 price pathway.
+"""Extract a CO2 price pathway.
 
 The transform is name-agnostic: it takes an already-loaded frame with canonical columns
-``[region, year, value]`` (the loader/Coupler handles the GDX symbol + renames).
+``[region, year, value]`` (the loader/Coupler handles the GDX symbol + renames). Unit
+conversion happens at the load seam and currency scaling in ``costs.apply_currency_factor``,
+so nothing here changes a magnitude.
 """
 
 from collections.abc import Sequence
 
 import pandas as pd
-
-from iampypsa.units import TONNE_C_TO_TONNE_CO2
 
 
 def extract_co2_prices(
@@ -43,15 +43,3 @@ def extract_co2_prices(
     return df.sort_values([region_col, year_col]).reset_index(drop=True)
 
 
-def convert_co2_prices(
-    prices: pd.DataFrame,
-    currency_factor: float = 1.0,
-    *,
-    carbon_to_co2: bool = True,
-    value_col: str = "value",
-) -> pd.DataFrame:
-    """Convert CO2 prices to PyPSA units: tC→tCO2 (optional) and a currency factor."""
-    out = prices.copy()
-    factor = currency_factor * (TONNE_C_TO_TONNE_CO2 if carbon_to_co2 else 1.0)
-    out[value_col] = out[value_col] * factor
-    return out

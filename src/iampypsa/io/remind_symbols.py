@@ -22,13 +22,14 @@ coverage gaps are inspectable without running a full coupling.
 import importlib.resources
 import logging
 import os
+from importlib.resources.abc import Traversable
 from os import PathLike
 from typing import Any
 
 import pandas as pd
 import yaml
 
-from iampypsa.io.loader import RemindLoader, SymbolRef
+from iampypsa.io.loader import Backend, RemindLoader, SymbolRef
 from iampypsa.units import unit_factor
 
 logger = logging.getLogger(__name__)
@@ -37,18 +38,31 @@ logger = logging.getLogger(__name__)
 SYMBOL_CONFIG_ENV = "IAMPYPSA_SYMBOLS"
 
 
-def default_symbol_config_path(backend: str | None = None) -> Any:
+#: Packaged default symbol config per backend.
+_BACKEND_CONFIGS = {
+    "gdx": "remind_symbols_gdx.yaml",
+    "iamc": "remind_symbols_mif.yaml",
+}
+
+
+def default_symbol_config_path(backend: Backend) -> Traversable:
     """Return the path to the packaged default symbol config for ``backend``.
 
-    ``backend="gdx"`` → ``remind_symbols_gdx.yaml``;
-    ``backend="iamc"`` → ``remind_symbols_mif.yaml``;
-    ``backend=None`` → ``remind_symbols_gdx.yaml`` (backward-compatible default).
+    ``backend`` is required and must be known. There is deliberately no GDX fallback: it made a
+    typo, or a forgotten argument on an IAMC run, resolve GDX symbol names against a mif — which
+    surfaces far from the cause, or not at all. Pass ``backend=loader.backend``.
+
+    Args:
+        backend: ``"gdx"`` or ``"iamc"``.
+
+    Raises:
+        ValueError: If ``backend`` is not a known backend.
     """
-    if backend == "iamc":
-        name = "remind_symbols_mif.yaml"
-    else:
-        name = "remind_symbols_gdx.yaml"
-    return importlib.resources.files("iampypsa.data").joinpath(name)
+    if backend not in _BACKEND_CONFIGS:
+        raise ValueError(
+            f"Unknown backend {backend!r}; expected one of {sorted(_BACKEND_CONFIGS)}."
+        )
+    return importlib.resources.files("iampypsa.data").joinpath(_BACKEND_CONFIGS[backend])
 
 
 def _merge_config(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -66,18 +80,22 @@ def _merge_config(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, An
 def read_symbol_config(
     path: str | PathLike | None = None,
     *,
-    backend: str | None = None,
+    backend: Backend,
 ) -> dict[str, Any]:
     """Read the raw symbol config (``{default, overrides}``), overlaying a user file if any.
 
     Always starts from the packaged default for ``backend``. An overlay file (``path``, else
     the ``IAMPYPSA_SYMBOLS`` env var) is deep-merged on top.
+
+    Args:
+        path: Overlay YAML to deep-merge onto the packaged default.
+        backend: ``"gdx"`` or ``"iamc"`` — required, see ``default_symbol_config_path``.
     """
-    base_path = default_symbol_config_path(backend)
-    base = yaml.safe_load(base_path.read_text())
-    overlay_path = path if path is not None else os.environ.get(SYMBOL_CONFIG_ENV)  # noqa: E501
+    base = yaml.safe_load(default_symbol_config_path(backend).read_text())
+    overlay_path = path if path is not None else os.environ.get(SYMBOL_CONFIG_ENV)
     if overlay_path:
-        base = _merge_config(base, yaml.safe_load(open(overlay_path).read()))
+        with open(overlay_path) as f:
+            base = _merge_config(base, yaml.safe_load(f))
     return base
 
 
@@ -97,13 +115,15 @@ def load_symbol_specs(
     region: str | None = None,
     path: str | PathLike | None = None,
     *,
-    backend: str | None = None,
+    backend: Backend,
 ) -> dict[str, Any]:
     """Return the resolved symbol map for ``backend`` and ``region``.
 
-    ``region`` and ``path`` are positional for backward compatibility with existing callers.
-    Pass ``backend=loader.backend`` as a keyword argument to select the GDX or IAMC config.
-    ``backend=None`` (default) falls back to the GDX config.
+    Args:
+        region: IAM region whose ``overrides:`` block wins over ``default:``; ``None`` for
+            the defaults alone. Positional, for existing callers.
+        path: Overlay YAML to deep-merge onto the packaged default. Positional, as above.
+        backend: ``"gdx"`` or ``"iamc"`` — required. Pass ``backend=loader.backend``.
     """
     return merge_region_overrides(read_symbol_config(path, backend=backend), region)
 
@@ -156,7 +176,8 @@ def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """
     ref = _derive_symbol_ref(spec)
     resolved = loader.resolve_symbol(ref)
-    df = loader.load_symbol(ref, rename_columns=spec.get("rename"))
+    # Pass the resolved name, not the candidate list — load_symbol would otherwise re-resolve.
+    df = loader.load_symbol(resolved, rename_columns=spec.get("rename"))
     for col, value in spec.get("filter", {}).items():
         # GAMS domain columns are categorical/string labels even for numeric-looking values
         # (e.g. rlf: 1) -- compare as strings so a plain int in the spec still matches.

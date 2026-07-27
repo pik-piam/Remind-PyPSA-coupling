@@ -5,11 +5,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from iampypsa.transforms.co2_prices import (
-    TONNE_C_TO_TONNE_CO2,
-    convert_co2_prices,
-    extract_co2_prices,
-)
+from iampypsa.transforms.co2_prices import extract_co2_prices
+from iampypsa.transforms.costs import apply_currency_factor
+from iampypsa.units import TONNE_C_TO_TONNE_CO2
 
 GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
 
@@ -39,25 +37,32 @@ def test_extract_reindexes_to_full_grid_with_zeros():
     assert len(out) == 4  # 2 regions x 2 years
 
 
-def test_convert_applies_carbon_and_currency_factor():
-    out = convert_co2_prices(_raw(), currency_factor=0.9, carbon_to_co2=True)
-    expected = 100.0 * 0.9 * TONNE_C_TO_TONNE_CO2
-    assert out["value"].iloc[0] == pytest.approx(expected)
+def test_currency_factor_scales_every_row_of_a_single_quantity_frame():
+    """The CO2 price frame has no `parameter` column, so parameters=None scales all of it —
+    the same seam the cost table uses with a parameter filter."""
+    out = apply_currency_factor(_raw(), 0.9, parameters=None)
+    assert out["value"].iloc[0] == pytest.approx(100.0 * 0.9)
 
 
 def test_against_real_amt_gdx():
-    from iampypsa.io import read_gdx_symbol as read_gdx
+    """Load through the seam, as production does: the spec's USD/tC -> USD/tCO2 conversion is
+    applied by load_frame, and the currency factor only rescales."""
+    from iampypsa.io import RemindLoader, load_frame, load_symbol_specs, read_gdx_symbol
 
-    raw = read_gdx(str(GDX), "p_priceCO2", rename_columns={"tall": "year", "all_regi": "region"})
-    prices = convert_co2_prices(
+    loader = RemindLoader(str(GDX))
+    raw = load_frame(loader, load_symbol_specs(backend="gdx")["co2_price"])
+    prices = apply_currency_factor(
         extract_co2_prices(raw, regions=["DEU", "EWN"], years=[2090, 2100]),
-        currency_factor=1.0,
+        1.0,
+        parameters=None,
     )
     assert len(prices) == 4  # 2 regions x 2 years
     assert (prices["value"] >= 0).all()
-    # converted prices are the carbon-price values scaled by the molar factor
+
+    # The seam applied the molar factor exactly once, against the untouched GDX values.
+    gdx = read_gdx_symbol(str(GDX), "p_priceCO2", {"tall": "year", "all_regi": "region"})
     assert prices["value"].max() == pytest.approx(
-        raw.assign(year=raw.year.astype(int))
+        gdx.assign(year=gdx.year.astype(int))
         .query("region in ['DEU','EWN'] and year in [2090,2100]")["value"].max()
         * TONNE_C_TO_TONNE_CO2
     )

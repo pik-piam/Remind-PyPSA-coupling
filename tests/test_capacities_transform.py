@@ -96,7 +96,7 @@ def test_apply_consolidation_uses_btin_directly_when_present():
 
 def test_build_capacity_targets_reads_consolidation_from_symbols():
     """build_capacity_targets applies the consolidation block declared in the capacity spec."""
-    from iampypsa.transforms.capacities import build_capacity_targets
+    from iampypsa.couplers.base import Coupler
 
     class _FakeLoader:
         def load_symbol(self, ref, rename_columns=None):
@@ -119,9 +119,9 @@ def test_build_capacity_targets_reads_consolidation_from_symbols():
         },
     }
     tmap = pd.DataFrame({"model_tech": ["btin"], "target_carrier": ["battery charger"]})
-    out = build_capacity_targets(
-        _FakeLoader(), symbols, ["DEU"], tmap,
-        map_tech_col="model_tech", map_carrier_col="target_carrier",
+    coupler = Coupler(_FakeLoader(), symbols, {}, {}, model_regions=["DEU"])
+    out = coupler.build_capacity_targets(
+        tmap, map_tech_col="model_tech", map_carrier_col="target_carrier",
     )
     assert out.query("carrier == 'battery charger'")["value"].iloc[0] == pytest.approx(5.0 * 4.0)
 
@@ -130,13 +130,12 @@ def test_generator_targets_match_reference():
     from iampypsa.io import RemindLoader, build_capacity_reporting_technologies, load_technology_parameters
     from iampypsa.io.remind_symbols import load_symbol_specs
     from iampypsa.io.technology_mapping import iam_name
-    from iampypsa.transforms.capacities import prepare_capacities
-
+    from iampypsa.couplers.base import Coupler
     from iampypsa.io.remind_symbols import rename_technologies
 
     loader = RemindLoader(str(GDX))
     symbols = load_symbol_specs(backend=loader.backend)
-    raw = prepare_capacities(loader, symbols)
+    raw = Coupler(loader, symbols, {}, {}).prepare_capacities()
     raw = rename_technologies(raw, symbols.get("technology_names"))
     raw["year"] = raw["year"].astype(int)
 

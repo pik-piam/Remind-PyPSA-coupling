@@ -14,7 +14,7 @@ def test_valid_scenario_passes():
     from iampypsa.io import RemindLoader
 
     loader = RemindLoader(str(GDX))
-    sym = load_symbol_specs()
+    sym = load_symbol_specs(backend="gdx")
     validate_scenario_against_remind(loader, sym, ["DEU", "EWN"], [2090, 2100])  # no raise
 
 
@@ -22,7 +22,7 @@ def test_missing_region_raises():
     from iampypsa.io import RemindLoader
 
     loader = RemindLoader(str(GDX))
-    sym = load_symbol_specs()
+    sym = load_symbol_specs(backend="gdx")
     with pytest.raises(ValueError, match="regions"):
         validate_scenario_against_remind(loader, sym, ["DEU", "ATLANTIS"], [2090])
 
@@ -31,6 +31,6 @@ def test_missing_year_raises():
     from iampypsa.io import RemindLoader
 
     loader = RemindLoader(str(GDX))
-    sym = load_symbol_specs()
+    sym = load_symbol_specs(backend="gdx")
     with pytest.raises(ValueError, match="years"):
         validate_scenario_against_remind(loader, sym, ["DEU"], [1999])

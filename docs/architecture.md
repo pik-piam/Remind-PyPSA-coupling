@@ -121,6 +121,8 @@ Methods, grouped by whether they're IAM-specific or shared:
 | `build_co2_prices(years=None)` | concrete, inherited | rarely — only if the model's CO2 handling diverges. |
 | `downscale_country_demand(regional=None)` | concrete, inherited | the model needs extra steps (e.g. a historical-calibration adjustment). |
 | `build_discount_rates(year)` | concrete, inherited | rarely. |
+| `prepare_capacities()` | concrete, inherited | rarely — capacities at model-tech resolution, before carrier aggregation. |
+| `build_capacity_targets(tech_map, …)` | concrete, inherited | rarely — the same, aggregated to the model's PyPSA carriers. |
 
 ---
 
@@ -170,7 +172,7 @@ that differ** — everything else is inherited from `default:`. Resolve with
 
 Two layering mechanisms let a model adjust symbols without forking the package:
 
-- `load_symbol_specs(path=…)` or the `IAMPYPSA_SYMBOLS` env var — overlay a model-local YAML
+- `load_symbol_specs(path=…, backend=…)` or the `IAMPYPSA_SYMBOLS` env var — overlay a model-local YAML
   on top of the packaged default.
 - the `overrides:` block — per-IAM-region deltas inside one config.
 
@@ -191,15 +193,17 @@ is the loader's job — which makes them trivially unit-testable and reusable ac
 Because conversion happens at the load seam (above), transforms are invoked with conversion
 already applied — they don't re-scale a quantity.
 
+The rule that decides where a step lives: **building a whole coupled quantity is a `Coupler`
+method; reading one symbol or applying one pure transform is a direct call.** 
+
 | Module | Key functions | Does |
 |---|---|---|
-| `co2_prices` | `extract_co2_prices`, `convert_co2_prices` | Filter/reindex the CO2 price pathway to the coupled `regions × years` grid (missing → 0); apply the currency factor. |
+| `co2_prices` | `extract_co2_prices` | Filter/reindex the CO2 price pathway to the coupled `regions × years` grid (missing → 0). Currency scaling is `costs.apply_currency_factor`, shared with the cost table. |
 | `loads` | `convert_loads` | Reduce IAM demand to one row per `(year, region, sector)` in annual MWh. |
-| `capacities` | `prepare_capacities`, `apply_consolidation`, `adjust_link_capacities_to_input`, `aggregate_capacities_to_carriers`, `build_capacity_targets` | Read + consolidate (VRE-variant merge, battery scaling) capacities; divide link-like techs by efficiency (output→input basis); map IAM techs to PyPSA carriers and sum to capacity targets. |
+| `capacities` | `apply_consolidation`, `adjust_link_capacities_to_input`, `aggregate_capacities_to_carriers` | Consolidate (VRE-variant merge, battery scaling); divide link-like techs by efficiency (output→input basis); map IAM techs to PyPSA carriers and sum. Sequenced by `Coupler.build_capacity_targets`. |
 | `costs` | `build_iam_techdata`, `build_pypsa_techdata`, `build_set_value_overrides`, `apply_overrides`, `add_discount_rate`, `convert_investment_to_input_capacity_basis` | Split cost values by [technology-mapping](getting-started/technology-mapping.md) source, merge IAM values onto the PyPSA baseline, convert investment from per-output to per-input capacity (`× efficiency ** exp`), add discount-rate rows. |
 
-The `Coupler`'s `build_*` / `extract_*` methods and the `transforms/capacities` entry point
-(`build_capacity_targets`) are thin orchestrations over these functions; each function is
+The `Coupler`'s `build_*` / `extract_*` methods are thin orchestrations over these functions; each function is
 documented individually in the **Reference** section of the nav.
 
 ---

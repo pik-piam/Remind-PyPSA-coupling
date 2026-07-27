@@ -1,19 +1,17 @@
-"""Determine installed-capacity targets (p_nom_min) for PyPSA from IAM output.
+"""Pure steps for turning IAM installed capacities into PyPSA targets (p_nom_min).
 
-The shared pipeline is: 
-1. read the capacity spec via ``load_spec`` (handles unit conversion and
-backend dispatch)
-2. optionally apply a ``consolidation`` block from the spec (VRE-variant merging,
-battery scaling — only exercised when the symbol config declares it, e.g. for GDX input),
-3. adjust link-like techs to input-capacity basis, and aggregate to PyPSA carriers.
+In pipeline order: consolidate variant tokens (:func:`apply_consolidation`), put link-like
+technologies on an input-capacity basis (:func:`adjust_link_capacities_to_input`), then map
+model tech tokens to PyPSA carriers and sum (:func:`aggregate_capacities_to_carriers`).
+
+Reading the symbols and sequencing these is the Coupler's job — see
+``Coupler.prepare_capacities`` / ``Coupler.build_capacity_targets``.
 """
 
 import logging
 from collections.abc import Sequence
 
 import pandas as pd
-
-from iampypsa.io.remind_symbols import load_spec, rename_technologies
 
 logger = logging.getLogger(__name__)
 
@@ -125,48 +123,3 @@ def apply_consolidation(
     return caps
 
 
-def prepare_capacities(loader, symbols: dict) -> pd.DataFrame:
-    """Read capacities at model-tech resolution, before any carrier aggregation.
-
-    Returns ``[year, region, technology, value, unit]``. Callers that need PyPSA carriers pass
-    this to :func:`aggregate_capacities_to_carriers`; callers that need model-tech resolution
-    (e.g. group-wise brownfield harmonisation) consume it directly.
-    """
-    cap_spec = symbols["capacity"]
-    cons = dict(cap_spec.get("consolidation", {}))
-    link_techs = set(cons.pop("link_techs", []))
-
-    caps = load_spec(loader, cap_spec)
-    caps = apply_consolidation(caps, **cons)
-
-    if link_techs and "efficiency_conv" in symbols:
-        eff = load_spec(loader, symbols["efficiency_conv"]).rename(columns={"value": "efficiency"})
-        caps = adjust_link_capacities_to_input(caps, eff, link_techs)
-
-    return caps
-
-
-def build_capacity_targets(
-    loader,
-    symbols: dict,
-    regions: Sequence[str],
-    tech_map: pd.DataFrame,
-    *,
-    map_tech_col: str,
-    map_carrier_col: str,
-) -> pd.DataFrame:
-    """Build installed-capacity targets per ``[year, region, carrier, value, unit]``.
-
-    Prepare capacities (:func:`prepare_capacities`), map tech tokens to carriers via ``tech_map``
-    and sum, then filter to ``regions``. The ``unit`` column reflects the target unit declared in
-    the capacity spec (``to_unit``).
-    """
-    unit = symbols["capacity"].get("to_unit", "MW")
-
-    caps = prepare_capacities(loader, symbols)
-    caps = rename_technologies(caps, symbols.get("technology_names"))
-    caps = aggregate_capacities_to_carriers(
-        caps, tech_map, map_tech_col=map_tech_col, map_carrier_col=map_carrier_col, unit=unit,
-    )
-    caps["year"] = caps["year"].astype(int)
-    return caps[caps["region"].isin(set(regions))].reset_index(drop=True)

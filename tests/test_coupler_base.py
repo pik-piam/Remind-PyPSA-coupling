@@ -11,7 +11,6 @@ import pytest
 
 from iampypsa.couplers.base import Coupler
 from iampypsa.couplers.remind import RemindGdxCoupler
-from iampypsa.transforms.capacities import build_capacity_targets
 
 DATA = Path(__file__).parent / "data"
 GDX = DATA / "remind2pypsa_amt_filtered.gdx"
@@ -147,10 +146,7 @@ def test_full_capacity_targets_match_reference():
         ]
     )
     a = _coupler()
-    got = build_capacity_targets(
-        a.loader, a.symbols, a.model_regions, tmap,
-        map_tech_col="IAM", map_carrier_col="PyPSA",
-    )
+    got = a.build_capacity_targets(tmap, map_tech_col="IAM", map_carrier_col="PyPSA")
     got["year"] = got["year"].astype(int)
     g = got.query("region == 'DEU' and year == 2090").set_index("carrier")["value"]
     r = (
@@ -160,3 +156,18 @@ def test_full_capacity_targets_match_reference():
     )
     assert g.index.equals(r.index)
     pd.testing.assert_series_equal(g, r, check_names=False, rtol=1e-6)
+
+
+def test_prepare_capacities_stops_before_carrier_aggregation():
+    """prepare_capacities is the model-tech seam consumers reach for (brownfield
+    harmonisation); build_capacity_targets is the same data aggregated to PyPSA carriers."""
+    a = _coupler()
+    raw = a.prepare_capacities()
+    assert "technology" in raw.columns and "carrier" not in raw.columns
+
+    tmap = pd.DataFrame(
+        [{"PyPSA": "onwind", "IAM": "wind-onshore"}, {"PyPSA": "solar", "IAM": "solar-pv"}]
+    )
+    targets = a.build_capacity_targets(tmap, map_tech_col="IAM", map_carrier_col="PyPSA")
+    assert set(targets["carrier"]) == {"onwind", "solar"}
+    assert set(targets["region"]) <= set(a.model_regions)

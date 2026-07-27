@@ -25,12 +25,17 @@ from typing import Any
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-
 from iampypsa.downscale.demand import disaggregate_demand_to_country
-from iampypsa.io.remind_symbols import load_frame
-from iampypsa.transforms.co2_prices import convert_co2_prices, extract_co2_prices
-from iampypsa.transforms.costs import select_discount_rate
+from iampypsa.io.remind_symbols import load_frame, load_spec, rename_technologies
+from iampypsa.transforms.capacities import (
+    adjust_link_capacities_to_input,
+    aggregate_capacities_to_carriers,
+    apply_consolidation,
+)
+from iampypsa.transforms.co2_prices import extract_co2_prices
+from iampypsa.transforms.costs import apply_currency_factor, select_discount_rate
+
+logger = logging.getLogger(__name__)
 
 
 class Coupler:
@@ -88,8 +93,10 @@ class Coupler:
         raw = load_frame(self.loader, self.symbols["co2_price"])
         years = years if years is not None else self.config.get("planning_horizons")
         prices = extract_co2_prices(raw, regions=self.model_regions, years=years)
-        return convert_co2_prices(
-            prices, currency_factor=self.config.get("currency_factor", 1.0), carbon_to_co2=False
+        # parameters=None, not a CURRENCY_COST_PARAMETERS entry: this frame is single-quantity
+        # (no `parameter` column), so every row is the monetary one.
+        return apply_currency_factor(
+            prices, self.config.get("currency_factor", 1.0), parameters=None
         )
 
     def downscale_country_demand(self, regional: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -116,3 +123,55 @@ class Coupler:
         rates = load_frame(self.loader, self.symbols["discount_rate"])
         rates = rates[rates["region"].isin(self.model_regions)]
         return select_discount_rate(rates, year, self.model_regions)
+
+    def prepare_capacities(self) -> pd.DataFrame:
+        """Read installed capacities at model-tech resolution, before carrier aggregation.
+
+        Returns ``[year, region, technology, value, unit]``. Applies the capacity spec's
+        optional ``consolidation`` block (VRE-variant merging, battery scaling) and puts
+        link-like technologies on an input-capacity basis. Callers wanting PyPSA carriers use
+        :meth:`build_capacity_targets`; callers needing model-tech resolution (e.g. group-wise
+        brownfield harmonisation) use this directly.
+        """
+        cap_spec = self.symbols["capacity"]
+        consolidation = dict(cap_spec.get("consolidation", {}))
+        link_techs = set(consolidation.pop("link_techs", []))
+
+        caps = apply_consolidation(load_spec(self.loader, cap_spec), **consolidation)
+        if link_techs and "efficiency_conv" in self.symbols:
+            eff = load_spec(self.loader, self.symbols["efficiency_conv"]).rename(
+                columns={"value": "efficiency"}
+            )
+            caps = adjust_link_capacities_to_input(caps, eff, link_techs)
+        return caps
+
+    def build_capacity_targets(
+        self,
+        tech_map: pd.DataFrame,
+        *,
+        map_tech_col: str,
+        map_carrier_col: str,
+        regions: Sequence[str] | None = None,
+    ) -> pd.DataFrame:
+        """Build installed-capacity targets as ``[year, region, carrier, value, unit]``.
+
+        ``tech_map`` stays an argument because the carrier vocabulary is PyPSA-side and never
+        lives in the package. The ``unit`` column reflects the capacity spec's ``to_unit``.
+
+        Args:
+            tech_map: Model technology→carrier mapping table.
+            map_tech_col: Column in ``tech_map`` holding the IAM technology token.
+            map_carrier_col: Column in ``tech_map`` holding the target PyPSA carrier.
+            regions: IAM regions to keep; defaults to ``self.model_regions``.
+        """
+        regions = self.model_regions if regions is None else regions
+        caps = rename_technologies(self.prepare_capacities(), self.symbols.get("technology_names"))
+        caps = aggregate_capacities_to_carriers(
+            caps,
+            tech_map,
+            map_tech_col=map_tech_col,
+            map_carrier_col=map_carrier_col,
+            unit=self.symbols["capacity"].get("to_unit", "MW"),
+        )
+        caps["year"] = caps["year"].astype(int)
+        return caps[caps["region"].isin(set(regions))].reset_index(drop=True)

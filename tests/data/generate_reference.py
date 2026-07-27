@@ -16,7 +16,6 @@ from iampypsa.couplers.remind import RemindGdxCoupler
 from iampypsa.io import RemindLoader, build_capacity_reporting_technologies, load_technology_parameters
 from iampypsa.io.remind_symbols import load_symbol_specs
 from iampypsa.io.technology_mapping import iam_name
-from iampypsa.transforms.capacities import build_capacity_targets
 from iampypsa.transforms.costs import build_iam_techdata, convert_investment_to_input_capacity_basis
 
 HERE = Path(__file__).parent
@@ -89,9 +88,8 @@ if __name__ == "__main__":
             if iam_name(tech, spec) in reports_capacity
         ]
     )
-    capacities = build_capacity_targets(
-        coupler.loader, coupler.symbols, coupler.model_regions, tmap,
-        map_tech_col="IAM", map_carrier_col="PyPSA",
+    capacities = coupler.build_capacity_targets(
+        tmap, map_tech_col="IAM", map_carrier_col="PyPSA"
     )
     capacities.to_csv(REF / "installed_capacities.csv", index=False)
     print(f"installed_capacities.csv: {len(capacities)} rows")

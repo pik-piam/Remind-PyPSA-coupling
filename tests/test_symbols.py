@@ -37,7 +37,7 @@ class _FakeLoader:
 
 
 def test_load_specs_default():
-    default = load_symbol_specs()
+    default = load_symbol_specs(backend="gdx")
     assert default["co2_price"]["symbol"] == "p_priceCO2"
     assert default["demand_fe_sectors"]["rename"]["loadPy32"] == "sector"
 
@@ -58,7 +58,7 @@ def test_merge_region_overrides_prefers_region_entry():
 
 
 def test_load_specs_region_without_override_equals_default():
-    assert load_symbol_specs("DEU") == load_symbol_specs()
+    assert load_symbol_specs("DEU", backend="gdx") == load_symbol_specs(backend="gdx")
 
 
 OVERLAY = (
@@ -76,10 +76,10 @@ OVERLAY = (
 def test_overlay_path_layers_onto_package_default(tmp_path):
     p = tmp_path / "syms.yaml"
     p.write_text(OVERLAY)
-    specs = load_symbol_specs(path=p)
+    specs = load_symbol_specs(path=p, backend="gdx")
     assert specs["co2_price"]["symbol"] == "my_symbol"  # overlay overrides the package default
     assert "demand_fe_sectors" in specs  # an entry only in the package default is still present
-    cha = load_symbol_specs("CHA", path=p)
+    cha = load_symbol_specs("CHA", path=p, backend="gdx")
     assert cha["co2_price"]["symbol"] == "cha_symbol"  # overlay region override wins
 
 
@@ -89,17 +89,26 @@ def test_overlay_via_env_var(tmp_path, monkeypatch):
     p = tmp_path / "syms.yaml"
     p.write_text(OVERLAY)
     monkeypatch.setenv(SYMBOL_CONFIG_ENV, str(p))
-    assert load_symbol_specs()["co2_price"]["symbol"] == "my_symbol"
+    assert load_symbol_specs(backend="gdx")["co2_price"]["symbol"] == "my_symbol"
 
 
 def test_default_symbol_config_path_exists():
     from iampypsa.io.remind_symbols import default_symbol_config_path
 
-    # Default (no backend) and explicit "gdx" both resolve to the GDX config.
-    assert default_symbol_config_path().name == "remind_symbols_gdx.yaml"
     assert default_symbol_config_path(backend="gdx").name == "remind_symbols_gdx.yaml"
     assert default_symbol_config_path(backend="iamc").name == "remind_symbols_mif.yaml"
-    assert "default:" in default_symbol_config_path().read_text()
+    assert "default:" in default_symbol_config_path(backend="gdx").read_text()
+
+
+def test_default_symbol_config_path_requires_a_known_backend():
+    """No GDX fallback: a missing or mistyped backend must fail here, not by resolving GDX
+    symbol names against a mif much later. 'mif' is the obvious typo — it names the file."""
+    from iampypsa.io.remind_symbols import default_symbol_config_path
+
+    with pytest.raises(ValueError, match="Unknown backend"):
+        default_symbol_config_path(backend="mif")
+    with pytest.raises(TypeError):
+        load_symbol_specs()  # backend is keyword-only and required
 
 
 def test_load_frame_applies_per_candidate_unit():
@@ -343,7 +352,7 @@ def test_load_frame_against_real_gdx():
     from iampypsa.io import RemindLoader
 
     loader = RemindLoader(str(EUR_GDX))
-    spec = load_symbol_specs()["co2_price"]
+    spec = load_symbol_specs(backend="gdx")["co2_price"]
     df = load_frame(loader, spec)
     assert {"year", "region", "value"} <= set(df.columns)
     assert "DEU" in set(df["region"])

@@ -12,6 +12,7 @@ receives a ``mapping`` dict (variable → token label) and an optional ``derived
 linear combinations (e.g. ``pc = Coal|w/o CC − IGCC − CHP``).
 """
 
+import functools
 import logging
 import re
 from collections.abc import Sequence
@@ -67,10 +68,18 @@ def read_iamc(
     return long.dropna(subset=["value"]).reset_index(drop=True)
 
 
+@functools.lru_cache(maxsize=8)
+def _read_iamc_variables(path: str, sep: str) -> tuple[str, ...]:
+    """Read and cache the sorted variable names of one ``.mif`` (keyed by path, like the GDX
+    container cache). Every symbol resolution scans this column, so on a full-size mif the
+    repeated reads dominate."""
+    raw = pd.read_csv(path, sep=sep, usecols=["Variable"], dtype=str)
+    return tuple(sorted(_strip_agg_markers(raw["Variable"].dropna()).unique().tolist()))
+
+
 def list_iamc_variables(path: str | PathLike, sep: str = ";") -> list[str]:
     """List the IAMC variable names present in a ``.mif`` file (sorted)."""
-    raw = pd.read_csv(path, sep=sep, usecols=["Variable"], dtype=str)
-    return sorted(_strip_agg_markers(raw["Variable"].dropna()).unique().tolist())
+    return list(_read_iamc_variables(str(path), sep))
 
 
 def parse_currency_year(unit: str) -> int | None:

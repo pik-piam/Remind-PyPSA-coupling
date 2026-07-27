@@ -42,28 +42,41 @@ def annotate_cost_rows(
     return costs
 
 
-#: Currency-denominated parameters — the only rows ``apply_currency_factor`` scales.
-#: Excludes physical units (lifetime/efficiency/CO2 intensity) and FOM (a ratio; factor cancels).
-CURRENCY_PARAMETERS = {"investment", "VOM", "fuel"}
+#: Which ``parameter`` values of a *cost table* are currency-denominated. Excludes physical
+#: units (lifetime/efficiency/CO2 intensity) and FOM (a ratio — the factor cancels). The CO2
+#: price is monetary too, but is a single-quantity frame with no ``parameter`` column to match
+#: on, so it scales via ``parameters=None`` rather than by being listed here.
+CURRENCY_COST_PARAMETERS = {"investment", "VOM", "fuel"}
 
 
 # TODO: Implement more generic deflator for different currency years
 def apply_currency_factor(
-    costs: pd.DataFrame,
+    values: pd.DataFrame,
     currency_factor: float,
-    parameters: Iterable[str] = CURRENCY_PARAMETERS,
+    parameters: Iterable[str] | None = CURRENCY_COST_PARAMETERS,
 ) -> pd.DataFrame:
-    """Scale ``value`` by ``currency_factor`` for currency-denominated ``parameter`` rows.
+    """Scale ``value`` by ``currency_factor`` for currency-denominated rows.
 
-    One-directional (IAM USD -> PyPSA baseline currency); converts between currencies, not
-    between currency years (e.g. REMIND's US$2017 vs the baseline's own reporting year).
+    The single seam for currency on every monetary quantity — cost parameters and the CO2
+    price pathway alike. One-directional (IAM USD -> PyPSA baseline currency); it converts
+    between currencies, not between currency *years* (e.g. REMIND's US$2017 vs the baseline's
+    own reporting year), which nothing handles yet.
+
+    Args:
+        values: Long frame with a ``value`` column, and a ``parameter`` column if selecting.
+        currency_factor: Multiplier into the baseline currency; ``1.0`` is a no-op.
+        parameters: ``parameter`` values to restrict scaling to, for a multi-quantity cost
+            table. Pass ``None`` for a single-quantity monetary frame such as the CO2 price
+            pathway, which has no ``parameter`` column — then every row is scaled.
     """
     if currency_factor == 1.0:
-        return costs
-    costs = costs.copy()
-    mask = costs["parameter"].isin(set(parameters))
-    costs.loc[mask, "value"] *= currency_factor
-    return costs
+        return values
+    values = values.copy()
+    if parameters is None:
+        values["value"] *= currency_factor
+    else:
+        values.loc[values["parameter"].isin(set(parameters)), "value"] *= currency_factor
+    return values
 
 
 def broadcast_fuel_prices(
