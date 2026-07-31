@@ -2,9 +2,9 @@
 
 1. the package default ships at ``iampypsa/data/remind_symbols_gdx.yaml`` (or ``…_mif.yaml``),
    selected by ``backend``.
-2. a model/run may overlay its own YAML — passed as ``path=`` or via the ``IAMPYPSA_SYMBOLS``
-   environment variable — which is **deep-merged on top** of the default, so the overlay only
-   needs to list what differs (a new symbol, a renamed candidate, a region override).
+2. a model/run may overlay its own YAML — passed as ``path=`` — which is **deep-merged on top**
+   of the default, so the overlay only needs to list what differs (a new symbol, a renamed
+   candidate, a region override).
 
 Loading layer:
 
@@ -21,7 +21,6 @@ coverage gaps are inspectable without running a full coupling.
 
 import importlib.resources
 import logging
-import os
 from importlib.resources.abc import Traversable
 from os import PathLike
 from typing import Any
@@ -33,10 +32,6 @@ from iampypsa.io.loader import Backend, RemindLoader, SymbolRef
 from iampypsa.units import unit_factor
 
 logger = logging.getLogger(__name__)
-
-#: Environment variable holding a path to a symbol-config overlay (deep-merged onto the default).
-SYMBOL_CONFIG_ENV = "IAMPYPSA_SYMBOLS"
-
 
 #: Packaged default symbol config per backend.
 _BACKEND_CONFIGS = {
@@ -84,17 +79,16 @@ def read_symbol_config(
 ) -> dict[str, Any]:
     """Read the raw symbol config (``{default, overrides}``), overlaying a user file if any.
 
-    Always starts from the packaged default for ``backend``. An overlay file (``path``, else
-    the ``IAMPYPSA_SYMBOLS`` env var) is deep-merged on top.
+    Always starts from the packaged default for ``backend``. An overlay file (``path``) is
+    deep-merged on top.
 
     Args:
         path: Overlay YAML to deep-merge onto the packaged default.
         backend: ``"gdx"`` or ``"iamc"`` — required, see ``default_symbol_config_path``.
     """
     base = yaml.safe_load(default_symbol_config_path(backend).read_text())
-    overlay_path = path if path is not None else os.environ.get(SYMBOL_CONFIG_ENV)
-    if overlay_path:
-        with open(overlay_path) as f:
+    if path:
+        with open(path) as f:
             base = _merge_config(base, yaml.safe_load(f))
     return base
 

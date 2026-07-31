@@ -16,7 +16,7 @@
 #       schema:  index-value -> {parameter, unit, to_unit}
 #
 # `overrides` (keyed by REMIND region) lists only the logical names that differ from `default`.
-# A model may overlay its own YAML via load_symbol_specs(path=...) or IAMPYPSA_SYMBOLS (deep-merged).
+# A model may overlay its own YAML via load_symbol_specs(path=...) (deep-merged).
 
 default:
   # --- Canonical technology vocabulary --------------------------------------

@@ -17,6 +17,9 @@ config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``plan
 convert IAM-sourced (REMIND: USD) monetary values into the target PyPSA baseline's currency —
 it is not looked up or computed here. It converts between currencies only, not between
 currency *years* (e.g. REMIND's US$2017 vs the baseline's own reporting year).
+
+TODO: once other IAMs are coupled, add a general pre-run validator confirming all data PyPSA
+needs is actually present in the source (symbols, declared regions/years).
 """
 
 import logging

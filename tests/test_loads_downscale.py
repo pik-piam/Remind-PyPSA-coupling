@@ -7,7 +7,6 @@ import pytest
 
 from iampypsa.downscale import (
     ProportionalDownscaler,
-    build_ssp_shares,
     disaggregate_demand_to_country,
 )
 from iampypsa.transforms.loads import convert_loads
@@ -34,15 +33,6 @@ def test_convert_loads_labels_and_groups():
     out = convert_loads(raw)
     assert out["value"].iloc[0] == pytest.approx(1.5)
     assert out["unit"].iloc[0] == "MWh_el"
-
-
-def test_build_ssp_shares_blend_and_normalise():
-    pop = pd.DataFrame({"iso2": ["DE", "FR"], "year": [2030, 2030], "value": [80.0, 60.0]}).set_index(["iso2", "year"])
-    gdp = pd.DataFrame({"iso2": ["DE", "FR"], "year": [2030, 2030], "value": [40.0, 10.0]}).set_index(["iso2", "year"])
-    shares = build_ssp_shares(["DE", "FR"], 2030, "AC", pop, gdp, {"AC": {"gdp": 0.5, "population": 0.5}})
-    assert sum(shares.values()) == pytest.approx(1.0)
-    # DE has higher GDP and pop -> larger share
-    assert shares["DE"] > shares["FR"]
 
 
 def test_proportional_downscaler_splits_by_share():

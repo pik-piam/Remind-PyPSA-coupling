@@ -83,15 +83,6 @@ def test_overlay_path_layers_onto_package_default(tmp_path):
     assert cha["co2_price"]["symbol"] == "cha_symbol"  # overlay region override wins
 
 
-def test_overlay_via_env_var(tmp_path, monkeypatch):
-    from iampypsa.io.remind_symbols import SYMBOL_CONFIG_ENV
-
-    p = tmp_path / "syms.yaml"
-    p.write_text(OVERLAY)
-    monkeypatch.setenv(SYMBOL_CONFIG_ENV, str(p))
-    assert load_symbol_specs(backend="gdx")["co2_price"]["symbol"] == "my_symbol"
-
-
 def test_default_symbol_config_path_exists():
     from iampypsa.io.remind_symbols import default_symbol_config_path
 

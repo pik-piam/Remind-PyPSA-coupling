@@ -83,7 +83,6 @@ or assembled step-by-step in the model's own Snakemake rules.
 | `downscale/` | `demand`, `proxy`, `base` | Region → country disaggregation via SSP/degree-day proxy shares. |
 | `couplers/` | `base.Coupler` | The interface + shared concrete builders (CO2 prices, country demand, discount rates). |
 | `couplers/` | `remind.RemindGdxCoupler`, `remind.RemindIamcCoupler`, `remind.read_region_map` | REMIND's two `Coupler` subclasses (GDX / IAMC backends), and the REMIND region↔country CSV reader. |
-| *(root)* | `validate` | Check the config's declared scenario (regions/years) actually exists in the IAM source before a run. |
 
 ### In the PyPSA repo — Snakemake glue (and, optionally, a subclass)
 
@@ -172,8 +171,8 @@ that differ** — everything else is inherited from `default:`. Resolve with
 
 Two layering mechanisms let a model adjust symbols without forking the package:
 
-- `load_symbol_specs(path=…, backend=…)` or the `IAMPYPSA_SYMBOLS` env var — overlay a model-local YAML
-  on top of the packaged default.
+- `load_symbol_specs(path=…, backend=…)` — overlay a model-local YAML on top of the packaged
+  default.
 - the `overrides:` block — per-IAM-region deltas inside one config.
 
 **Unit conversions:** `load_frame`/`load_set` apply the declared conversion *at

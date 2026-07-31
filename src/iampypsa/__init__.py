@@ -28,7 +28,6 @@ from .io import (
     report_fallbacks,
     build_technology_sources,
 )
-from .validate import validate_scenario_against_remind
 
 __all__ = [
     "Coupler",
@@ -51,7 +50,6 @@ __all__ = [
     "iam_name",
     "build_technology_sources",
     "build_capacity_reporting_technologies",
-    "validate_scenario_against_remind",
 ]
 
 try:
