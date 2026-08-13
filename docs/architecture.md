@@ -12,7 +12,7 @@ Guiding rule:
 
 !!! info "Symbols"
     "Symbol" is the GAMS name for sets, scalars, parameters and variables — these are the
-    REMIND outputs that `iampypsa` reads.
+    IAM outputs that `iampypsa` reads.
 
 ---
 
@@ -83,7 +83,6 @@ or assembled step-by-step in the model's own Snakemake rules.
 | `downscale/` | `demand`, `proxy`, `base` | Region → country disaggregation via SSP/degree-day proxy shares. |
 | `couplers/` | `base.Coupler` | The interface + shared concrete builders (CO2 prices, country demand, discount rates). |
 | `couplers/` | `remind.RemindGdxCoupler`, `remind.RemindIamcCoupler`, `remind.read_region_map` | REMIND's two `Coupler` subclasses (GDX / IAMC backends), and the REMIND region↔country CSV reader. |
-| *(root)* | `validate` | Check the config's declared scenario (regions/years) actually exists in the IAM source before a run. |
 
 ### In the PyPSA repo — Snakemake glue (and, optionally, a subclass)
 
@@ -120,7 +119,9 @@ Methods, grouped by whether they're IAM-specific or shared:
 | `extract_cost_parameters(year)` | **hook** — must implement per IAM backend | always, for a new IAM/backend. Same as above. |
 | `build_co2_prices(years=None)` | concrete, inherited | rarely — only if the model's CO2 handling diverges. |
 | `downscale_country_demand(regional=None)` | concrete, inherited | the model needs extra steps (e.g. a historical-calibration adjustment). |
-| `discount_rates(year)` | concrete, inherited | rarely. |
+| `build_discount_rates(year)` | concrete, inherited | rarely. |
+| `prepare_capacities()` | concrete, inherited | rarely — capacities at model-tech resolution, before carrier aggregation. |
+| `get_capacities(tech_map, …)` | concrete, inherited | rarely — the same, aggregated to the model's PyPSA carriers. |
 
 ---
 
@@ -146,8 +147,8 @@ unit(s) and target unit:
 co2_price:
   symbol: [v32_taxCO2eq, p_priceCO2]   # try v32_… first, fall back to p_priceCO2
   rename: {tall: year, all_regi: region}
-  units: [$/tC, $/tC]                  # per-candidate source unit
-  to_unit: $/tCO2                      # load_frame() applies the (units, to_unit) factor
+  units: [USD/tC, USD/tC]              # per-candidate source unit
+  to_unit: USD/tCO2                    # load_frame() applies the (units, to_unit) factor
 ```
 
 A **mixed-unit set** — one IAM symbol whose `index` column selects several quantities
@@ -161,7 +162,7 @@ tech_data:
   schema:
     lifetime: {parameter: lifetime, unit: yr,     to_unit: yr}
     omf:      {parameter: FOM,      unit: p.u.,   to_unit: "%/yr"}
-    omv:      {parameter: VOM,      unit: T$/TWa, to_unit: $/MWh}
+    omv:      {parameter: VOM,      unit: TUSD/TWa, to_unit: USD/MWh}
 ```
 
 Per-region differences go under `overrides:` (e.g. `CHA:`) and need to list **only the entries
@@ -170,14 +171,14 @@ that differ** — everything else is inherited from `default:`. Resolve with
 
 Two layering mechanisms let a model adjust symbols without forking the package:
 
-- `load_symbol_specs(path=…)` or the `IAMPYPSA_SYMBOLS` env var — overlay a model-local YAML
-  on top of the packaged default.
+- `load_symbol_specs(path=…, backend=…)` — overlay a model-local YAML on top of the packaged
+  default.
 - the `overrides:` block — per-IAM-region deltas inside one config.
 
-**The unit conversion contract:** `load_frame`/`load_set` apply the declared conversion *at
-the moment of loading* (the "Coupler seam"). The downstream transforms are therefore called
-with conversion disabled so units are never applied twice. Add a new conversion by adding one
-row to `UNIT_CONVERSIONS` in `units.py` — never as a literal in a transform or a rule.
+**Unit conversions:** `load_frame`/`load_set` apply the declared conversion *at
+the moment of loading* (the "Coupler seam") and stamp the resulting unit onto a `unit` column.
+The downstream transforms are therefore called with conversion disabled so units are never
+applied twice. Add a new conversion by adding one row to `UNIT_CONVERSIONS` in `units.py`.
 
 ---
 
@@ -191,15 +192,16 @@ is the loader's job — which makes them trivially unit-testable and reusable ac
 Because conversion happens at the load seam (above), transforms are invoked with conversion
 already applied — they don't re-scale a quantity.
 
+The rule that decides where a step lives: **building a whole coupled quantity is a `Coupler`
+method; reading one symbol or applying one pure transform is a direct call.** 
+
 | Module | Key functions | Does |
 |---|---|---|
-| `co2_prices` | `extract_co2_prices`, `convert_co2_prices` | Filter/reindex the CO2 price pathway to the coupled `regions × years` grid (missing → 0); apply the currency factor. |
-| `loads` | `convert_loads` | Reduce IAM demand to one tidy row per `(year, region, sector)` in annual MWh. |
-| `capacities` | `prepare_capacities`, `apply_consolidation`, `adjust_link_capacities_to_input`, `aggregate_capacities_to_carriers`, `build_capacity_targets` | Read + consolidate (VRE-variant merge, battery scaling) tidy capacities; divide link-like techs by efficiency (output→input basis); map IAM techs to PyPSA carriers and sum to capacity targets. |
+| `co2_prices` | `extract_co2_prices` | Filter/reindex the CO2 price pathway to the coupled `regions × years` grid (missing → 0). Currency scaling is `costs.apply_currency_factor`, shared with the cost table. |
+| `capacities` | `apply_postprocessing`, `adjust_link_capacities_to_input`, `aggregate_capacities_to_carriers` | Postprocess (technology-variant merge, scaling); divide link-like techs by efficiency (output→input basis); map IAM techs to PyPSA carriers and sum. Sequenced by `Coupler.get_capacities`. |
 | `costs` | `build_iam_techdata`, `build_pypsa_techdata`, `build_set_value_overrides`, `apply_overrides`, `add_discount_rate`, `convert_investment_to_input_capacity_basis` | Split cost values by [technology-mapping](getting-started/technology-mapping.md) source, merge IAM values onto the PyPSA baseline, convert investment from per-output to per-input capacity (`× efficiency ** exp`), add discount-rate rows. |
 
-The `Coupler`'s `build_*` / `extract_*` methods and the `transforms/capacities` entry point
-(`build_capacity_targets`) are thin orchestrations over these functions; each function is
+The `Coupler`'s `build_*` / `extract_*` methods are thin orchestrations over these functions; each function is
 documented individually in the **Reference** section of the nav.
 
 ---

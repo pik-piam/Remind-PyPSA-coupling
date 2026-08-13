@@ -2,7 +2,7 @@
 
 Degree-day CSVs carry columns ``[year, country, type, tlim_setpoint, rcp, ssp, value]`` with
 ``country`` as ISO3 and ``type`` one of ``CDD``/``HDD``. ``read_degree_days`` selects one
-``(type, tlim_setpoint, rcp, ssp)`` combination and returns the tidy ``[iso2, year, value]`` frame
+``(type, tlim_setpoint, rcp, ssp)`` combination and returns the ``[iso2, year, value]`` frame
 used as a downscaling proxy — the same shape as :func:`iampypsa.io.ssp.read_ssp_data`, so callers do
 ``.set_index(["iso2", "year"])`` and pass it in the ``proxies`` registry.
 """
@@ -26,7 +26,7 @@ def read_degree_days(
     rcp: str,
     ssp: str,
 ) -> pd.DataFrame:
-    """Read a degree-day CSV and return the tidy ``[iso2, year, value]`` proxy frame.
+    """Read a degree-day CSV and return the ``[iso2, year, value]`` proxy frame.
 
     Filters to ``type == dd_type`` (``CDD``/``HDD``), the given ``tlim_setpoint``, ``rcp`` and
     ``ssp``; converts ISO3 → ISO2 (unmapped codes dropped) and sums any duplicates. Raises

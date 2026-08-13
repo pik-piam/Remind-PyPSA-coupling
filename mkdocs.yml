@@ -91,8 +91,8 @@ nav:
   - Home: index.md
   - Getting started:
     - Overview: getting-started/index.md
-    - Data exchange: getting-started/data-exchange.md
     - Integrating a PyPSA model: getting-started/integrating-a-model.md
+    - Data exchange: getting-started/data-exchange.md
     - Technology mapping: getting-started/technology-mapping.md
     - Downscaling demand: getting-started/downscaling-demand.md
     - Harmonising capacities: getting-started/harmonising-capacities.md

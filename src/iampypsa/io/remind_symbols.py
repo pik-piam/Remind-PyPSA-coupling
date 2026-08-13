@@ -1,27 +1,22 @@
 """Central REMIND symbol configuration: load logical→GDX/IAMC symbol maps and load frames.
 
-Symbol definitions evolve, so they live in YAML (not code) and are *layered*:
-
 1. the package default ships at ``iampypsa/data/remind_symbols_gdx.yaml`` (or ``…_mif.yaml``),
-   selected by ``backend`` — neither is the implicit default when an explicit backend is given;
-2. a model/run may overlay its own YAML — passed as ``path=`` or via the ``IAMPYPSA_SYMBOLS``
-   environment variable — which is **deep-merged on top** of the default, so the overlay only
-   needs to list what differs (a new symbol, a renamed candidate, a region override).
-
-``load_symbol_specs`` is split into debuggable steps: ``read_symbol_config`` (I/O + overlay →
-raw ``{default, overrides}`` dict) and ``merge_region_overrides`` (pure per-logical-name merge
-→ the flat map). Inspect either on its own when debugging.
+   selected by ``backend``.
+2. a model/run may overlay its own YAML — passed as ``path=`` — which is **deep-merged on top**
+   of the default, so the overlay only needs to list what differs (a new symbol, a renamed
+   candidate, a region override).
 
 Loading layer:
 
-* ``load_frame``     — single-quantity symbol, addressed via ``symbol:`` key.
-* ``load_set``       — mixed-unit set symbol (``index:``/``schema:`` shape).
-* ``load_variable_set`` — many-variables-to-one-frame assembly (``variables:`` shape);
-  only satisfiable by a loader whose source format exposes named-variable lookup (IAMC today).
+* ``load_frame``     — single-quantity symbol, addressed via ``symbol:`` key. GDX and IAMC.
+* ``load_set``       — mixed-unit set symbol (``index:``/``schema:`` shape). GDX only.
+* ``load_variable_set`` — many-variables-to-one-frame assembly (``variables:`` shape).
+  IAMC only — raises if given a GDX-backed loader.
 * ``load_spec``      — dispatcher: picks by spec shape (``variables:`` →
   ``load_variable_set``; ``index:``/``schema:`` → ``load_set``; else → ``load_frame``).
-  A ``variables:`` spec still requires an IAMC-backed loader; the dispatch is on spec shape,
-  not a guarantee that every spec shape works with every backend.
+
+Unit conversion (resolving which unit a spec/frame declares, then applying the central
+``iampypsa.units`` factor) is generic and lives in ``iampypsa.io.conversion``.
 
 ``report_fallbacks`` returns a summary of all fallback declarations in a symbol map so
 coverage gaps are inspectable without running a full coupling.
@@ -29,34 +24,43 @@ coverage gaps are inspectable without running a full coupling.
 
 import importlib.resources
 import logging
-import os
+from importlib.resources.abc import Traversable
 from os import PathLike
 from typing import Any
 
 import pandas as pd
 import yaml
 
-from iampypsa.io.loader import RemindLoader
-from iampypsa.units import unit_factor
+from iampypsa.io.conversion import convert_column, resolve_source_unit
+from iampypsa.io.loader import Backend, RemindLoader, SymbolRef
 
 logger = logging.getLogger(__name__)
 
-#: Environment variable holding a path to a symbol-config overlay (deep-merged onto the default).
-SYMBOL_CONFIG_ENV = "IAMPYPSA_SYMBOLS"
+#: Packaged default symbol config per backend.
+_BACKEND_CONFIGS = {
+    "gdx": "remind_symbols_gdx.yaml",
+    "iamc": "remind_symbols_mif.yaml",
+}
 
 
-def default_symbol_config_path(backend: str | None = None) -> Any:
+def default_symbol_config_path(backend: Backend) -> Traversable:
     """Return the path to the packaged default symbol config for ``backend``.
 
-    ``backend="gdx"`` → ``remind_symbols_gdx.yaml``;
-    ``backend="iamc"`` → ``remind_symbols_mif.yaml``;
-    ``backend=None`` → ``remind_symbols_gdx.yaml`` (backward-compatible default).
+    ``backend`` is required and must be known. There is deliberately no GDX fallback: it made a
+    typo, or a forgotten argument on an IAMC run, resolve GDX symbol names against a mif — which
+    surfaces far from the cause, or not at all. Pass ``backend=loader.backend``.
+
+    Args:
+        backend: ``"gdx"`` or ``"iamc"``.
+
+    Raises:
+        ValueError: If ``backend`` is not a known backend.
     """
-    if backend == "iamc":
-        name = "remind_symbols_mif.yaml"
-    else:
-        name = "remind_symbols_gdx.yaml"
-    return importlib.resources.files("iampypsa.data").joinpath(name)
+    if backend not in _BACKEND_CONFIGS:
+        raise ValueError(
+            f"Unknown backend {backend!r}; expected one of {sorted(_BACKEND_CONFIGS)}."
+        )
+    return importlib.resources.files("iampypsa.data").joinpath(_BACKEND_CONFIGS[backend])
 
 
 def _merge_config(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -74,18 +78,21 @@ def _merge_config(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, An
 def read_symbol_config(
     path: str | PathLike | None = None,
     *,
-    backend: str | None = None,
+    backend: Backend,
 ) -> dict[str, Any]:
     """Read the raw symbol config (``{default, overrides}``), overlaying a user file if any.
 
-    Always starts from the packaged default for ``backend``. An overlay file (``path``, else
-    the ``IAMPYPSA_SYMBOLS`` env var) is deep-merged on top.
+    Always starts from the packaged default for ``backend``. An overlay file (``path``) is
+    deep-merged on top.
+
+    Args:
+        path: Overlay YAML to deep-merge onto the packaged default.
+        backend: ``"gdx"`` or ``"iamc"`` — required, see ``default_symbol_config_path``.
     """
-    base_path = default_symbol_config_path(backend)
-    base = yaml.safe_load(base_path.read_text())
-    overlay_path = path if path is not None else os.environ.get(SYMBOL_CONFIG_ENV)  # noqa: E501
-    if overlay_path:
-        base = _merge_config(base, yaml.safe_load(open(overlay_path).read()))
+    base = yaml.safe_load(default_symbol_config_path(backend).read_text())
+    if path:
+        with open(path) as f:
+            base = _merge_config(base, yaml.safe_load(f))
     return base
 
 
@@ -105,65 +112,51 @@ def load_symbol_specs(
     region: str | None = None,
     path: str | PathLike | None = None,
     *,
-    backend: str | None = None,
+    backend: Backend,
 ) -> dict[str, Any]:
     """Return the resolved symbol map for ``backend`` and ``region``.
 
-    ``region`` and ``path`` are positional for backward compatibility with existing callers.
-    Pass ``backend=loader.backend`` as a keyword argument to select the GDX or IAMC config.
-    ``backend=None`` (default) falls back to the GDX config.
+    Args:
+        region: IAM region whose ``overrides:`` block wins over ``default:``; ``None`` for
+            the defaults alone. Positional, for existing callers.
+        path: Overlay YAML to deep-merge onto the packaged default. Positional, as above.
+        backend: ``"gdx"`` or ``"iamc"`` — required. Pass ``backend=loader.backend``.
     """
     return merge_region_overrides(read_symbol_config(path, backend=backend), region)
 
 
-def _get_symbol_ref(spec: dict[str, Any]):
-    """Return the spec's source-symbol reference (``symbol``, falling back to legacy ``gdx``)."""
-    ref = spec.get("symbol", spec.get("gdx"))
+def _derive_symbol_ref(spec: dict[str, Any]) -> SymbolRef:
+    """Return the spec's source-symbol reference."""
+    ref = spec.get("symbol")
     if ref is None:
-        raise KeyError(f"Symbol spec has neither 'symbol' nor 'gdx': {spec}")
+        raise KeyError(f"Symbol spec has no 'symbol': {spec}")
     return ref
-
-
-def _source_unit(spec: dict[str, Any], ref, resolved_name: str) -> str | None:
-    """Resolve the source unit for a single-quantity spec.
-
-    Supports a per-candidate ``units:`` list (parallel to the ``symbol:`` candidate list — the
-    unit of whichever candidate actually resolved) or a scalar ``unit:``. Returns None if no
-    unit is declared.
-    """
-    if "units" in spec:
-        candidates = [ref] if isinstance(ref, str) else list(ref)
-        return spec["units"][candidates.index(resolved_name)]
-    return spec.get("unit")
 
 
 def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Load the frame for one single-quantity symbol spec, applying its unit conversion.
 
-    Resolves ``symbol`` (falls back to legacy ``gdx``), then scales ``value`` via the central
-    ``iampypsa.units`` factor when both a source unit (``unit:``/``units:``) and ``to_unit:``
-    are declared (a legacy ``unit_factor:`` scalar is also honoured). Stamps the resolved unit
-    onto a ``unit`` column, matching ``load_set``/``load_variable_set``, unless no unit is
-    declared at all. Use ``load_set`` for mixed-unit symbols.
+    Resolves ``symbol``, then scales ``value`` via the central
+    ``iampypsa.units`` factor when both a source unit and ``to_unit:`` are declared. The source
+    unit is read live from the data when available (mif's own ``Unit`` column), else from the
+    spec's ``unit:``/``units:`` (GDX has no per-row unit info). Stamps the resolved unit onto a
+    ``unit`` column, matching ``load_set``/``load_variable_set``, unless no unit is available at
+    all. Use ``load_set`` for mixed-unit symbols.
 
     An optional ``filter: {column: value}`` drops rows that don't match — e.g. selecting a
     single GAMS domain slice (``rlf: 1``) out of a symbol that carries extra dimensions.
     """
-    ref = _get_symbol_ref(spec)
+    ref = _derive_symbol_ref(spec)
     resolved = loader.resolve_symbol(ref)
-    df = loader.load_symbol(ref, rename_columns=spec.get("rename"))
+    # Pass the resolved name, not the candidate list — load_symbol would otherwise re-resolve.
+    df = loader.load_symbol(resolved, rename_columns=spec.get("rename"))
     for col, value in spec.get("filter", {}).items():
         # GAMS domain columns are categorical/string labels even for numeric-looking values
         # (e.g. rlf: 1) -- compare as strings so a plain int in the spec still matches.
         df = df[df[col].astype(str) == str(value)]
     to_unit = spec.get("to_unit")
-    src_unit = _source_unit(spec, ref, resolved)
-    if to_unit is not None and src_unit is not None and "value" in df.columns:
-        df = df.copy()
-        df["value"] = df["value"] * unit_factor(src_unit, to_unit)
-    if "unit_factor" in spec and "value" in df.columns:
-        df = df.copy()
-        df["value"] = df["value"] * spec["unit_factor"]
+    src_unit = resolve_source_unit(spec, ref, resolved, df)
+    df = convert_column(df, "value", src_unit, to_unit)
     unit = to_unit if to_unit is not None else src_unit
     if unit is not None and "value" in df.columns:
         df = df.copy()
@@ -179,7 +172,7 @@ def load_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     frame with a ``parameter`` column, ``value`` converted per row via the central units table,
     and a ``unit`` column set to the target unit. Index values not in the schema are dropped.
     """
-    ref = _get_symbol_ref(spec)
+    ref = _derive_symbol_ref(spec)
     raw = loader.load_symbol(ref, rename_columns=spec.get("rename"))
     index = spec["index"]
     frames = []
@@ -188,7 +181,7 @@ def load_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
         if part.empty:
             continue
         if "to_unit" in sub:
-            part["value"] = part["value"] * unit_factor(sub.get("unit", sub["to_unit"]), sub["to_unit"])
+            part = convert_column(part, "value", sub.get("unit", sub["to_unit"]), sub["to_unit"])
         part["parameter"] = sub["parameter"]
         part["unit"] = sub.get("to_unit", sub.get("unit"))
         frames.append(part)
@@ -203,7 +196,7 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
     linear combinations. Fallback tokens in ``spec['fallback']`` (``{token: {value, unit,
     reason}}``) are synthesised for every ``(year, region)`` when absent from the data.
     """
-    from iampypsa.io.iamc import assemble_variable_set, read_iamc
+    from iampypsa.io.iamc import build_variable_set, read_iamc
 
     if loader.backend != "iamc":
         raise ValueError(
@@ -225,7 +218,7 @@ def load_variable_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFram
     all_vars = list(direct_vars | derived_vars)
 
     df = read_iamc(loader.source, variables=all_vars)
-    result = assemble_variable_set(df, mapping, label_col=label_col, derived=derived, to_unit=to_unit)
+    result = build_variable_set(df, mapping, label_col=label_col, derived=derived, to_unit=to_unit)
 
     # Synthesise rows for any fallback tokens absent from the loaded data.
     # A fallback entry must declare a ``value``; ``unit`` defaults to ``to_unit`` if omitted.

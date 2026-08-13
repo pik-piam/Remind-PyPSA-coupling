@@ -2,7 +2,7 @@
 and is the entry point for the coupling workflow.
 
 - ``Coupler`` is the backend-neutral base: it holds the shared, concrete builders
-(``build_co2_prices``, ``discount_rates``, ``downscale_country_demand``)
+(``build_co2_prices``, ``build_discount_rates``, ``downscale_country_demand``)
 - it consumes the IAM symbols (resolved via their config) and the region map, and it contains
  the reference data (population, GDP, etc.) for downscaling.
 
@@ -12,6 +12,14 @@ a new IAM or output format is added as a further ``Coupler`` subclass, not a bra
 - ``RemindIamcCoupler`` (``iampypsa.couplers.remind``)
 
 config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``planning_horizons``.
+
+``currency_factor`` (default ``1.0``, a no-op) is a flat multiplier the caller supplies to
+convert IAM-sourced (REMIND: USD) monetary values into the target PyPSA baseline's currency —
+it is not looked up or computed here. It converts between currencies only, not between
+currency *years* (e.g. REMIND's US$2017 vs the baseline's own reporting year).
+
+TODO: once other IAMs are coupled, add a general pre-run validator confirming all data PyPSA
+needs is actually present in the source (symbols, declared regions/years).
 """
 
 import logging
@@ -20,15 +28,17 @@ from typing import Any
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-
 from iampypsa.downscale.demand import disaggregate_demand_to_country
-from iampypsa.io.remind_symbols import load_frame
-from iampypsa.transforms.co2_prices import convert_co2_prices, extract_co2_prices
-from iampypsa.transforms.costs import (
-    convert_investment_to_input_capacity_basis,
-    apply_overrides,
+from iampypsa.io.remind_symbols import load_frame, load_spec, rename_technologies
+from iampypsa.transforms.capacities import (
+    adjust_link_capacities_to_input,
+    aggregate_capacities_to_carriers,
+    apply_postprocessing,
 )
+from iampypsa.transforms.co2_prices import extract_co2_prices
+from iampypsa.transforms.costs import apply_currency_factor, select_discount_rate
+
+logger = logging.getLogger(__name__)
 
 
 class Coupler:
@@ -43,8 +53,6 @@ class Coupler:
         *,
         model_regions: list[str] | None = None,
         reference_data: dict[str, pd.DataFrame] | None = None,
-        ssp_population: pd.DataFrame | None = None,
-        ssp_gdp: pd.DataFrame | None = None,
     ) -> None:
         """Bind the loader, resolved symbol map, region map, config, and reference data."""
         self.loader = loader
@@ -53,18 +61,6 @@ class Coupler:
         self.config = config
         self.model_regions = model_regions or list(region_map)
         self.reference_data: dict[str, pd.DataFrame] = dict(reference_data or {})
-        if ssp_population is not None:
-            self.reference_data.setdefault("population", ssp_population)
-        if ssp_gdp is not None:
-            self.reference_data.setdefault("gdp", ssp_gdp)
-
-    @property
-    def ssp_population(self) -> pd.DataFrame | None:
-        return self.reference_data.get("population")
-
-    @property
-    def ssp_gdp(self) -> pd.DataFrame | None:
-        return self.reference_data.get("gdp")
 
     # -- Source-specific hooks (must be overridden by subclasses) -----------
 
@@ -93,21 +89,17 @@ class Coupler:
     # -- Shared concrete builders -------------------------------------------
 
     def build_co2_prices(self, years: Sequence[int] | None = None) -> pd.DataFrame:
-        """Build the per-(region, year) CO2 price pathway.
+        """Build the per-(region, year) CO2 price pathway, converted to the runtime currency.
 
-        Conversion is spec-driven: applies whatever ``(unit, to_unit)`` factor the resolved
-        ``co2_price`` symbol's config declares (a no-op when the source already reports t CO2).
-        The runtime ``currency_factor`` is always applied.
-
-        ``years`` selects the year set to reindex to (missing filled with 0); when ``None``
-        it falls back to ``config["planning_horizons"]``. Callers that derive the coupled-year
-        set from the IAM source (e.g. the GDX ``t`` symbol) pass it explicitly.
+        ``years`` reindexes the result (missing filled with 0); defaults to ``config["planning_horizons"]``.
         """
         raw = load_frame(self.loader, self.symbols["co2_price"])
         years = years if years is not None else self.config.get("planning_horizons")
         prices = extract_co2_prices(raw, regions=self.model_regions, years=years)
-        return convert_co2_prices(
-            prices, currency_factor=self.config.get("currency_factor", 1.0), carbon_to_co2=False
+        # parameters=None, not a CURRENCY_COST_PARAMETERS entry: this frame is single-quantity
+        # (no `parameter` column), so every row is the monetary one.
+        return apply_currency_factor(
+            prices, self.config.get("currency_factor", 1.0), parameters=None
         )
 
     def downscale_country_demand(self, regional: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -129,29 +121,61 @@ class Coupler:
             set(self.config["countries"]),
         )
 
-    def discount_rates(self, year: int) -> pd.Series:
-        """Return the discount rate per region for ``year``, indexed by region.
+    def build_discount_rates(self, year: int) -> pd.Series:
+        """Return the discount rate per region for ``year``, indexed by region."""
+        rates = load_frame(self.loader, self.symbols["discount_rate"])
+        rates = rates[rates["region"].isin(self.model_regions)]
+        return select_discount_rate(rates, year, self.model_regions)
 
-        When a region has no value for ``year`` (e.g. a trailing NaN in the source), the
-        most recent earlier year's value is used with a warning.
+    def prepare_capacities(self) -> pd.DataFrame:
+        """Read installed capacities at model-tech resolution, before carrier aggregation.
+
+        Returns ``[year, region, technology, value, unit]``. Applies the capacity spec's
+        optional ``postprocessing`` block (technology-variant merging, scaling) and puts
+        link-like technologies on an input-capacity basis. Callers wanting PyPSA carriers use
+        :meth:`get_capacities`; callers needing model-tech resolution (e.g. group-wise
+        brownfield harmonisation) use this directly.
         """
-        p_r = (
-            load_frame(self.loader, self.symbols["discount_rate"])
-            .pipe(lambda df: df[df["region"].isin(self.model_regions)])
+        cap_spec = self.symbols["capacity"]
+        postprocessing = dict(cap_spec.get("postprocessing", {}))
+        link_techs = set(postprocessing.pop("link_techs", []))
+
+        caps = apply_postprocessing(load_spec(self.loader, cap_spec), **postprocessing)
+        if link_techs and "efficiency_conv" in self.symbols:
+            eff = load_spec(self.loader, self.symbols["efficiency_conv"]).rename(
+                columns={"value": "efficiency"}
+            )
+            caps = adjust_link_capacities_to_input(caps, eff, link_techs)
+        return caps
+
+    def get_capacities(
+        self,
+        tech_map: pd.DataFrame,
+        *,
+        map_tech_col: str,
+        map_carrier_col: str,
+        regions: Sequence[str] | None = None,
+    ) -> pd.DataFrame:
+        """Get IAM capacities in PyPSA-ready format (where they will become must-build
+        constraints), as ``[year, region, carrier, value, unit]``.
+
+        ``tech_map`` stays an argument because the carrier vocabulary is PyPSA-side and never
+        lives in the package. The ``unit`` column reflects the capacity spec's ``to_unit``.
+
+        Args:
+            tech_map: Model technology→carrier mapping table.
+            map_tech_col: Column in ``tech_map`` holding the IAM technology token.
+            map_carrier_col: Column in ``tech_map`` holding the target PyPSA carrier.
+            regions: IAM regions to keep; defaults to ``self.model_regions``.
+        """
+        regions = self.model_regions if regions is None else regions
+        caps = rename_technologies(self.prepare_capacities(), self.symbols.get("technology_names"))
+        caps = aggregate_capacities_to_carriers(
+            caps,
+            tech_map,
+            map_tech_col=map_tech_col,
+            map_carrier_col=map_carrier_col,
+            unit=self.symbols["capacity"].get("to_unit", "MW"),
         )
-        # Last-value per region: covers both the requested year and any forward-fill fallback.
-        last = p_r.sort_values("year").groupby("region")["value"].last()
-        missing = set(self.model_regions) - set(last.index)
-        if missing:
-            raise ValueError(
-                f"No discount rate for year {year} or any earlier year, "
-                f"regions: {sorted(missing)}"
-            )
-        exact = p_r[p_r["year"].astype(str) == str(year)].set_index("region")["value"]
-        filled = last.index.difference(exact.index)
-        if len(filled):
-            logger.warning(
-                "Discount rate absent for year %d in regions %s; using most-recent value.",
-                year, sorted(filled),
-            )
-        return exact.combine_first(last)
+        caps["year"] = caps["year"].astype(int)
+        return caps[caps["region"].isin(set(regions))].reset_index(drop=True)

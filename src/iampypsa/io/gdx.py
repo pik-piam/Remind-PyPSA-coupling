@@ -1,6 +1,7 @@
 """Read REMIND symbols from a GDX container (via ``gamspy``).
 
-Ported from ``iampypsa.utils.read_gdx`` / PyPSA-Eur ``_helpers.read_remind_data``.
+Provides symbol/scalar readers and a symbol-name listing, with the opened container cached
+per path so repeated reads against the same GDX file don't re-open it.
 """
 
 import functools
@@ -22,7 +23,7 @@ def read_gdx_symbol(
     rename_columns: Mapping[str, str] | None = None,
     error_on_empty: bool = True,
 ):
-    """Read one GDX symbol into a tidy long DataFrame."""
+    """Read one GDX symbol into a long DataFrame."""
     data = _open_container(str(path))[symbol]
     df = data.records
     if error_on_empty and (df is None or df.empty):

@@ -5,20 +5,15 @@ or directly set them from values specified in the mapping.
 
 The *extraction* of individual cost parameters is source-specific and lives in each ``Coupler`` subclass.
 The shared functions (which live here) — provide the conversion/mapping and merging tools.
-
-Unit factors are centrally defined in ``iampypsa.units`` (re-exported below
-for convenience) so any IAM or PyPSA coupler can swap the conversion table without touching transforms.
 """
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import pandas as pd
 
 from iampypsa.io.technology_mapping import build_technology_sources, iam_name
-# Unit conventions are centralized in iampypsa.units; re-exported here for convenient imports.
-from iampypsa.units import DEFAULT_ETA_EXPONENTS
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +22,61 @@ def annotate_cost_rows(
     costs: pd.DataFrame,
     *,
     parameter: str,
-    unit: str,
-    factor: float = 1.0,
+    unit: str | None = None,
 ) -> pd.DataFrame:
-    """Annotate ``parameter``/``unit`` onto a cost-row frame, optionally scaling ``value`` by ``factor``."""
+    """Annotate ``parameter`` (and optionally ``unit``) onto a cost-row frame.
+
+    Omit ``unit`` to keep the one the load layer already stamped from the spec's ``to_unit:``.
+    Pass it only to override a declared unit — hardcoding a unit that merely restates the YAML
+    lets the two drift apart.
+
+    Args:
+        costs: Cost rows to annotate.
+        parameter: Canonical parameter name to write into the ``parameter`` column.
+        unit: Unit to force onto the ``unit`` column, overriding the loaded one.
+    """
     costs = costs.copy()
     costs["parameter"] = parameter
-    costs["unit"] = unit
-    if factor != 1.0:
-        costs["value"] = costs["value"] * factor
+    if unit is not None:
+        costs["unit"] = unit
     return costs
+
+
+#: Which ``parameter`` values of a *cost table* are currency-denominated. Excludes physical
+#: units (lifetime/efficiency/CO2 intensity) and FOM (a ratio — the factor cancels). The CO2
+#: price is monetary too, but is a single-quantity frame with no ``parameter`` column to match
+#: on, so it scales via ``parameters=None`` rather than by being listed here.
+CURRENCY_COST_PARAMETERS = {"investment", "VOM", "fuel"}
+
+
+# TODO: Implement more generic deflator for different currency years
+def apply_currency_factor(
+    values: pd.DataFrame,
+    currency_factor: float,
+    parameters: Iterable[str] | None = CURRENCY_COST_PARAMETERS,
+) -> pd.DataFrame:
+    """Scale ``value`` by ``currency_factor`` for currency-denominated rows.
+
+    The single seam for currency on every monetary quantity — cost parameters and the CO2
+    price pathway alike. One-directional (IAM USD -> PyPSA baseline currency); it converts
+    between currencies, not between currency *years* (e.g. REMIND's US$2017 vs the baseline's
+    own reporting year), which nothing handles yet.
+
+    Args:
+        values: Long frame with a ``value`` column, and a ``parameter`` column if selecting.
+        currency_factor: Multiplier into the baseline currency; ``1.0`` is a no-op.
+        parameters: ``parameter`` values to restrict scaling to, for a multi-quantity cost
+            table. Pass ``None`` for a single-quantity monetary frame such as the CO2 price
+            pathway, which has no ``parameter`` column — then every row is scaled.
+    """
+    if currency_factor == 1.0:
+        return values
+    values = values.copy()
+    if parameters is None:
+        values["value"] *= currency_factor
+    else:
+        values.loc[values["parameter"].isin(set(parameters)), "value"] *= currency_factor
+    return values
 
 
 def broadcast_fuel_prices(
@@ -74,22 +114,45 @@ def broadcast_fuel_prices(
 
 def convert_investment_to_input_capacity_basis(
     costs: pd.DataFrame,
-    eta_exponents: Mapping[str, float] = DEFAULT_ETA_EXPONENTS,
+    link_techs: Iterable[str],
 ) -> pd.DataFrame:
-    """Convert per-output-kW investment to per-input-kW by multiplying by efficiency**exp.
+    """Convert per-output-kW investment to per-input-kW by multiplying by efficiency.
 
-    Some IAMs report investment per kW of output capacity; PyPSA needs per kW of input
-    (``p_nom``). For each technology in ``eta_exponents``, ``investment`` is multiplied by
-    ``efficiency ** exp`` (exp=1 uses eta directly; exp=0.5 takes the one-way value out of a
-    pre-squared round-trip efficiency).
+    IAMs report investment per kW of output capacity; PyPSA needs per kW of input (``p_nom``)
+    for link-like technologies — ordinary generators need no adjustment and must not be listed
+    in ``link_techs``. Which techs need this is specific to how the calling model's own
+    network-building code consumes the result — see the caller for the reasoning per
+    technology.
     """
     costs = costs.copy()
-    for tech, exp in eta_exponents.items():
+    for tech in link_techs:
         inv = (costs["technology"] == tech) & (costs["parameter"] == "investment")
         eff = (costs["technology"] == tech) & (costs["parameter"] == "efficiency")
         if inv.any() and eff.any():
-            costs.loc[inv, "value"] *= costs.loc[eff, "value"].values ** exp
+            costs.loc[inv, "value"] *= costs.loc[eff, "value"].values
     return costs
+
+
+def select_discount_rate(rates: pd.DataFrame, year: int, regions: Iterable[str]) -> pd.Series:
+    """Return the discount rate per region for ``year``, indexed by region.
+
+    Falls back to the most recent earlier year's value when a region has no value for
+    ``year`` (e.g. a trailing NaN in the source), logging a warning for those regions.
+    """
+    last = rates.sort_values("year").groupby("region")["value"].last()
+    missing = set(regions) - set(last.index)
+    if missing:
+        raise ValueError(
+            f"No discount rate for year {year} or any earlier year, regions: {sorted(missing)}"
+        )
+    exact = rates[rates["year"].astype(str) == str(year)].set_index("region")["value"]
+    filled = last.index.difference(exact.index)
+    if len(filled):
+        logger.warning(
+            "Discount rate absent for year %d in regions %s; using most-recent value.",
+            year, sorted(filled),
+        )
+    return exact.combine_first(last)
 
 
 def add_discount_rate(
@@ -97,7 +160,7 @@ def add_discount_rate(
     discount_rate: float,
     *,
     source: str = "IAM",
-    reference: str = "p_r",
+    reference: str = "",
 ) -> pd.DataFrame:
     """Add a ``discount rate`` row for every technology that does not already have one.
 

@@ -1,14 +1,13 @@
 # IAMC / .mif symbol map for the REMIND→PyPSA coupling.
 #
-# This is remind_symbols_mif.yaml, parallel to remind_symbols_gdx.yaml;
-# selected by load_symbol_specs(backend="iamc").
-#
 # Spec shapes:
 #
 # (1) Single-quantity symbol
 #       symbol: "IAMC variable name"
 #       rename: {source_col: canonical_col}  — optional; read_iamc already uses lowercase names
-#       unit / to_unit  — optional unit conversion
+#       unit:    optional — documents the expected mif 'Unit'; load_frame checks it against
+#                the live mif value and raises if they disagree
+#       to_unit: optional target unit (source unit is read from the 'Unit' column of the mif)
 #
 # (2) Variable-set  (IAMC-specific — one logical quantity from many IAMC variables):
 #       variables:  {IAMC variable name: canonical_name, ...}
@@ -20,8 +19,6 @@
 # Unit strings must match the mif's 'Unit' column exactly and exist in iampypsa.units.UNIT_CONVERSIONS.
 # No per-region overrides for the IAMC backend: PyPSA-China couples REMIND region CHA from the
 # IAMC .mif, whose variable names are region-independent.
-overrides: {}
-
 
 default:
   # --- Technology -> fuel map ------------------------------------------------
@@ -44,6 +41,7 @@ default:
   co2_price:
     symbol: "Price|Carbon"
     unit: "US$2017/t CO2"
+    to_unit: "USD/tCO2"
 
   # --- Discount rate -------------------------------------------------------
   discount_rate:
@@ -56,7 +54,7 @@ default:
   # output-basis capacity divided by efficiency to get PyPSA input-basis p_nom.
   # Derived: coal-pulverised and biomass-igcc have no own Cap| variable; residuals.
   capacity:
-    consolidation:
+    postprocessing:
       link_techs: [electrolysis, hydrogen-turbine]
     variables:
       "Cap|Electricity|Gas|GT":                gas-ocgt
@@ -201,7 +199,7 @@ default:
     to_unit: "USD/MWh"
 
   # Efficiency for link-capacity adjustment (output→input basis).
-  # Used by build_capacity_targets; subset of the full efficiency variable-set.
+  # Used by get_capacities; subset of the full efficiency variable-set below.
   efficiency_conv:
     variables:
       "Tech|Hydrogen|Electricity|Efficiency":  electrolysis
@@ -280,13 +278,12 @@ default:
       hydrogen-turbine: {value: 0.0, reason: "No mif variable; zero-emission technology"}
 
   # --- Demand variables ----------------------------------------------------
-  # Read by RemindIamcCoupler.build_regional_demand via load_spec / symbol lookup.
-  # demand_fe_sectors uses load_variable_set (variables: block → token labels + unit conversion).
-  # The three scalar specs supply only the variable name (symbol:); the adapter reads
-  # them via read_iamc and applies the η_td formula and AC residual computation on top.
-  # All source units EJ/yr.
+  # Read by RemindIamcCoupler.build_regional_demand via load_spec / load_variable_set / load_frame.
+  # demand_fe_sectors and demand_energy_balance both use load_variable_set (variables: block →
+  # token labels + unit conversion); the adapter applies the η_td formula and AC residual
+  # computation on top of their already-MWh output.
   demand_fe_sectors:
-    # Electricity FE sectors only: each is rebased to the SE level (÷ η_td) and subtracted
+    # Electricity FE sectors only: each is converted to the SE level (÷ η_td) and subtracted
     # from the AC residual in build_regional_demand. All source variables share EJ/yr, so a
     # single flat variables: block satisfies load_variable_set's homogeneous-unit contract.
     variables:
@@ -296,36 +293,31 @@ default:
       "FE|Buildings|Heating|Electricity|Resistance":             resistive
       "FE|Buildings|non-Heating|Electricity|Space Cooling":      space_cooling
     # DEFERRED: useful-energy heating ("UE|Buildings|Heating" → space_heating) is not a FE
-    # electricity load and must not be rebased/subtracted from AC. Feeding it into a coupled
+    # electricity load and must not be converted/subtracted from AC. Feeding it into a coupled
     # heat sector needs a central/decentral split and COP conversion (see the NotImplementedError
     # in PyPSA-China import_REMIND_demand._consolidate_heating_fe_demand). Add it back — as a
     # separately-handled group, not here — once that path exists.
     label_col: sector
     to_unit: MWh
 
-  demand_se_electricity:
-    symbol: "SE|Electricity"
-    unit: "EJ/yr"
-
-  demand_transmission_losses:
-    symbol: "SE|Electricity|Transmission Losses"
-    unit: "EJ/yr"
-
-  # Net electrolysis demand = (H2 produced − H2 consumed by fuel cells) / η_elec.
-  # Both SE variables are in EJ H2; dividing by η_elec yields EJ electricity.
+  # SE electricity/losses and the H2-from-electricity balance (electrolysis production vs.
+  # fuel-cell consumption) — homogeneous EJ/yr, one variable-set/one file read.
   # SE|Input|Hydrogen|Electricity = H2 fed into H2→electricity turbines (hydrogen-turbine).
   # SE|Hydrogen|Electricity       = total H2 produced from electricity (electrolysis).
-  demand_h2_from_electricity:
-    symbol: "SE|Hydrogen|Electricity"
-    unit: "EJ/yr"
+  demand_energy_balance:
+    variables:
+      "SE|Electricity":                     se
+      "SE|Electricity|Transmission Losses": losses
+      "SE|Hydrogen|Electricity":            h2_prod
+      "SE|Input|Hydrogen|Electricity":      h2_turb
+    label_col: quantity
+    to_unit: MWh
 
-  demand_h2_to_turbines:
-    symbol: "SE|Input|Hydrogen|Electricity"
-    unit: "EJ/yr"
-
+  # Net electrolysis demand = (H2 produced − H2 consumed by fuel cells) / η_elec.
   demand_electrolysis_efficiency:
     symbol: "Tech|Hydrogen|Electricity|Efficiency"
     unit: "%"
+    to_unit: "p.u."
 
   # --- Hydro special case --------------------------------------------------
   # Hydro needs BOTH capacity and generation so the downstream step can derive a
@@ -339,3 +331,5 @@ default:
     symbol: "SE|Electricity|Hydro"
     unit: "EJ/yr"
     to_unit: "MWh"
+
+overrides: {}

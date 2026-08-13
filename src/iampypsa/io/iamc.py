@@ -6,12 +6,13 @@ variable × region combination. A trailing ``;`` in each line produces a spuriou
 column, which is dropped on read. All five id columns are lower-cased on import so callers
 reference them uniformly as ``model``, ``scenario``, ``region``, ``variable``, ``unit``.
 
-``assemble_variable_set`` is the generic layer between the IAMC long frame and the
+``build_variable_set`` is the generic layer between the IAMC long frame and the
 token-labelled frames the ``Coupler`` classes consume. It knows nothing about REMIND — it
 receives a ``mapping`` dict (variable → token label) and an optional ``derived`` dict for
 linear combinations (e.g. ``pc = Coal|w/o CC − IGCC − CHP``).
 """
 
+import functools
 import logging
 import re
 from collections.abc import Sequence
@@ -28,11 +29,9 @@ ID_COLUMNS = ["model", "scenario", "region", "variable", "unit"]
 # IAMC id-column header names (as written in the file, before lower-casing).
 _ID_RAW = ["Model", "Scenario", "Region", "Variable", "Unit"]
 
-# REMIND writes variable trees with "+"-only segments marking the current summation level
-# (e.g. ``Cap|Electricity|+|Nuclear``, ``Cap|Electricity|Gas|CC|+|w/o CC``). Those markers are a
-# pure reporting artifact — the canonical variable name has no "+" — and their placement varies
-# with reporting depth. Strip them so symbol maps reference clean names (matching the wider REMIND
-# tooling, e.g. piamInterfaces/remind2). Verified collision-free on the reference REMIND .mif.
+# REMIND variable trees carry "+"-only reporting-depth markers (e.g. ``Cap|Electricity|+|Nuclear``)
+# that aren't part of the canonical name and whose placement varies by depth — strip them so
+# symbol maps match clean names.
 _AGG_MARKER = re.compile(r"\|\++\|")
 
 
@@ -46,26 +45,21 @@ def read_iamc(
     variables: Sequence[str] | None = None,
     sep: str = ";",
 ) -> pd.DataFrame:
-    """Read an IAMC ``.mif`` file into a tidy long DataFrame.
+    """Read an IAMC ``.mif`` file into a long DataFrame.
 
     Returns columns ``[model, scenario, region, variable, unit, year, value]``; ``NA``
-    entries and rows with ``NaN`` value are dropped. Pass ``variables`` to filter early
-    (before the expensive melt) on the ~167k-row files typical of REMIND output.
+    entries and rows with ``NaN`` value are dropped. Pass ``variables`` to filter early.
     """
     raw = pd.read_csv(path, sep=sep, na_values=["NA"], dtype=str)
     # Drop trailing unnamed column produced by a trailing semicolon on every data row.
     raw = raw.loc[:, ~raw.columns.str.startswith("Unnamed")]
-    # Lower-case the five id columns so callers can rely on consistent names.
     rename = {c: c.lower() for c in _ID_RAW if c in raw.columns}
     raw = raw.rename(columns=rename)
-    # Canonicalise variable names by dropping REMIND summation-level "+" markers (see above),
-    # so both the early filter and downstream mapping match clean spec names.
     if "variable" in raw.columns:
         raw["variable"] = _strip_agg_markers(raw["variable"])
     # Filter before the expensive melt — on a 167k-variable file this matters.
     if variables is not None:
         raw = raw[raw["variable"].isin(set(variables))]
-    # Every non-id column is a year.
     id_present = [c for c in ID_COLUMNS if c in raw.columns]
     year_cols = [c for c in raw.columns if c not in ID_COLUMNS]
     long = raw.melt(id_vars=id_present, value_vars=year_cols, var_name="year", value_name="value")
@@ -74,10 +68,18 @@ def read_iamc(
     return long.dropna(subset=["value"]).reset_index(drop=True)
 
 
+@functools.lru_cache(maxsize=8)
+def _read_iamc_variables(path: str, sep: str) -> tuple[str, ...]:
+    """Read and cache the sorted variable names of one ``.mif`` (keyed by path, like the GDX
+    container cache). Every symbol resolution scans this column, so on a full-size mif the
+    repeated reads dominate."""
+    raw = pd.read_csv(path, sep=sep, usecols=["Variable"], dtype=str)
+    return tuple(sorted(_strip_agg_markers(raw["Variable"].dropna()).unique().tolist()))
+
+
 def list_iamc_variables(path: str | PathLike, sep: str = ";") -> list[str]:
     """List the IAMC variable names present in a ``.mif`` file (sorted)."""
-    raw = pd.read_csv(path, sep=sep, usecols=["Variable"], dtype=str)
-    return sorted(_strip_agg_markers(raw["Variable"].dropna()).unique().tolist())
+    return list(_read_iamc_variables(str(path), sep))
 
 
 def parse_currency_year(unit: str) -> int | None:
@@ -90,7 +92,7 @@ def parse_currency_year(unit: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def assemble_variable_set(
+def build_variable_set(
     df: pd.DataFrame,
     mapping: dict[str, str],
     *,

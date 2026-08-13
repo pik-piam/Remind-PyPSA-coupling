@@ -16,7 +16,6 @@ from iampypsa.couplers.remind import RemindGdxCoupler
 from iampypsa.io import RemindLoader, build_capacity_reporting_technologies, load_technology_parameters
 from iampypsa.io.remind_symbols import load_symbol_specs
 from iampypsa.io.technology_mapping import iam_name
-from iampypsa.transforms.capacities import build_capacity_targets
 from iampypsa.transforms.costs import build_iam_techdata, convert_investment_to_input_capacity_basis
 
 HERE = Path(__file__).parent
@@ -49,8 +48,7 @@ def _coupler() -> RemindGdxCoupler:
             "planning_horizons": YEARS,
         },
         model_regions=["DEU", "EWN", "CHA"],
-        ssp_population=pop,
-        ssp_gdp=gdp,
+        reference_data={"population": pop, "gdp": gdp},
     )
 
 
@@ -77,7 +75,7 @@ if __name__ == "__main__":
     is_eff = (remind_long["parameter"] == "efficiency") & (remind_long["technology"] == "battery-inverter")
     remind_long.loc[is_eff, "value"] **= 2
     costs_raw = convert_investment_to_input_capacity_basis(
-        build_iam_techdata(tech_mapping, remind_long)
+        build_iam_techdata(tech_mapping, remind_long), ["electrolysis"]
     )
     costs_raw.to_csv(REF / "costs_raw_overwritten.csv", index=False)
     print(f"costs_raw_overwritten.csv: {len(costs_raw)} rows")
@@ -90,9 +88,8 @@ if __name__ == "__main__":
             if iam_name(tech, spec) in reports_capacity
         ]
     )
-    capacities = build_capacity_targets(
-        coupler.loader, coupler.symbols, coupler.model_regions, tmap,
-        map_tech_col="IAM", map_carrier_col="PyPSA",
+    capacities = coupler.get_capacities(
+        tmap, map_tech_col="IAM", map_carrier_col="PyPSA"
     )
     capacities.to_csv(REF / "installed_capacities.csv", index=False)
     print(f"installed_capacities.csv: {len(capacities)} rows")

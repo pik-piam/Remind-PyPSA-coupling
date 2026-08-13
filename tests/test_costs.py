@@ -7,6 +7,7 @@ import pytest
 
 from iampypsa.transforms.costs import (
     add_discount_rate,
+    apply_currency_factor,
     broadcast_fuel_prices,
     build_pypsa_techdata,
     build_iam_techdata,
@@ -158,14 +159,65 @@ def test_add_discount_rate_only_where_missing():
     assert set(added["technology"]) == {"b"}
 
 
+def test_apply_currency_factor_scales_only_currency_parameters():
+    costs = pd.DataFrame(
+        {
+            "technology": ["a", "a", "a", "a"],
+            "parameter": ["investment", "VOM", "fuel", "efficiency"],
+            "value": [1.0, 2.0, 3.0, 0.4],
+            "unit": ["USD/MW", "USD/MWh", "USD/MWh_th", "p.u."],
+        }
+    )
+    out = apply_currency_factor(costs, 2.0)
+    scaled = out.set_index("parameter")["value"]
+    assert scaled[["investment", "VOM", "fuel"]].tolist() == [2.0, 4.0, 6.0]
+    assert scaled["efficiency"] == 0.4
+
+    # default factor is a no-op
+    noop = apply_currency_factor(costs, 1.0)
+    pd.testing.assert_frame_equal(noop, costs)
+
+
 def test_convert_investment_basis_synthetic():
     costs = pd.DataFrame(
         {"technology": ["electrolysis", "electrolysis"], "parameter": ["investment", "efficiency"],
          "value": [1000.0, 0.5], "unit": ["", ""]}
     )
-    out = convert_investment_to_input_capacity_basis(costs)
+    out = convert_investment_to_input_capacity_basis(costs, ["electrolysis"])
     inv = out.query("technology=='electrolysis' and parameter=='investment'")["value"].iloc[0]
-    assert inv == pytest.approx(500.0)  # 1000 * 0.5**1
+    assert inv == pytest.approx(500.0)  # 1000 * 0.5
+
+
+def test_battery_inverter_squaring_matches_iam_sourced_convention():
+    """If a future technology_mapping ever sources battery inverter from IAM (it currently
+    doesn't — see import_REMIND_costs.py's dormant squaring tweak), REMIND's one-way efficiency
+    must be squared to round-trip before the merge, matching PyPSA-Eur's own round-trip
+    convention for this technology; investment then uses that round-trip value directly."""
+    one_way = 0.95
+    investment = 1000.0
+    technology_mapping = {
+        "battery inverter": {
+            "iam_name": "battery-inverter",
+            "overrides": {"investment": "IAM", "efficiency": "IAM"},
+        }
+    }
+    remind_long = pd.DataFrame(
+        {"region": ["DEU", "DEU"],
+         "technology": ["battery-inverter", "battery-inverter"],
+         "parameter": ["investment", "efficiency"],
+         "value": [investment, one_way], "unit": ["", ""]}
+    )
+    # Mirrors the squaring tweak in import_REMIND_costs.py.
+    is_eff = remind_long["parameter"] == "efficiency"
+    remind_long.loc[is_eff, "value"] **= 2
+
+    mapped = build_iam_techdata(technology_mapping, remind_long)
+    out = convert_investment_to_input_capacity_basis(
+        mapped, ["battery inverter"]
+    ).set_index("parameter")["value"]
+
+    assert out["efficiency"] == pytest.approx(one_way**2)
+    assert out["investment"] == pytest.approx(investment * one_way**2)
 
 
 def test_investment_basis_matches_reference_for_electrolysis():
@@ -180,7 +232,7 @@ def test_investment_basis_matches_reference_for_electrolysis():
     electrolysis = remind_long.query("region=='DEU' and technology=='electrolysis'")
 
     costs = electrolysis.query("parameter in ('investment', 'efficiency')")[["technology", "parameter", "value", "unit"]]
-    got = convert_investment_to_input_capacity_basis(costs)
+    got = convert_investment_to_input_capacity_basis(costs, ["electrolysis"])
     got_inv = got.query("parameter=='investment'")["value"].iloc[0]
 
     ref = pd.read_csv(REF_RAW).query(

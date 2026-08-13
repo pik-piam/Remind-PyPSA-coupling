@@ -11,7 +11,6 @@ import pytest
 
 from iampypsa.couplers.base import Coupler
 from iampypsa.couplers.remind import RemindGdxCoupler
-from iampypsa.transforms.capacities import build_capacity_targets
 
 DATA = Path(__file__).parent / "data"
 GDX = DATA / "remind2pypsa_amt_filtered.gdx"
@@ -42,7 +41,7 @@ def test_technology_mapping_example_matches_examples_dir():
     )
 
 
-def _coupler() -> RemindGdxCoupler:
+def _coupler(currency_factor: float = 1.0) -> RemindGdxCoupler:
     from iampypsa.io import RemindLoader
     from iampypsa.io.remind_symbols import load_symbol_specs
 
@@ -55,10 +54,13 @@ def _coupler() -> RemindGdxCoupler:
             "sector_weights": SECTOR_WEIGHTS,
             "countries": COUNTRIES,
             "planning_horizons": YEARS,
+            "currency_factor": currency_factor,
         },
         model_regions=["DEU", "EWN", "CHA"],
-        ssp_population=pd.read_csv(DATA / "ssp_population_filtered.csv").set_index(["iso2", "year"]),
-        ssp_gdp=pd.read_csv(DATA / "ssp_gdp_filtered.csv").set_index(["iso2", "year"]),
+        reference_data={
+            "population": pd.read_csv(DATA / "ssp_population_filtered.csv").set_index(["iso2", "year"]),
+            "gdp": pd.read_csv(DATA / "ssp_gdp_filtered.csv").set_index(["iso2", "year"]),
+        },
     )
 
 
@@ -94,7 +96,7 @@ def test_cost_overrides_match_reference_remind_rows():
 
     technology_mapping = load_technology_parameters(str(TECH_MAPPING))["technologies"]
     overrides = convert_investment_to_input_capacity_basis(
-        build_iam_techdata(technology_mapping, remind_long)
+        build_iam_techdata(technology_mapping, remind_long), ["electrolysis"]
     )
     got = (
         overrides.query("region == 'DEU'")
@@ -111,6 +113,25 @@ def test_cost_overrides_match_reference_remind_rows():
     pd.testing.assert_series_equal(got, ref, check_names=False, rtol=1e-6)
 
 
+def test_currency_factor_scales_gdx_cost_parameters():
+    """currency_factor scales investment/VOM/fuel only, on the GDX path."""
+    base = _coupler().extract_cost_parameters(2090).set_index(["region", "technology", "parameter"])["value"]
+    scaled = (
+        _coupler(currency_factor=0.9)
+        .extract_cost_parameters(2090)
+        .set_index(["region", "technology", "parameter"])["value"]
+    )
+    assert base.index.equals(scaled.index)
+
+    currency_params = base.index.get_level_values("parameter").isin({"investment", "VOM", "fuel"})
+    pd.testing.assert_series_equal(
+        scaled[currency_params], base[currency_params] * 0.9, check_names=False, rtol=1e-9
+    )
+    pd.testing.assert_series_equal(
+        scaled[~currency_params], base[~currency_params], check_names=False, rtol=1e-9
+    )
+
+
 def test_full_capacity_targets_match_reference():
     from iampypsa.io import build_capacity_reporting_technologies, load_technology_parameters
     from iampypsa.io.technology_mapping import iam_name
@@ -125,10 +146,7 @@ def test_full_capacity_targets_match_reference():
         ]
     )
     a = _coupler()
-    got = build_capacity_targets(
-        a.loader, a.symbols, a.model_regions, tmap,
-        map_tech_col="IAM", map_carrier_col="PyPSA",
-    )
+    got = a.get_capacities(tmap, map_tech_col="IAM", map_carrier_col="PyPSA")
     got["year"] = got["year"].astype(int)
     g = got.query("region == 'DEU' and year == 2090").set_index("carrier")["value"]
     r = (
@@ -138,3 +156,18 @@ def test_full_capacity_targets_match_reference():
     )
     assert g.index.equals(r.index)
     pd.testing.assert_series_equal(g, r, check_names=False, rtol=1e-6)
+
+
+def test_prepare_capacities_stops_before_carrier_aggregation():
+    """prepare_capacities is the model-tech seam consumers reach for (brownfield
+    harmonisation); get_capacities is the same data aggregated to PyPSA carriers."""
+    a = _coupler()
+    raw = a.prepare_capacities()
+    assert "technology" in raw.columns and "carrier" not in raw.columns
+
+    tmap = pd.DataFrame(
+        [{"PyPSA": "onwind", "IAM": "wind-onshore"}, {"PyPSA": "solar", "IAM": "solar-pv"}]
+    )
+    targets = a.get_capacities(tmap, map_tech_col="IAM", map_carrier_col="PyPSA")
+    assert set(targets["carrier"]) == {"onwind", "solar"}
+    assert set(targets["region"]) <= set(a.model_regions)

@@ -13,7 +13,7 @@ def test_import_main_package():
 def test_import_subpackages():
     """The current sub-packages import correctly."""
     from iampypsa import couplers, downscale, io, transforms  # noqa: F401
-    from iampypsa import units, validate  # noqa: F401
+    from iampypsa import units  # noqa: F401
     from iampypsa.io import remind_symbols  # noqa: F401
 
 

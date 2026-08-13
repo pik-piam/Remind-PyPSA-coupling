@@ -1,0 +1,72 @@
+name: Tests
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install the package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # gdx: the symbol/coupler tests read a real .gdx fixture via gamspy.
+          pip install -e ".[gdx,test]"
+
+      - name: Run tests
+        run: pytest -q
+
+  package:
+    name: wheel ships its data files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      # The symbol maps and the region CSV are read at runtime via importlib.resources, so a
+      # wheel that omits them fails only on a non-editable install — which no test can catch.
+      - name: Assert the packaged data files are present
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+
+          wheel = glob.glob("dist/*.whl")[0]
+          names = set(zipfile.ZipFile(wheel).namelist())
+          required = {
+              "iampypsa/data/remind_symbols_gdx.yaml",
+              "iampypsa/data/remind_symbols_mif.yaml",
+              "iampypsa/data/remind/regions.csv",
+          }
+          missing = sorted(required - names)
+          assert not missing, f"{wheel} is missing {missing}\ncontains: {sorted(names)}"
+          print(f"{wheel} ships all {len(required)} data files")
+          PY

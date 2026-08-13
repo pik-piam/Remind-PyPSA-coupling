@@ -14,6 +14,8 @@ from .io import (
     iam_name,
     build_capacity_reporting_technologies,
     default_symbol_config_path,
+    load_frame,
+    load_set,
     load_symbol_specs,
     load_spec,
     load_technology_parameters,
@@ -26,7 +28,6 @@ from .io import (
     report_fallbacks,
     build_technology_sources,
 )
-from .validate import validate_scenario_against_remind
 
 __all__ = [
     "Coupler",
@@ -36,6 +37,8 @@ __all__ = [
     "read_gdx_symbol",
     "read_ssp_data",
     "load_symbol_specs",
+    "load_frame",
+    "load_set",
     "load_spec",
     "load_variable_set",
     "read_symbol_config",
@@ -47,7 +50,6 @@ __all__ = [
     "iam_name",
     "build_technology_sources",
     "build_capacity_reporting_technologies",
-    "validate_scenario_against_remind",
 ]
 
 try:

@@ -16,6 +16,7 @@ from iampypsa.io.remind_symbols import (
 from pathlib import Path
 
 EUR_GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
+GENERIC_MIF = Path(__file__).parent / "data" / "remind_generic_amt_filtered.mif"
 
 
 class _FakeLoader:
@@ -36,7 +37,7 @@ class _FakeLoader:
 
 
 def test_load_specs_default():
-    default = load_symbol_specs()
+    default = load_symbol_specs(backend="gdx")
     assert default["co2_price"]["symbol"] == "p_priceCO2"
     assert default["demand_fe_sectors"]["rename"]["loadPy32"] == "sector"
 
@@ -57,7 +58,7 @@ def test_merge_region_overrides_prefers_region_entry():
 
 
 def test_load_specs_region_without_override_equals_default():
-    assert load_symbol_specs("DEU") == load_symbol_specs()
+    assert load_symbol_specs("DEU", backend="gdx") == load_symbol_specs(backend="gdx")
 
 
 OVERLAY = (
@@ -75,56 +76,78 @@ OVERLAY = (
 def test_overlay_path_layers_onto_package_default(tmp_path):
     p = tmp_path / "syms.yaml"
     p.write_text(OVERLAY)
-    specs = load_symbol_specs(path=p)
+    specs = load_symbol_specs(path=p, backend="gdx")
     assert specs["co2_price"]["symbol"] == "my_symbol"  # overlay overrides the package default
     assert "demand_fe_sectors" in specs  # an entry only in the package default is still present
-    cha = load_symbol_specs("CHA", path=p)
+    cha = load_symbol_specs("CHA", path=p, backend="gdx")
     assert cha["co2_price"]["symbol"] == "cha_symbol"  # overlay region override wins
-
-
-def test_overlay_via_env_var(tmp_path, monkeypatch):
-    from iampypsa.io.remind_symbols import SYMBOL_CONFIG_ENV
-
-    p = tmp_path / "syms.yaml"
-    p.write_text(OVERLAY)
-    monkeypatch.setenv(SYMBOL_CONFIG_ENV, str(p))
-    assert load_symbol_specs()["co2_price"]["symbol"] == "my_symbol"
 
 
 def test_default_symbol_config_path_exists():
     from iampypsa.io.remind_symbols import default_symbol_config_path
 
-    # Default (no backend) and explicit "gdx" both resolve to the GDX config.
-    assert default_symbol_config_path().name == "remind_symbols_gdx.yaml"
     assert default_symbol_config_path(backend="gdx").name == "remind_symbols_gdx.yaml"
     assert default_symbol_config_path(backend="iamc").name == "remind_symbols_mif.yaml"
-    assert "default:" in default_symbol_config_path().read_text()
+    assert "default:" in default_symbol_config_path(backend="gdx").read_text()
+
+
+def test_default_symbol_config_path_requires_a_known_backend():
+    """No GDX fallback: a missing or mistyped backend must fail here, not by resolving GDX
+    symbol names against a mif much later. 'mif' is the obvious typo — it names the file."""
+    from iampypsa.io.remind_symbols import default_symbol_config_path
+
+    with pytest.raises(ValueError, match="Unknown backend"):
+        default_symbol_config_path(backend="mif")
+    with pytest.raises(TypeError):
+        load_symbol_specs()  # backend is keyword-only and required
 
 
 def test_load_frame_applies_per_candidate_unit():
-    # Primary missing → resolves the fallback whose unit ($/tC) triggers the 12/44 conversion.
+    # Primary missing → resolves the fallback whose unit (USD/tC) triggers the 12/44 conversion.
     loader = _FakeLoader({"p_priceCO2": pd.DataFrame({"region": ["DEU"], "value": [100.0]})})
     spec = {
         "symbol": ["v32_taxCO2eq", "p_priceCO2"],
-        "units": ["$/tC", "$/tC"],
-        "to_unit": "$/tCO2",
+        "units": ["USD/tC", "USD/tC"],
+        "to_unit": "USD/tCO2",
     }
     out = load_frame(loader, spec)
     assert out["value"].iloc[0] == pytest.approx(100.0 * 12 / 44)
-    assert out["unit"].iloc[0] == "$/tCO2"  # stamped from to_unit
+    assert out["unit"].iloc[0] == "USD/tCO2"  # stamped from to_unit
 
 
 def test_load_frame_no_conversion_without_to_unit():
     loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0]})})
-    out = load_frame(loader, {"symbol": "sym", "unit": "T$/TWa"})  # no to_unit → untouched
+    out = load_frame(loader, {"symbol": "sym", "unit": "TUSD/TWa"})  # no to_unit → untouched
     assert out["value"].iloc[0] == 5.0
-    assert out["unit"].iloc[0] == "T$/TWa"  # stamped from the declared source unit
+    assert out["unit"].iloc[0] == "TUSD/TWa"  # stamped from the declared source unit
 
 
 def test_load_frame_no_unit_column_when_unit_undeclared():
     loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0]})})
     out = load_frame(loader, {"symbol": "sym"})  # no unit/to_unit declared at all
     assert "unit" not in out.columns
+
+
+def test_load_frame_uses_live_unit_when_declared_unit_matches():
+    # Simulates the mif case: read_iamc already stamped a real 'unit' column onto the frame.
+    loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0], "unit": ["GW"]})})
+    out = load_frame(loader, {"symbol": "sym", "unit": "GW", "to_unit": "MW"})
+    assert out["value"].iloc[0] == pytest.approx(5.0 * 1e3)  # GW->MW
+    assert out["unit"].iloc[0] == "MW"
+
+
+def test_load_frame_raises_on_declared_unit_mismatch():
+    # A declared `unit:` that disagrees with the live mif value is stale documentation —
+    # must fail loud rather than be silently overridden.
+    loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0], "unit": ["GW"]})})
+    with pytest.raises(ValueError, match="does not match"):
+        load_frame(loader, {"symbol": "sym", "unit": "TUSD/TWa", "to_unit": "MW"})
+
+
+def test_load_frame_raises_on_heterogeneous_live_units():
+    loader = _FakeLoader({"sym": pd.DataFrame({"value": [5.0, 6.0], "unit": ["GW", "MW"]})})
+    with pytest.raises(ValueError, match="Heterogeneous units"):
+        load_frame(loader, {"symbol": "sym"})
 
 
 def test_load_set_splits_mixed_units_via_schema():
@@ -142,14 +165,14 @@ def test_load_set_splits_mixed_units_via_schema():
         "schema": {
             "lifetime": {"parameter": "lifetime", "unit": "yr", "to_unit": "yr"},
             "omf": {"parameter": "FOM", "unit": "p.u.", "to_unit": "%/yr"},
-            "omv": {"parameter": "VOM", "unit": "T$/TWa", "to_unit": "$/MWh"},
+            "omv": {"parameter": "VOM", "unit": "TUSD/TWa", "to_unit": "USD/MWh"},
         },
     }
     out = load_set(loader, spec).set_index("parameter")
     assert out.loc["lifetime", "value"] == 30.0          # factor 1
     assert out.loc["FOM", "value"] == pytest.approx(5.0)  # 0.05 * 100
     assert out.loc["VOM", "value"] == pytest.approx(2.0 * 1e6 / 8760)
-    assert out.loc["VOM", "unit"] == "$/MWh"
+    assert out.loc["VOM", "unit"] == "USD/MWh"
 
 
 def test_load_symbol_specs_iamc_backend():
@@ -293,11 +316,15 @@ def test_mif_vocabulary_matches_gdx_technology_names():
     gdx = read_symbol_config(backend="gdx")["default"]
     canonical_values = set(gdx["technology_names"].values())
     mif_names = _mif_canonical_names()
-    # mif also carries demand-sector labels (EV_pass, heatpump, ...) which have no gdx-token
-    # counterpart in technology_names (they're sector labels, not technology tokens).
-    demand_sectors = {"EV_pass", "EV_freight", "heatpump", "resistive", "space_cooling"}
-    assert mif_names - demand_sectors <= canonical_values
-    assert (mif_names - demand_sectors) & canonical_values  # sanity: not vacuously true
+    # mif also carries demand-sector labels (EV_pass, heatpump, ...) and energy-balance
+    # quantity labels (se, losses, ...), neither of which have a gdx-token counterpart in
+    # technology_names — they're not technology tokens.
+    non_technology_labels = {
+        "EV_pass", "EV_freight", "heatpump", "resistive", "space_cooling",
+        "se", "losses", "h2_prod", "h2_turb",
+    }
+    assert mif_names - non_technology_labels <= canonical_values
+    assert (mif_names - non_technology_labels) & canonical_values  # sanity: not vacuously true
 
 
 def test_tech_fuel_map_is_keyed_by_the_canonical_vocabulary():
@@ -316,7 +343,73 @@ def test_load_frame_against_real_gdx():
     from iampypsa.io import RemindLoader
 
     loader = RemindLoader(str(EUR_GDX))
-    spec = load_symbol_specs()["co2_price"]
+    spec = load_symbol_specs(backend="gdx")["co2_price"]
     df = load_frame(loader, spec)
     assert {"year", "region", "value"} <= set(df.columns)
     assert "DEU" in set(df["region"])
+
+
+def test_load_frame_against_real_mif_uses_live_unit():
+    """hydro_capacity's GW->MW conversion uses the live mif unit; a stale declared unit: raises."""
+    from iampypsa.io import RemindLoader
+
+    loader = RemindLoader(str(GENERIC_MIF))
+    spec = dict(load_symbol_specs(backend="iamc")["hydro_capacity"])
+    assert spec["unit"] == "GW"  # matches the live mif value -- documentation is accurate
+    live_df = load_frame(loader, spec)
+    assert (live_df["unit"] == "MW").all()
+
+    spec["unit"] = "kW"  # now stale/wrong
+    with pytest.raises(ValueError, match="does not match"):
+        load_frame(loader, spec)
+    assert not live_df.empty
+
+
+def test_demand_energy_balance_variable_set_converts_ej_to_mwh():
+    from iampypsa.io import RemindLoader
+
+    loader = RemindLoader(str(GENERIC_MIF))
+    spec = load_symbol_specs(backend="iamc")["demand_energy_balance"]
+    df = load_variable_set(loader, spec)
+    assert set(df["quantity"]) == {"se", "losses", "h2_prod", "h2_turb"}
+    assert (df["unit"] == "MWh").all()
+    assert not df.empty
+
+
+def test_demand_electrolysis_efficiency_converts_percent_to_pu():
+    from iampypsa.io import RemindLoader
+
+    loader = RemindLoader(str(GENERIC_MIF))
+    spec = load_symbol_specs(backend="iamc")["demand_electrolysis_efficiency"]
+    df = load_frame(loader, spec)
+    assert (df["unit"] == "p.u.").all()
+    assert (df["value"] <= 1.0).all()  # a genuine p.u. fraction, not a raw percent
+
+
+def test_build_regional_demand_matches_hand_computed_electrolysis():
+    """End-to-end: RemindIamcCoupler.build_regional_demand's electrolysis figure, computed via
+    config-driven to_unit conversion, matches the formula applied by hand to raw mif EJ/% values."""
+    from iampypsa.io import RemindLoader
+    from iampypsa.couplers.remind import RemindIamcCoupler
+    from iampypsa.units import unit_factor
+
+    loader = RemindLoader(str(GENERIC_MIF))
+    symbols = load_symbol_specs(backend="iamc")
+    coupler = RemindIamcCoupler(
+        loader, symbols,
+        region_map={"DEU": ["DE"], "EWN": ["AT"], "CHA": ["CN"]},
+        config={}, model_regions=["DEU", "EWN", "CHA"],
+    )
+    out = coupler.build_regional_demand()
+
+    raw = pd.read_csv(GENERIC_MIF, sep=";", dtype=str)
+    raw.columns = [c.strip() for c in raw.columns]
+    row = lambda v: float(raw.loc[(raw["Variable"].str.strip() == v) & (raw["Region"] == "DEU"), "2090"].iloc[0])
+    ej_to_mwh = unit_factor("EJ/yr", "MWh")
+    h2_prod_mwh = row("SE|Hydrogen|Electricity") * ej_to_mwh
+    h2_turb_mwh = row("SE|Input|Hydrogen|Electricity") * ej_to_mwh
+    eta_pu = row("Tech|Hydrogen|Electricity|Efficiency") / 100.0
+    expected_electrolysis = max(h2_prod_mwh - h2_turb_mwh, 0.0) / eta_pu
+
+    got = out.query("region=='DEU' and year==2090 and sector=='electrolysis'")["value"].iloc[0]
+    assert got == pytest.approx(expected_electrolysis, rel=1e-9)

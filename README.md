@@ -75,16 +75,16 @@ costs = coupler.extract_cost_parameters(2030)  # cost components for one year
 Alternatively, for a single step, you may also call the `io`/`transforms` functions directly instead of going through a `Coupler`:
 
 ```python
-from iampypsa import RemindLoader, load_symbol_specs
-from iampypsa.io.remind_symbols import load_frame
-from iampypsa.transforms.co2_prices import extract_co2_prices, convert_co2_prices
+from iampypsa import RemindLoader, load_frame, load_symbol_specs
+from iampypsa.transforms.co2_prices import extract_co2_prices
+from iampypsa.transforms.costs import apply_currency_factor
 
 loader = RemindLoader("REMIND.mif")
 symbols = load_symbol_specs(backend=loader.backend)
 
-raw = load_frame(loader, symbols["co2_price"])
+raw = load_frame(loader, symbols["co2_price"])  # unit conversion applied here
 prices = extract_co2_prices(raw, regions=["DEU", "FRA"], years=[2030, 2050])
-co2_prices = convert_co2_prices(prices, currency_factor=1.0, carbon_to_co2=False)
+co2_prices = apply_currency_factor(prices, currency_factor=1.0, parameters=None)
 ```
 
 See [Getting started](https://pik-piam.github.io/IAM-PyPSA-coupling/getting-started/) for a more complete tutorial.

@@ -25,7 +25,7 @@ def _adapter():
     spec.loader.exec_module(mod)
     return mod.RemindChinaAdapter(
         loader=RemindLoader(CHINA_GDX),
-        symbols=load_symbol_specs("CHA"),
+        symbols=load_symbol_specs("CHA", backend="gdx"),
         region_map={"CHA": ["CN"]},
         config={"planning_horizons": [2030, 2050], "currency_factor": 1.0,
                 "sector_weights": {}, "countries": ["CN"]},

@@ -1,19 +1,17 @@
-"""Determine installed-capacity targets (p_nom_min) for PyPSA from IAM output.
+"""Pure steps for turning IAM installed capacities into PyPSA targets (p_nom_min).
 
-The shared pipeline is: 
-1. read the capacity spec via ``load_spec`` (handles unit conversion and
-backend dispatch)
-2. optionally apply a ``consolidation`` block from the spec (VRE-variant merging,
-battery scaling — only exercised when the symbol config declares it, e.g. for GDX input),
-3. adjust link-like techs to input-capacity basis, and aggregate to PyPSA carriers.
+In pipeline order: postprocess variant tokens (:func:`apply_postprocessing`), put link-like
+technologies on an input-capacity basis (:func:`adjust_link_capacities_to_input`), then map
+model tech tokens to PyPSA carriers and sum (:func:`aggregate_capacities_to_carriers`).
+
+Reading the symbols and sequencing these is the Coupler's job — see
+``Coupler.prepare_capacities`` / ``Coupler.get_capacities``.
 """
 
 import logging
 from collections.abc import Sequence
 
 import pandas as pd
-
-from iampypsa.io.remind_symbols import load_spec, rename_technologies
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +27,7 @@ def adjust_link_capacities_to_input(
     eff_col: str = "efficiency",
 ) -> pd.DataFrame:
     """Divide output-based capacities by efficiency for link-like techs (→ input basis).
-    (PyPSA links are defined by input capacity, but some IAMs report output capacity.)
+    (PyPSA links are defined by input capacity, but IAMs report output capacity.)
 
     Rows with missing or zero efficiency are left unchanged (with a warning).
     """
@@ -61,13 +59,12 @@ def aggregate_capacities_to_carriers(
 ) -> pd.DataFrame:
     """Map model tech tokens to target carrier names, sum per (group, carrier).
 
-    Returns ``[year, region, carrier, value, unit]``.
-    Rows whose tech token is absent from ``tech_to_carrier`` are dropped with a warning.
-    Aggregation is needed when the mapping is not 1:1 (several tokens share a carrier).
+    Returns ``[year, region, carrier, value, unit]``. ``tech_to_carrier`` may be many-to-many:
+    several tokens sharing a carrier are summed; one token feeding several carriers is
+    preserved (not deduped), each carrier getting the full value. Rows whose tech token is
+    absent from ``tech_to_carrier`` are dropped with a warning.
     """
-    carrier_map = tech_to_carrier[[map_tech_col, map_carrier_col]].drop_duplicates(
-        subset=map_tech_col, keep="first"
-    )
+    carrier_map = tech_to_carrier[[map_tech_col, map_carrier_col]].drop_duplicates()
     mapped = capacities.merge(carrier_map, left_on=tech_col, right_on=map_tech_col, how="left")
     unmapped = mapped[map_carrier_col].isna().sum()
     if unmapped:
@@ -84,94 +81,46 @@ def aggregate_capacities_to_carriers(
     return grouped.sort_values([*group_cols, "carrier"]).reset_index(drop=True)
 
 
-def apply_consolidation(
+def apply_postprocessing(
     caps: pd.DataFrame,
     *,
-    vre_to_primary: dict[str, str] | None = None,
-    battery_scaling: dict[str, float] | None = None,
+    merge: dict[str, list[str]] | None = None,
+    scale: dict[str, float] | None = None,
     tech_col: str = "technology",
     value_col: str = "value",
 ) -> pd.DataFrame:
-    """Apply the optional ``consolidation`` block from the capacity symbol spec.
+    """Apply the optional ``postprocessing`` block from the capacity symbol spec.
 
     Two steps, both driven by config — no-op when params are absent (e.g. IAMC configs
-    that have no ``consolidation`` block):
+    that have no ``postprocessing`` block):
 
-    1. **VRE-variant merge**: rename coupled VRE tech tokens to their primary token
-       (e.g. ``elh2VRE`` → ``elh2``).
-    2. **Battery scaling**: fold storage tech rows into the charger token (``btin``) by
-       multiplying each storage row by its scaling factor. If a ``btin`` row already carries
-       a positive value, the storage rows are dropped instead (bidirectional-coupling guard).
+    1. **Merge**: rename coupled variant tokens to their primary token via ``merge``, a
+       ``{target: [sources, ...]}`` map (e.g. ``{"elh2": ["elh2", "elh2VRE"]}`` merges
+       ``elh2VRE`` into ``elh2``; also used for scaling targets below, e.g.
+       ``{"btin": ["btin", "storspv", ...]}``).
+    2. **Scale**: multiply each ``scale`` source row by its scaling factor before it's merged
+       into its ``merge`` target. If that target already carries a positive value on its own,
+       the source rows are dropped instead of scaled (bidirectional-coupling guard).
     """
     caps = caps.copy()
-    vre_to_primary = vre_to_primary or {}
-    battery_scaling = battery_scaling or {}
+    merge = merge or {}
+    scale = scale or {}
+    rename_map = {source: target for target, sources in merge.items() for source in sources}
 
     tech = caps[tech_col].astype(str)
-    caps[tech_col] = tech.map(lambda t: vre_to_primary.get(t, t))
 
-    if not battery_scaling:
-        return caps
+    if scale:
+        targets = {source: rename_map.get(source, source) for source in scale}
+        is_target_present = tech.isin(set(targets.values())) & (caps[value_col] > 0)
+        is_scaled = tech.isin(scale)
+        if is_target_present.any():
+            caps = caps[~is_scaled].copy()
+            tech = caps[tech_col].astype(str)
+        else:
+            factor = tech.map(scale)
+            caps.loc[factor.notna(), value_col] *= factor[factor.notna()]
 
-    tech = caps[tech_col].astype(str)
-    is_btin_present = ((tech == "btin") & (caps[value_col] > 0)).any()
-    is_stor = tech.isin(battery_scaling)
-    if is_btin_present:
-        return caps[~is_stor].copy()
-    scale = tech.map(battery_scaling)
-    caps.loc[scale.notna(), value_col] *= scale[scale.notna()]
-    caps[tech_col] = tech.map(lambda t: "btin" if t in battery_scaling else t)
+    caps[tech_col] = tech.map(lambda t: rename_map.get(t, t))
     return caps
 
 
-def prepare_capacities(loader, symbols: dict) -> pd.DataFrame:
-    """Read capacities at model-tech resolution, before any carrier aggregation.
-
-    Shared preparation for every consumer:
-    1. Read the ``capacity`` spec via ``load_spec`` (dispatches on spec shape; unit conversion
-       applied by the spec's ``to_unit``).
-    2. Apply the ``consolidation`` block if present (VRE-variant merge, battery scaling).
-    3. Adjust link-like techs to input-capacity basis (requires ``efficiency_conv`` symbol).
-
-    Returns ``[year, region, technology, value, unit]``. Callers that need PyPSA carriers pass
-    this to :func:`aggregate_capacities_to_carriers`; callers that need model-tech resolution
-    (e.g. group-wise brownfield harmonisation) consume it directly.
-    """
-    cap_spec = symbols["capacity"]
-    cons = dict(cap_spec.get("consolidation", {}))
-    link_techs = set(cons.pop("link_techs", []))
-
-    caps = load_spec(loader, cap_spec)
-    caps = apply_consolidation(caps, **cons)
-
-    if link_techs and "efficiency_conv" in symbols:
-        eff = load_spec(loader, symbols["efficiency_conv"]).rename(columns={"value": "efficiency"})
-        caps = adjust_link_capacities_to_input(caps, eff, link_techs)
-
-    return caps
-
-
-def build_capacity_targets(
-    loader,
-    symbols: dict,
-    regions: Sequence[str],
-    tech_map: pd.DataFrame,
-    *,
-    map_tech_col: str,
-    map_carrier_col: str,
-) -> pd.DataFrame:
-    """Build installed-capacity targets per ``[year, region, carrier, value, unit]``.
-
-    Prepare capacities (:func:`prepare_capacities`), map tech tokens to carriers via ``tech_map``
-    and sum, then filter to ``regions``. The ``unit`` column reflects the target unit declared in
-    the capacity spec (``to_unit``).
-    """
-    unit = symbols["capacity"].get("to_unit", "MW")
-
-    caps = prepare_capacities(loader, symbols)
-    caps = rename_technologies(caps, symbols.get("technology_names"))
-    caps = aggregate_capacities_to_carriers(
-        caps, tech_map, map_tech_col=map_tech_col, map_carrier_col=map_carrier_col, unit=unit,
-    )
-    caps["year"] = caps["year"].astype(int)
-    return caps[caps["region"].isin(set(regions))].reset_index(drop=True)
