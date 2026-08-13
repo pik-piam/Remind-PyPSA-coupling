@@ -12,7 +12,7 @@ Guiding rule:
 
 !!! info "Symbols"
     "Symbol" is the GAMS name for sets, scalars, parameters and variables — these are the
-    REMIND outputs that `iampypsa` reads.
+    IAM outputs that `iampypsa` reads.
 
 ---
 
@@ -121,7 +121,7 @@ Methods, grouped by whether they're IAM-specific or shared:
 | `downscale_country_demand(regional=None)` | concrete, inherited | the model needs extra steps (e.g. a historical-calibration adjustment). |
 | `build_discount_rates(year)` | concrete, inherited | rarely. |
 | `prepare_capacities()` | concrete, inherited | rarely — capacities at model-tech resolution, before carrier aggregation. |
-| `build_capacity_targets(tech_map, …)` | concrete, inherited | rarely — the same, aggregated to the model's PyPSA carriers. |
+| `get_capacities(tech_map, …)` | concrete, inherited | rarely — the same, aggregated to the model's PyPSA carriers. |
 
 ---
 
@@ -198,8 +198,7 @@ method; reading one symbol or applying one pure transform is a direct call.**
 | Module | Key functions | Does |
 |---|---|---|
 | `co2_prices` | `extract_co2_prices` | Filter/reindex the CO2 price pathway to the coupled `regions × years` grid (missing → 0). Currency scaling is `costs.apply_currency_factor`, shared with the cost table. |
-| `loads` | `convert_loads` | Reduce IAM demand to one row per `(year, region, sector)` in annual MWh. |
-| `capacities` | `apply_consolidation`, `adjust_link_capacities_to_input`, `aggregate_capacities_to_carriers` | Consolidate (VRE-variant merge, battery scaling); divide link-like techs by efficiency (output→input basis); map IAM techs to PyPSA carriers and sum. Sequenced by `Coupler.build_capacity_targets`. |
+| `capacities` | `apply_postprocessing`, `adjust_link_capacities_to_input`, `aggregate_capacities_to_carriers` | Postprocess (technology-variant merge, scaling); divide link-like techs by efficiency (output→input basis); map IAM techs to PyPSA carriers and sum. Sequenced by `Coupler.get_capacities`. |
 | `costs` | `build_iam_techdata`, `build_pypsa_techdata`, `build_set_value_overrides`, `apply_overrides`, `add_discount_rate`, `convert_investment_to_input_capacity_basis` | Split cost values by [technology-mapping](getting-started/technology-mapping.md) source, merge IAM values onto the PyPSA baseline, convert investment from per-output to per-input capacity (`× efficiency ** exp`), add discount-rate rows. |
 
 The `Coupler`'s `build_*` / `extract_*` methods are thin orchestrations over these functions; each function is

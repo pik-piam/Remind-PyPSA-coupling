@@ -146,7 +146,7 @@ def test_full_capacity_targets_match_reference():
         ]
     )
     a = _coupler()
-    got = a.build_capacity_targets(tmap, map_tech_col="IAM", map_carrier_col="PyPSA")
+    got = a.get_capacities(tmap, map_tech_col="IAM", map_carrier_col="PyPSA")
     got["year"] = got["year"].astype(int)
     g = got.query("region == 'DEU' and year == 2090").set_index("carrier")["value"]
     r = (
@@ -160,7 +160,7 @@ def test_full_capacity_targets_match_reference():
 
 def test_prepare_capacities_stops_before_carrier_aggregation():
     """prepare_capacities is the model-tech seam consumers reach for (brownfield
-    harmonisation); build_capacity_targets is the same data aggregated to PyPSA carriers."""
+    harmonisation); get_capacities is the same data aggregated to PyPSA carriers."""
     a = _coupler()
     raw = a.prepare_capacities()
     assert "technology" in raw.columns and "carrier" not in raw.columns
@@ -168,6 +168,6 @@ def test_prepare_capacities_stops_before_carrier_aggregation():
     tmap = pd.DataFrame(
         [{"PyPSA": "onwind", "IAM": "wind-onshore"}, {"PyPSA": "solar", "IAM": "solar-pv"}]
     )
-    targets = a.build_capacity_targets(tmap, map_tech_col="IAM", map_carrier_col="PyPSA")
+    targets = a.get_capacities(tmap, map_tech_col="IAM", map_carrier_col="PyPSA")
     assert set(targets["carrier"]) == {"onwind", "solar"}
     assert set(targets["region"]) <= set(a.model_regions)

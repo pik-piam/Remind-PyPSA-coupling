@@ -33,14 +33,14 @@ solar: {source: IAM, iam_name: solar-pv}
 biomass-igcc-ccs:
   source: IAM
   overrides:
-    CO2 intensity: {value: 0, unit: "tCO2/MWh_th", comment: "carbon-negative in REMIND, but that makes PyPSA unbounded"}
+    CO2 intensity: {value: 0, unit: "tCO2/MWh_th", comment: "carbon-negative in IAM, but that makes PyPSA unbounded"}
 
 # A technology that's entirely PyPSA-sourced, with one parameter zeroed out because
 # the IAM's own cost for the primary technology already includes it.
 offwind-ac-connection-submarine:
   source: PyPSA
   overrides:
-    investment: {value: 0, unit: "USD/MW/km", comment: "Connection costs already included in REMIND offwind investment"}
+    investment: {value: 0, unit: "USD/MW/km", comment: "Connection costs already included in IAM offwind investment"}
 ```
 
 See [`examples/technology-mapping.example.yaml`](https://github.com/pik-piam/IAM-PyPSA-coupling/blob/main/examples/technology-mapping.example.yaml)
@@ -58,18 +58,17 @@ The same mapping serves two different consumers:
   split the model's baseline cost table and the IAM's cost table according to each technology's
   `build_technology_sources`, and `apply_overrides` merges them back together, IAM values
   overriding baseline values only where `source: IAM` (or an explicit override) says so.
-- **Capacity-target technology selection** — `transforms/capacities.py`:
-  `build_capacity_targets` and `build_capacity_reporting_technologies` use the mapping to decide
-  which of the IAM's reported technologies should be summed into which of the model's carriers
-  when building capacity targets (see [Harmonising capacities](harmonising-capacities.md) for how
-  those targets then get applied).
+- **Capacity-target technology selection** — `Coupler.get_capacities` and
+  `build_capacity_reporting_technologies` use the mapping to decide which of the IAM's reported
+  technologies should be summed into which of the model's carriers when building capacity targets
+  (see [Harmonising capacities](harmonising-capacities.md) for how those targets then get
+  applied).
 
-`transforms/costs.py`'s `convert_investment_to_input_capacity_basis` (output→input capacity-basis
-conversion for link-like technologies) is *not* driven by this mapping — which technologies need
-it depends on how the specific PyPSA model's own network-building code consumes the result, not
-on anything the mapping declares, so each model's coupling script lists them explicitly (see
-`pypsa-eur-iam/scripts/remind/import_REMIND_costs.py`'s `LINK_TECHS` for a worked example and the
-reasoning behind it).
+!!! info "PyPSA link technologies"
+    PyPSA link investment costs are defined per *input* power and not nameplate output capacity.
+    Many IAMs use the more frequent output capacity convention. The conversion is supported by
+    `transforms.costs.convert_investment_to_input_capacity_basis`. A template for how to use it
+    can be found at `pypsa-eur-iam/scripts/remind/import_REMIND_costs.py`.
 
 If a technology declares `source: IAM` (directly or via an override) for a parameter, but the
 IAM's own output has no matching data for it, `build_iam_techdata` raises an error.

@@ -9,7 +9,6 @@ from iampypsa.downscale import (
     ProportionalDownscaler,
     disaggregate_demand_to_country,
 )
-from iampypsa.transforms.loads import convert_loads
 
 DATA = Path(__file__).parent / "data"
 GDX = DATA / "remind2pypsa_amt_filtered.gdx"
@@ -26,11 +25,23 @@ SECTOR_WEIGHTS = {
 COUNTRIES = {"DE", "AT", "BE", "LU", "NL", "CN", "HK", "MO", "TW"}
 
 
-def test_convert_loads_labels_and_groups():
-    raw = pd.DataFrame(
-        {"year": [2030, 2030], "region": ["DEU", "DEU"], "sector": ["AC", "AC"], "value": [1.0, 0.5]}
-    )
-    out = convert_loads(raw)
+def test_build_regional_demand_labels_and_groups():
+    from iampypsa.couplers.remind import RemindGdxCoupler
+
+    class _FakeLoader:
+        backend = "gdx"
+
+        def resolve_symbol(self, ref):
+            return ref if isinstance(ref, str) else ref[0]
+
+        def load_symbol(self, ref, rename_columns=None):
+            return pd.DataFrame(
+                {"year": [2030, 2030], "region": ["DEU", "DEU"], "sector": ["AC", "AC"], "value": [1.0, 0.5]}
+            )
+
+    symbols = {"demand_fe_sectors": {"symbol": "p32_load_sector"}}
+    coupler = RemindGdxCoupler(_FakeLoader(), symbols, region_map={}, config={}, model_regions=["DEU"])
+    out = coupler.build_regional_demand()
     assert out["value"].iloc[0] == pytest.approx(1.5)
     assert out["unit"].iloc[0] == "MWh_el"
 
@@ -43,15 +54,15 @@ def test_proportional_downscaler_splits_by_share():
     assert out["FR"] == pytest.approx(30.0)
 
 
-def test_convert_loads_matches_reference_regional():
+def test_build_regional_demand_matches_reference_regional():
+    from iampypsa.couplers.remind import RemindGdxCoupler
     from iampypsa.io import RemindLoader
-    from iampypsa.io.remind_symbols import load_frame, load_symbol_specs
+    from iampypsa.io.remind_symbols import load_symbol_specs
 
     loader = RemindLoader(str(GDX))
     symbols = load_symbol_specs(backend=loader.backend)
-    raw = load_frame(loader, symbols["demand_fe_sectors"])
-    raw["year"] = raw["year"].astype(int)
-    got = convert_loads(raw, regions=["DEU"]).query(
+    coupler = RemindGdxCoupler(loader, symbols, region_map={}, config={}, model_regions=["DEU"])
+    got = coupler.build_regional_demand().query(
         "region == 'DEU' and year == 2090 and sector == 'AC'"
     )["value"].iloc[0]
     ref = pd.read_csv(SECT_LOAD).query("region=='DEU' and year==2090 and sector=='AC'")["value"].iloc[0]

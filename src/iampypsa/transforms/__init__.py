@@ -21,14 +21,12 @@ from iampypsa.transforms.costs import (
 from iampypsa.transforms.capacities import (
     adjust_link_capacities_to_input,
     aggregate_capacities_to_carriers,
-    apply_consolidation,
+    apply_postprocessing,
 )
-from iampypsa.transforms.loads import convert_loads
 
 __all__ = [
     "extract_co2_prices",
-    "convert_loads",
-    "apply_consolidation",
+    "apply_postprocessing",
     "adjust_link_capacities_to_input",
     "aggregate_capacities_to_carriers",
     "annotate_cost_rows",

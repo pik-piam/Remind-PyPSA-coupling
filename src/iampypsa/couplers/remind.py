@@ -23,7 +23,6 @@ import country_converter as coco
 from iampypsa.couplers.base import Coupler
 from iampypsa.io.remind_symbols import load_frame, load_set, load_spec, load_variable_set, rename_technologies
 from iampypsa.transforms.costs import broadcast_fuel_prices, annotate_cost_rows, apply_currency_factor
-from iampypsa.transforms.loads import convert_loads
 from iampypsa.units import HOURS_PER_YEAR, unit_factor
 
 
@@ -46,10 +45,19 @@ class RemindGdxCoupler(Coupler):
         Reads ``demand_fe_sectors`` (``p32_load_sector``), with TWa→MWh conversion applied by
         ``load_frame``, and restricts to the configured REMIND regions. All available years are
         returned; the year filter to planning horizons happens in ``downscale_country_demand``.
+        Sums rows sharing a key as a guard against an unexpected extra source dimension.
         """
         raw = load_frame(self.loader, self.symbols["demand_fe_sectors"])
         raw["year"] = raw["year"].astype(int)
-        return convert_loads(raw, regions=self.model_regions)
+        df = raw[["year", "region", "sector", "value"]].copy()
+        df["unit"] = "MWh_el"
+        df = df[df["region"].isin(set(self.model_regions))]
+        return (
+            df.groupby(["year", "region", "sector", "unit"], as_index=False, observed=True)["value"]
+            .sum()
+            .sort_values(["year", "region", "sector"])
+            .reset_index(drop=True)
+        )
 
     def extract_cost_parameters(self, year: int) -> pd.DataFrame:
         """Extract REMIND GDX cost parameters as long

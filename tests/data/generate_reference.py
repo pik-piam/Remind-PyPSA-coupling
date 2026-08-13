@@ -88,7 +88,7 @@ if __name__ == "__main__":
             if iam_name(tech, spec) in reports_capacity
         ]
     )
-    capacities = coupler.build_capacity_targets(
+    capacities = coupler.get_capacities(
         tmap, map_tech_col="IAM", map_carrier_col="PyPSA"
     )
     capacities.to_csv(REF / "installed_capacities.csv", index=False)

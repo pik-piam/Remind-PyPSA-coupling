@@ -15,6 +15,9 @@ Loading layer:
 * ``load_spec``      — dispatcher: picks by spec shape (``variables:`` →
   ``load_variable_set``; ``index:``/``schema:`` → ``load_set``; else → ``load_frame``).
 
+Unit conversion (resolving which unit a spec/frame declares, then applying the central
+``iampypsa.units`` factor) is generic and lives in ``iampypsa.io.conversion``.
+
 ``report_fallbacks`` returns a summary of all fallback declarations in a symbol map so
 coverage gaps are inspectable without running a full coupling.
 """
@@ -28,8 +31,8 @@ from typing import Any
 import pandas as pd
 import yaml
 
+from iampypsa.io.conversion import convert_column, resolve_source_unit
 from iampypsa.io.loader import Backend, RemindLoader, SymbolRef
-from iampypsa.units import unit_factor
 
 logger = logging.getLogger(__name__)
 
@@ -130,31 +133,6 @@ def _derive_symbol_ref(spec: dict[str, Any]) -> SymbolRef:
     return ref
 
 
-def _source_unit(spec: dict[str, Any], ref, resolved_name: str, df: pd.DataFrame) -> str | None:
-    """Resolve the source unit for a single-quantity spec.
-
-    Prefers a live ``unit`` column on ``df`` (mif); raises on heterogeneous live values or a
-    stale declared ``unit:``. Falls back to a declared ``units:``/``unit:`` when no live column
-    exists (GDX). Returns None if neither is available.
-    """
-    if "unit" in df.columns:
-        live = df["unit"].dropna().unique()
-        if len(live) > 1:
-            raise ValueError(f"Heterogeneous units for {resolved_name!r}: {sorted(live)}.")
-        if len(live) == 1:
-            declared = spec.get("unit")
-            if declared is not None and declared != live[0]:
-                raise ValueError(
-                    f"Declared unit {declared!r} for {resolved_name!r} does not match "
-                    f"the live mif unit {live[0]!r} — update the yaml's ``unit:``."
-                )
-            return live[0]
-    if "units" in spec:
-        candidates = [ref] if isinstance(ref, str) else list(ref)
-        return spec["units"][candidates.index(resolved_name)]
-    return spec.get("unit")
-
-
 def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
     """Load the frame for one single-quantity symbol spec, applying its unit conversion.
 
@@ -177,10 +155,8 @@ def load_frame(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
         # (e.g. rlf: 1) -- compare as strings so a plain int in the spec still matches.
         df = df[df[col].astype(str) == str(value)]
     to_unit = spec.get("to_unit")
-    src_unit = _source_unit(spec, ref, resolved, df)
-    if to_unit is not None and src_unit is not None and "value" in df.columns:
-        df = df.copy()
-        df["value"] = df["value"] * unit_factor(src_unit, to_unit)
+    src_unit = resolve_source_unit(spec, ref, resolved, df)
+    df = convert_column(df, "value", src_unit, to_unit)
     unit = to_unit if to_unit is not None else src_unit
     if unit is not None and "value" in df.columns:
         df = df.copy()
@@ -205,7 +181,7 @@ def load_set(loader: RemindLoader, spec: dict[str, Any]) -> pd.DataFrame:
         if part.empty:
             continue
         if "to_unit" in sub:
-            part["value"] = part["value"] * unit_factor(sub.get("unit", sub["to_unit"]), sub["to_unit"])
+            part = convert_column(part, "value", sub.get("unit", sub["to_unit"]), sub["to_unit"])
         part["parameter"] = sub["parameter"]
         part["unit"] = sub.get("to_unit", sub.get("unit"))
         frames.append(part)

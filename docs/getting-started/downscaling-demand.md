@@ -20,7 +20,7 @@ This part is implemented in `iampypsa`. A model region like REMIND's `ECE` typic
 countries, whereas a PyPSA model requires country-level demand.
 
 - **The region → country map** — `read_region_map()` reads the packaged region-mapping CSV
-  (`data/remind/regions.csv`) and returns `{region: [country, ...]}` (or the reverse, depending
+  (e.g. `data/remind/regions.csv` for REMIND) and returns `{region: [country, ...]}` (or the reverse, depending
   on `source`/`target`).
 - **Proxy shares** — each sector's regional demand is weighted by *proxies*: normalised
   population and GDP projections (`downscale/proxy.py`) for most sectors, and degree-day-weighted

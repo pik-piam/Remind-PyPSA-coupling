@@ -1,8 +1,8 @@
 """Tests for the shared capacity-target transforms (synthetic + real EUR data).
 
 Validates the generator-carrier pipeline against installed_capacities.csv. Carriers that
-need spec-driven consolidation (VRE merge, battery scaling, link η-adjustment) are exercised
-in the consolidation tests below.
+need spec-driven postprocessing (token merge, scaling, link η-adjustment) are exercised
+in the postprocessing tests below.
 """
 
 from pathlib import Path
@@ -13,7 +13,7 @@ import pytest
 from iampypsa.transforms.capacities import (
     adjust_link_capacities_to_input,
     aggregate_capacities_to_carriers,
-    apply_consolidation,
+    apply_postprocessing,
 )
 
 DATA = Path(__file__).parent / "data"
@@ -60,42 +60,42 @@ def test_aggregate_preserves_one_tech_feeding_several_carriers():
     assert out["offwind-ac"] == pytest.approx(12.0)
 
 
-def test_apply_consolidation_noop_without_params():
-    """A config with no consolidation block (e.g. IAMC) leaves capacities untouched."""
+def test_apply_postprocessing_noop_without_params():
+    """A config with no postprocessing block (e.g. IAMC) leaves capacities untouched."""
     caps = pd.DataFrame({"year": [2050, 2050], "region": ["DEU", "DEU"],
                          "technology": ["elh2VRE", "storspv"], "value": [10.0, 5.0]})
-    out = apply_consolidation(caps)
+    out = apply_postprocessing(caps)
     pd.testing.assert_frame_equal(out, caps)
 
 
-def test_apply_consolidation_merges_vre_and_scales_battery():
-    """Consolidation block: elh2VRE→elh2 merge and storX→btin scaling."""
+def test_apply_postprocessing_merges_and_scales():
+    """Postprocessing block: elh2VRE→elh2 merge and storX→btin merge+scaling."""
     caps = pd.DataFrame(
         {"year": [2050, 2050, 2050], "region": ["DEU", "DEU", "DEU"],
          "technology": ["elh2VRE", "storspv", "storwindon"], "value": [10.0, 5.0, 2.0]})
-    out = apply_consolidation(
+    out = apply_postprocessing(
         caps,
-        vre_to_primary={"elh2VRE": "elh2", "storspv": "btin", "storwindon": "btin"},
-        battery_scaling={"storspv": 4.0, "storwindon": 1.2},
+        merge={"elh2": ["elh2", "elh2VRE"], "btin": ["btin", "storspv", "storwindon"]},
+        scale={"storspv": 4.0, "storwindon": 1.2},
     ).set_index("technology")["value"]
     assert out.loc["elh2"] == pytest.approx(10.0)
     assert out.loc["btin"].sum() == pytest.approx(5.0 * 4.0 + 2.0 * 1.2)
 
 
-def test_apply_consolidation_uses_btin_directly_when_present():
+def test_apply_postprocessing_uses_target_directly_when_present():
     """Bidirectional guard: an explicit btin capacity is kept; storX rows are dropped."""
     caps = pd.DataFrame(
         {"year": [2050, 2050], "region": ["DEU", "DEU"],
          "technology": ["btin", "storspv"], "value": [7.0, 5.0]})
-    out = apply_consolidation(
-        caps, vre_to_primary={"storspv": "btin"}, battery_scaling={"storspv": 4.0}
+    out = apply_postprocessing(
+        caps, merge={"btin": ["btin", "storspv"]}, scale={"storspv": 4.0}
     ).set_index("technology")["value"]
     assert out["btin"] == pytest.approx(7.0)
     assert "storspv" not in out.index
 
 
-def test_build_capacity_targets_reads_consolidation_from_symbols():
-    """build_capacity_targets applies the consolidation block declared in the capacity spec."""
+def test_get_capacities_reads_postprocessing_from_symbols():
+    """get_capacities applies the postprocessing block declared in the capacity spec."""
     from iampypsa.couplers.base import Coupler
 
     class _FakeLoader:
@@ -111,16 +111,16 @@ def test_build_capacity_targets_reads_consolidation_from_symbols():
     symbols = {
         "capacity": {
             "symbol": "p32_capAvg",
-            "consolidation": {
-                "vre_to_primary": {"storspv": "btin"},
-                "battery_scaling": {"storspv": 4.0},
+            "postprocessing": {
+                "merge": {"btin": ["btin", "storspv"]},
+                "scale": {"storspv": 4.0},
                 "link_techs": [],
             },
         },
     }
     tmap = pd.DataFrame({"model_tech": ["btin"], "target_carrier": ["battery charger"]})
     coupler = Coupler(_FakeLoader(), symbols, {}, {}, model_regions=["DEU"])
-    out = coupler.build_capacity_targets(
+    out = coupler.get_capacities(
         tmap, map_tech_col="model_tech", map_carrier_col="target_carrier",
     )
     assert out.query("carrier == 'battery charger'")["value"].iloc[0] == pytest.approx(5.0 * 4.0)

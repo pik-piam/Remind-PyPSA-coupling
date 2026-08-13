@@ -37,7 +37,7 @@ Regardless of the PyPSA model, the following steps should always be followed:
 1. **Read regional sectoral demand** — `Coupler.build_regional_demand()`.
 2. **Downscale demand to country level** — `Coupler.downscale_country_demand()`. See
    [Downscaling demand](downscaling-demand.md).
-3. **Read capacity targets** — `iampypsa.transforms.capacities.build_capacity_targets(...)`,
+3. **Read capacity targets** — `Coupler.get_capacities(...)`,
    using the [Technology mapping](technology-mapping.md).
 4. **Read CO2 prices** — `Coupler.build_co2_prices()`.
 5. **Read costs** — `Coupler.extract_cost_parameters(year)`, using the
@@ -54,11 +54,13 @@ Regardless of the PyPSA model, the following steps should always be followed:
 ## Reference implementation: `pypsa-eur-iam`
 
 `pypsa-eur-iam` showcases an implementation of this approach —
-`Snakefile_REMIND` sets up the workflow, `rules/REMIND_coupling.smk` contains all coupling rules,
+`Snakefile_REMIND` sets up the workflow for the IAM REMIND, `rules/REMIND_coupling.smk` contains all coupling rules,
 and `scripts/remind/` holds the per-step scripts.
 
 ## Next
 
+- [Data exchange](data-exchange.md) — what data can be exchanged between IAMs and PyPSA,
+  covering both directions.
 - [Technology mapping](technology-mapping.md) — how costs and capacities get mapped onto PyPSA's own carrier/technology names.
 - [Downscaling demand](downscaling-demand.md) — turning regional annual demand into country-level demand.
 - [Harmonising capacities](harmonising-capacities.md) — reconciling capacity targets with an

@@ -33,7 +33,7 @@ from iampypsa.io.remind_symbols import load_frame, load_spec, rename_technologie
 from iampypsa.transforms.capacities import (
     adjust_link_capacities_to_input,
     aggregate_capacities_to_carriers,
-    apply_consolidation,
+    apply_postprocessing,
 )
 from iampypsa.transforms.co2_prices import extract_co2_prices
 from iampypsa.transforms.costs import apply_currency_factor, select_discount_rate
@@ -131,16 +131,16 @@ class Coupler:
         """Read installed capacities at model-tech resolution, before carrier aggregation.
 
         Returns ``[year, region, technology, value, unit]``. Applies the capacity spec's
-        optional ``consolidation`` block (VRE-variant merging, battery scaling) and puts
+        optional ``postprocessing`` block (technology-variant merging, scaling) and puts
         link-like technologies on an input-capacity basis. Callers wanting PyPSA carriers use
-        :meth:`build_capacity_targets`; callers needing model-tech resolution (e.g. group-wise
+        :meth:`get_capacities`; callers needing model-tech resolution (e.g. group-wise
         brownfield harmonisation) use this directly.
         """
         cap_spec = self.symbols["capacity"]
-        consolidation = dict(cap_spec.get("consolidation", {}))
-        link_techs = set(consolidation.pop("link_techs", []))
+        postprocessing = dict(cap_spec.get("postprocessing", {}))
+        link_techs = set(postprocessing.pop("link_techs", []))
 
-        caps = apply_consolidation(load_spec(self.loader, cap_spec), **consolidation)
+        caps = apply_postprocessing(load_spec(self.loader, cap_spec), **postprocessing)
         if link_techs and "efficiency_conv" in self.symbols:
             eff = load_spec(self.loader, self.symbols["efficiency_conv"]).rename(
                 columns={"value": "efficiency"}
@@ -148,7 +148,7 @@ class Coupler:
             caps = adjust_link_capacities_to_input(caps, eff, link_techs)
         return caps
 
-    def build_capacity_targets(
+    def get_capacities(
         self,
         tech_map: pd.DataFrame,
         *,
@@ -156,7 +156,8 @@ class Coupler:
         map_carrier_col: str,
         regions: Sequence[str] | None = None,
     ) -> pd.DataFrame:
-        """Build installed-capacity targets as ``[year, region, carrier, value, unit]``.
+        """Get IAM capacities in PyPSA-ready format (where they will become must-build
+        constraints), as ``[year, region, carrier, value, unit]``.
 
         ``tech_map`` stays an argument because the carrier vocabulary is PyPSA-side and never
         lives in the package. The ``unit`` column reflects the capacity spec's ``to_unit``.

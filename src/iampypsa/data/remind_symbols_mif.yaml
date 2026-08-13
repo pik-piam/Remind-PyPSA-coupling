@@ -54,7 +54,7 @@ default:
   # output-basis capacity divided by efficiency to get PyPSA input-basis p_nom.
   # Derived: coal-pulverised and biomass-igcc have no own Cap| variable; residuals.
   capacity:
-    consolidation:
+    postprocessing:
       link_techs: [electrolysis, hydrogen-turbine]
     variables:
       "Cap|Electricity|Gas|GT":                gas-ocgt
@@ -199,7 +199,7 @@ default:
     to_unit: "USD/MWh"
 
   # Efficiency for link-capacity adjustment (output→input basis).
-  # Used by build_capacity_targets; subset of the full efficiency variable-set below.
+  # Used by get_capacities; subset of the full efficiency variable-set below.
   efficiency_conv:
     variables:
       "Tech|Hydrogen|Electricity|Efficiency":  electrolysis

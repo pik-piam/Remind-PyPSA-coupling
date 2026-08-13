@@ -2,10 +2,9 @@
 
 These pages explain what `iampypsa` does and how to use it.
 
-1. **[Data exchange](data-exchange.md)** — what data can be exchanged between IAMs and PyPSA,
-   covering both directions.
-2. **[Integrating a PyPSA model](integrating-a-model.md)** — the general approach for integrating
+1. **[Integrating a PyPSA model](integrating-a-model.md)** — the general approach for integrating
    `iampypsa` into PyPSA's snakemake workflow.
+2. **[Data exchange](data-exchange.md)** — what data can be exchanged between IAMs and PyPSA.
 3. **[Technology mapping](technology-mapping.md)** — the YAML file that decides, per technology
    and parameter, whether data comes from the IAM or PyPSA or is manually set.
 4. **[Downscaling demand](downscaling-demand.md)** — downscaling of annual sectoral demand to

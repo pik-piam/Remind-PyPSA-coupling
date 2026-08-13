@@ -1,11 +1,11 @@
 """Pure steps for turning IAM installed capacities into PyPSA targets (p_nom_min).
 
-In pipeline order: consolidate variant tokens (:func:`apply_consolidation`), put link-like
+In pipeline order: postprocess variant tokens (:func:`apply_postprocessing`), put link-like
 technologies on an input-capacity basis (:func:`adjust_link_capacities_to_input`), then map
 model tech tokens to PyPSA carriers and sum (:func:`aggregate_capacities_to_carriers`).
 
 Reading the symbols and sequencing these is the Coupler's job — see
-``Coupler.prepare_capacities`` / ``Coupler.build_capacity_targets``.
+``Coupler.prepare_capacities`` / ``Coupler.get_capacities``.
 """
 
 import logging
@@ -81,45 +81,46 @@ def aggregate_capacities_to_carriers(
     return grouped.sort_values([*group_cols, "carrier"]).reset_index(drop=True)
 
 
-def apply_consolidation(
+def apply_postprocessing(
     caps: pd.DataFrame,
     *,
-    vre_to_primary: dict[str, str] | None = None,
-    battery_scaling: dict[str, float] | None = None,
+    merge: dict[str, list[str]] | None = None,
+    scale: dict[str, float] | None = None,
     tech_col: str = "technology",
     value_col: str = "value",
 ) -> pd.DataFrame:
-    """Apply the optional ``consolidation`` block from the capacity symbol spec.
+    """Apply the optional ``postprocessing`` block from the capacity symbol spec.
 
     Two steps, both driven by config — no-op when params are absent (e.g. IAMC configs
-    that have no ``consolidation`` block):
+    that have no ``postprocessing`` block):
 
-    1. **Token rename**: rename coupled variant tokens to their primary token via
-       ``vre_to_primary`` (e.g. ``elh2VRE`` → ``elh2``; also used for battery-scaling targets
-       below, e.g. ``storspv`` → ``btin``).
-    2. **Battery scaling**: multiply each ``battery_scaling`` source row by its scaling factor
-       before it's renamed to its ``vre_to_primary`` target. If that target already carries a
-       positive value on its own, the source rows are dropped instead of scaled (bidirectional-
-       coupling guard).
+    1. **Merge**: rename coupled variant tokens to their primary token via ``merge``, a
+       ``{target: [sources, ...]}`` map (e.g. ``{"elh2": ["elh2", "elh2VRE"]}`` merges
+       ``elh2VRE`` into ``elh2``; also used for scaling targets below, e.g.
+       ``{"btin": ["btin", "storspv", ...]}``).
+    2. **Scale**: multiply each ``scale`` source row by its scaling factor before it's merged
+       into its ``merge`` target. If that target already carries a positive value on its own,
+       the source rows are dropped instead of scaled (bidirectional-coupling guard).
     """
     caps = caps.copy()
-    vre_to_primary = vre_to_primary or {}
-    battery_scaling = battery_scaling or {}
+    merge = merge or {}
+    scale = scale or {}
+    rename_map = {source: target for target, sources in merge.items() for source in sources}
 
     tech = caps[tech_col].astype(str)
 
-    if battery_scaling:
-        targets = {src: vre_to_primary.get(src, src) for src in battery_scaling}
+    if scale:
+        targets = {source: rename_map.get(source, source) for source in scale}
         is_target_present = tech.isin(set(targets.values())) & (caps[value_col] > 0)
-        is_stor = tech.isin(battery_scaling)
+        is_scaled = tech.isin(scale)
         if is_target_present.any():
-            caps = caps[~is_stor].copy()
+            caps = caps[~is_scaled].copy()
             tech = caps[tech_col].astype(str)
         else:
-            scale = tech.map(battery_scaling)
-            caps.loc[scale.notna(), value_col] *= scale[scale.notna()]
+            factor = tech.map(scale)
+            caps.loc[factor.notna(), value_col] *= factor[factor.notna()]
 
-    caps[tech_col] = tech.map(lambda t: vre_to_primary.get(t, t))
+    caps[tech_col] = tech.map(lambda t: rename_map.get(t, t))
     return caps
 
 
