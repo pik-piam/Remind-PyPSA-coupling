@@ -40,3 +40,19 @@ def test_open_coupler_rejects_an_unknown_model():
 
     with pytest.raises(ValueError, match="Unknown model"):
         open_coupler("whatever.gdx", model="not-an-iam")
+
+
+@pytest.mark.parametrize(
+    ("fixture", "expected"),
+    [
+        ("remind2pypsa_amt_filtered.gdx", "RemindGdxCoupler"),
+        ("remind_generic_amt_filtered.mif", "RemindIamcCoupler"),
+    ],
+)
+def test_open_coupler_pairs_the_backend_with_its_coupler(fixture, expected):
+    """The pairing consumers used to do by hand — one place, driven by the suffix."""
+    from iampypsa import open_coupler
+
+    coupler = open_coupler(pathlib.Path(__file__).parent / "data" / fixture)
+    assert type(coupler).__name__ == expected
+    assert coupler.quantities["co2_price"]["to_unit"] == "USD/tCO2"

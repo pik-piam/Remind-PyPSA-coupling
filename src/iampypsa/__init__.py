@@ -60,6 +60,12 @@ def open_coupler(
     )
     if region_map is None:
         region_map = read_default_region_map(model)
+    if not region_map and not model_regions:
+        # Both empty means every builder silently returns nothing — fail at the front door.
+        raise ValueError(
+            f"Model {model!r} ships no region map, so pass region_map= (or at least "
+            "model_regions=) to say which IAM regions to couple."
+        )
     coupler_cls = get_coupler_class(model, loader.backend)
     return coupler_cls(
         loader,
