@@ -7,6 +7,7 @@ live here — they live with their format in :mod:`iampypsa.formats`.
 """
 
 from iampypsa.quantities.config import (
+    check_currency_consistency,
     load_quantity_specs,
     load_technology_parameters,
     merge_region_overrides,
@@ -20,6 +21,7 @@ from iampypsa.quantities.load import (
 )
 
 __all__ = [
+    "check_currency_consistency",
     "load_quantity",
     "load_quantity_specs",
     "load_simple",

@@ -5,8 +5,8 @@
 # (1) Single-quantity symbol
 #       symbol: "IAMC variable name"
 #       rename: {source_col: canonical_col}  — optional; read_iamc already uses lowercase names
-#       unit:    optional — documents the expected mif 'Unit'; load_frame checks it against
-#                the live mif value and raises if they disagree
+#       unit:    optional — documents the expected mif 'Unit'; the load seam checks it
+#                against the live mif value and raises if they disagree
 #       to_unit: optional target unit (source unit is read from the 'Unit' column of the mif)
 #
 # (2) Variable-set  (IAMC-specific — one logical quantity from many IAMC variables):
@@ -21,6 +21,13 @@
 # IAMC .mif, whose variable names are region-independent.
 
 default:
+  # --- Currency -------------------------------------------------------------
+  # What every monetary quantity in this file is reported in. Values are NOT deflated between
+  # currency years; converting into the PyPSA baseline's currency is config["currency_factor"].
+  currency:
+    name: USD
+    year: 2017
+
   # --- Technology -> fuel map ------------------------------------------------
   tech_fuel_map:
     coal-pulverised: coal-fuel
@@ -280,14 +287,14 @@ default:
       hydrogen-turbine: {value: 0.0, reason: "No mif variable; zero-emission technology"}
 
   # --- Demand variables ----------------------------------------------------
-  # Read by RemindIamcCoupler.build_regional_demand via load_spec / load_variable_set / load_frame.
-  # demand_fe_sectors and demand_energy_balance both use load_variable_set (variables: block →
+  # Read by RemindIamcCoupler.build_regional_demand via load_quantity.
+  # demand_fe_sectors and demand_energy_balance are both `variables:` specs (→
   # token labels + unit conversion); the adapter applies the η_td formula and AC residual
   # computation on top of their already-MWh output.
   demand_fe_sectors:
     # Electricity FE sectors only: each is converted to the SE level (÷ η_td) and subtracted
     # from the AC residual in build_regional_demand. All source variables share EJ/yr, so a
-    # single flat variables: block satisfies load_variable_set's homogeneous-unit contract.
+    # single flat variables: block satisfies the homogeneous-unit contract of that shape.
     variables:
       "FE|Transport|Pass|Electricity":                           EV_pass
       "FE|Transport|Freight|Electricity":                        EV_freight
@@ -324,7 +331,7 @@ default:
   # --- Hydro special case --------------------------------------------------
   # Hydro needs BOTH capacity and generation so the downstream step can derive a
   # capacity factor (generation / (capacity × 8760)) to scale hydro inflow. Read by the
-  # dedicated import_REMIND_hydro.py via load_frame — outside the adapter/capacity/cost flow.
+  # dedicated import_REMIND_hydro.py via load_quantity — outside the capacity/cost flow.
   hydro_capacity:
     symbol: "Cap|Electricity|Hydro"
     unit: "GW"

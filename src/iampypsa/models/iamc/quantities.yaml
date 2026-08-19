@@ -9,6 +9,13 @@
 # iampypsa.units.UNIT_CONVERSIONS.
 
 default:
+  # --- Currency -------------------------------------------------------------
+  # What every monetary quantity in this file is reported in. Values are NOT deflated between
+  # currency years; converting into the PyPSA baseline's currency is config["currency_factor"].
+  currency:
+    name: USD
+    year: 2017
+
   # Which quantity spec supplies each techno-economic parameter. IamcCoupler loads exactly
   # these, in this order; drop an entry to stop sourcing that parameter from the IAM.
   cost_parameters:
@@ -145,7 +152,7 @@ default:
       "Price|Primary Energy|Biomass":  biomass-fuel
       "Price|Primary Energy|Uranium":  uranium-fuel
     label_col: technology
-    to_unit: "USD/MWh"
+    to_unit: "USD/MWh_th"   # thermal-input basis: marginal_cost = fuel / efficiency
 
   emission_factor:
     variables:

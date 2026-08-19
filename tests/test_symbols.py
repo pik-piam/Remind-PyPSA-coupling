@@ -1,5 +1,7 @@
 """Tests for the quantity-spec layer: config layering, shapes, units (no hardcoded names)."""
 
+import logging
+
 import pandas as pd
 import pytest
 
@@ -354,6 +356,41 @@ def test_load_frame_against_real_gdx():
     df = load_simple(loader, spec)
     assert {"year", "region", "value"} <= set(df.columns)
     assert "DEU" in set(df["region"])
+
+
+@pytest.mark.parametrize(("model", "backend"), [("remind", "gdx"), ("remind", "iamc"), ("iamc", "iamc")])
+def test_every_model_declares_its_currency(model, backend):
+    """The currency year is a property of the IAM run, so the model declares it — it is the only
+    way the GDX backend can state it at all, its unit strings carrying no year."""
+    currency = load_quantity_specs(backend=backend, model=model)["currency"]
+    assert currency["name"] == "USD"
+    assert currency["year"] == 2017
+
+
+def test_a_stale_currency_year_in_a_spec_warns(caplog):
+    """Values are never deflated between currency years, so a config that mixes them is
+    silently wrong. Half-updating the specs on a currency-year bump is the realistic slip."""
+    from iampypsa.quantities import check_currency_consistency
+
+    quantities = {
+        "currency": {"name": "USD", "year": 2017},
+        "cost_investment": {"symbol": "capex", "unit": "US$2020/kW", "to_unit": "USD/MW"},
+        "co2_price": {"symbol": "tax", "unit": "US$2017/t CO2", "to_unit": "USD/tCO2"},
+        "capacity": {"symbol": "cap", "unit": "GW", "to_unit": "MW"},
+    }
+    with caplog.at_level(logging.WARNING, logger="iampypsa.quantities.config"):
+        check_currency_consistency(quantities)
+
+    assert "cost_investment" in caplog.text and "2020" in caplog.text
+    assert "co2_price" not in caplog.text  # matching year
+    assert "capacity" not in caplog.text  # no currency at all
+
+
+@pytest.mark.parametrize(("model", "backend"), [("remind", "gdx"), ("remind", "iamc"), ("iamc", "iamc")])
+def test_shipped_configs_are_currency_consistent(model, backend, caplog):
+    with caplog.at_level(logging.WARNING, logger="iampypsa.quantities.config"):
+        load_quantity_specs(backend=backend, model=model)
+    assert caplog.text == ""
 
 
 def test_gdx_fuel_price_declares_per_carrier_units():

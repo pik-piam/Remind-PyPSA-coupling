@@ -1,5 +1,14 @@
 """Centralized IAM→PyPSA unit conversion factors.
+
+Monetary rows are keyed by a currency year (``US$2017/kW``) because that is what the source
+writes, and values are **not** deflated between years. Which year a source is in is declared by
+the model, not assumed here — see ``currency:`` in ``models/<iam>/quantities_*.yaml``.
 """
+
+import logging
+import re
+
+logger = logging.getLogger(__name__)
 
 #: Molar masses (g/mol) used for carbon↔CO2 mass conversions.
 MOLAR_MASS_C = 12.0
@@ -44,6 +53,12 @@ UNIT_CONVERSIONS: dict[tuple[str, str], float] = {
     # CO2 emission factor, thermal-input basis: g/kWh -> t/MWh (1 g/kWh = 1e-3 t/MWh)
     ("gCO2/kWh_th", "t_CO2/MWh_th"): 0.001,
 }
+
+
+def parse_currency_year(unit: str) -> int | None:
+    """Extract the reference year from a unit string such as ``'US$2017/kW'`` → 2017."""
+    match = re.search(r"US\$(\d{4})", unit)
+    return int(match.group(1)) if match else None
 
 
 def unit_factor(from_unit: str, to_unit: str) -> float:

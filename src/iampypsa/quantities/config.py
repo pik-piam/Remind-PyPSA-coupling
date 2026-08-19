@@ -7,6 +7,7 @@
    candidate, a region override).
 """
 
+import logging
 from os import PathLike
 from typing import Any
 
@@ -14,6 +15,9 @@ import yaml
 
 from iampypsa.formats import Backend
 from iampypsa.models import DEFAULT_MODEL, get_default_config_path
+from iampypsa.units import parse_currency_year
+
+logger = logging.getLogger(__name__)
 
 
 def merge_configs(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -76,9 +80,46 @@ def load_quantity_specs(
         backend: ``"gdx"`` or ``"iamc"`` — required. Pass ``backend=loader.backend``.
         model: IAM whose packaged default to start from.
     """
-    return merge_region_overrides(
+    quantities = merge_region_overrides(
         read_quantity_config(path, backend=backend, model=model), region
     )
+    check_currency_consistency(quantities)
+    return quantities
+
+
+def find_declared_units(spec: Any) -> list[str]:
+    """Return every unit string a spec declares, across all three spec shapes."""
+    if not isinstance(spec, dict):
+        return []
+    units = [spec.get("unit"), spec.get("to_unit"), *spec.get("units", [])]
+    for entry in spec.get("schema", {}).values():
+        units += [entry.get("unit"), entry.get("to_unit")]
+    return [u for u in units if isinstance(u, str)]
+
+
+def check_currency_consistency(quantities: dict[str, Any]) -> None:
+    """Warn when a spec declares a currency year other than the one the config declares.
+
+    Values are never deflated between currency years, so a config that mixes them is silently
+    wrong rather than loud. Catches the realistic case: a run moves to a new currency year and
+    only some specs get updated.
+    """
+    declared = quantities.get("currency", {}).get("year")
+    if declared is None:
+        return
+    mismatched = {
+        name: year
+        for name, spec in quantities.items()
+        for unit in find_declared_units(spec)
+        if (year := parse_currency_year(unit)) is not None and year != declared
+    }
+    if mismatched:
+        logger.warning(
+            "Quantity specs declare currency years other than the config's US$%d: %s. "
+            "Values are not deflated between years — the mismatched ones are wrong.",
+            declared,
+            mismatched,
+        )
 
 
 def load_technology_parameters(path: str | PathLike) -> dict[str, Any]:

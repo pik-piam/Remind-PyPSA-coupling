@@ -6,7 +6,7 @@ import pytest
 
 from iampypsa import IamLoader
 from iampypsa.formats.iamc import read_iamc
-from iampypsa.formats.iamc import parse_currency_year
+from iampypsa.units import parse_currency_year
 
 GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
 

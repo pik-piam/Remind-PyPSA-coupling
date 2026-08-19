@@ -8,17 +8,26 @@
 #                a GDX symbol or an IAMC `.mif` variable.
 #       rename:  source domain column -> canonical column ({year, region, technology, ...})
 #       unit / units / to_unit: optional unit conversion, resolved via the central table
-#                in iampypsa.units and applied by `load_frame`.
+#                in iampypsa.units and applied at the load seam.
 #
-# (2) Mixed-unit set symbol — ONE symbol whose `index` column selects several quantities with
-#     different units (e.g. pm_data indexed by `char` -> lifetime/FOM/VOM). Loaded by `load_set`:
+# (2) Indexed symbol — ONE symbol whose `index` column selects several quantities with
+#     different units (e.g. pm_data indexed by `char` -> lifetime/FOM/VOM):
 #       index:   the (renamed) column whose value selects the quantity
-#       schema:  index-value -> {parameter, unit, to_unit}
+#       schema:  index-value -> {parameter, unit, to_unit}.  Index values absent here are
+#                dropped, so the schema is also the allow-list.
 #
-# `overrides` (keyed by REMIND region) lists only the logical names that differ from `default`.
-# A model may overlay its own YAML via load_symbol_specs(path=...) (deep-merged).
+# Both shapes are loaded by `load_quantity`, which dispatches on the shape.
+# `overrides` (keyed by REMIND region) lists only the coupling names that differ from `default`.
+# A model may overlay its own YAML via load_quantity_specs(path=...) (deep-merged).
 
 default:
+  # --- Currency -------------------------------------------------------------
+  # What every monetary quantity in this file is reported in. Values are NOT deflated between
+  # currency years; converting into the PyPSA baseline's currency is config["currency_factor"].
+  currency:
+    name: USD
+    year: 2017
+
   # --- Canonical technology vocabulary --------------------------------------
   # REMIND all_te/all_enty token -> canonical name; applied by rename_technologies()
   technology_names:
