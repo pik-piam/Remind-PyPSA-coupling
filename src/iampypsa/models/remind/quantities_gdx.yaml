@@ -118,11 +118,21 @@ default:
     filter: {to_carrier: seel, emission_type: co2}
     unit: Gt_C/TWa
     to_unit: t_CO2/MWh_th
+  # Indexed by carrier because peur is priced on a uranium-mass basis while every other
+  # carrier is priced per unit of energy — one `unit:` cannot describe the symbol.
+  # Carriers absent from the schema are dropped: they have no technology_names entry either.
   fuel_price:
     symbol: pm_PEPrice
     rename: {ttot: year, all_regi: region, all_enty: technology}
-    # TUSD/TWa holds for every fuel except peur (raw TUSD/Mt_Ur) — handled in the coupler.
-    unit: TUSD/TWa
+    index: technology
+    schema:
+      pecoal:  {parameter: fuel, unit: TUSD/TWa, to_unit: USD/MWh_th}
+      pegas:   {parameter: fuel, unit: TUSD/TWa, to_unit: USD/MWh_th}
+      peoil:   {parameter: fuel, unit: TUSD/TWa, to_unit: USD/MWh_th}
+      pebiolc: {parameter: fuel, unit: TUSD/TWa, to_unit: USD/MWh_th}
+      # USD/g_U is TUSD/Mt_Ur written to match the mass unit tnrs' efficiency carries, so the
+      # two cancel in _nuclear_fuel_cost. No to_unit: it is already the target.
+      peur:    {parameter: fuel, unit: USD/g_U}
   discount_rate:
     symbol: p_r
     rename: {ttot: year, all_regi: region}

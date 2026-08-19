@@ -241,7 +241,9 @@ default:
       "Price|Primary Energy|Oil":         oil-fuel
       "Price|Primary Energy|Biomass|Modern": biomass-fuel
     label_col: technology
-    to_unit: "USD/MWh"
+    # Thermal-input basis, declared rather than stamped on in the coupler: downstream
+    # marginal_cost = fuel / efficiency depends on it.
+    to_unit: "USD/MWh_th"
 
   # --- Nuclear special case — uranium mass-basis price and conversion factor ------------------
   # REMIND parametrises nuclear on a uranium-mass basis.

@@ -119,14 +119,9 @@ class RemindGdxCoupler(Coupler):
         eff.loc[eff["technology"] == "tnrs", "value"] *= unit_factor("TWa/Mt_Ur", "MWh/g_U")
         eff.loc[eff["technology"] == "tnrs", "unit"] = "MWh/g_U"
 
-        # Fuel: the spec cannot declare to_unit here because peur is already USD/g_U in GDX while
-        # every other carrier is TUSD/TWa — so the conversion and the thermal-basis label are set
-        # per-carrier below rather than at the load seam.
+        # Fuel: per-carrier units (peur is mass-basis) come from the spec's schema.
         fuel = load("fuel_price")
         fuel = fuel.loc[fuel["year"].astype(str) == year_str].copy()
-        fuel.loc[fuel["technology"] != "peur", "value"] *= unit_factor("TUSD/TWa", "USD/MWh")
-        fuel = annotate_cost_rows(fuel, parameter="fuel", unit="USD/MWh_th")
-        fuel.loc[fuel["technology"] == "peur", "unit"] = "USD/g_U"
 
         eff, fuel = self._nuclear_fuel_cost(eff, fuel)
 
@@ -371,9 +366,8 @@ class RemindIamcCoupler(Coupler):
         fom_abs = load("cost_omf")
         fom_pct = self._compute_fom_pct(capex, fom_abs)
 
-        # Fuel prices are per unit of thermal input; the mif's unit string does not say so, and
-        # downstream marginal_cost = fuel / efficiency depends on that basis.
-        fuel = annotate_cost_rows(load("fuel_price"), parameter="fuel", unit="USD/MWh_th")
+        # Thermal-input basis comes from the spec's to_unit:.
+        fuel = annotate_cost_rows(load("fuel_price"), parameter="fuel")
 
         # --- nuclear: fuel cost (USD/MWh_el) + efficiency (1.0 p.u.), computed from the
         # uranium mass-basis price/conversion-factor variables (mass unit cancels in the

@@ -356,6 +356,22 @@ def test_load_frame_against_real_gdx():
     assert "DEU" in set(df["region"])
 
 
+def test_gdx_fuel_price_declares_per_carrier_units():
+    """peur is priced per unit of uranium mass while every other carrier is priced per energy —
+    the indexed spec declares that instead of the coupler patching it up afterwards."""
+    from iampypsa import IamLoader
+
+    loader = IamLoader(str(EUR_GDX))
+    fuel = load_quantity(loader, load_quantity_specs(backend="gdx")["fuel_price"])
+    units = fuel.drop_duplicates(["technology", "unit"]).set_index("technology")["unit"]
+
+    assert units["peur"] == "USD/g_U"  # cancels against tnrs' MWh/g_U efficiency
+    assert set(units.drop("peur")) == {"USD/MWh_th"}
+    assert (fuel["parameter"] == "fuel").all()
+    # Carriers with no technology_names entry never reach the cost table.
+    assert "pebios" not in set(fuel["technology"])
+
+
 def test_load_frame_against_real_mif_uses_live_unit():
     """hydro_capacity's GW->MW conversion uses the live mif unit; a stale declared unit: raises."""
     from iampypsa import IamLoader

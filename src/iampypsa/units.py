@@ -22,13 +22,17 @@ UNIT_CONVERSIONS: dict[tuple[str, str], float] = {
     ("EJ/yr", "MWh"): 1e18 / 3.6e9,  # annual energy flow → MWh (demand)
     ("TUSD/TW", "USD/MW"): 1e6,  # investment (capex)
     ("TUSD/TWh", "USD/MWh"): 1e6,  # storage investment
-    ("TUSD/TWa", "USD/MWh"): 1e6 / HOURS_PER_YEAR,  # VOM / fuel price
+    ("TUSD/TWa", "USD/MWh"): 1e6 / HOURS_PER_YEAR,  # VOM
+    # Fuel prices are per unit of *thermal input*; downstream marginal_cost = fuel / efficiency
+    # depends on that basis, so the target unit says so rather than a comment somewhere.
+    ("TUSD/TWa", "USD/MWh_th"): 1e6 / HOURS_PER_YEAR,
     ("p.u.", "%/yr"): 100.0,  # FOM expressed as fraction of capex/yr → percent
     ("Gt_C/TWa", "t_CO2/MWh_th"): 1e9 * (MOLAR_MASS_CO2 / MOLAR_MASS_C) / HOURS_PER_YEAR / 1e6,  # CO2 intensity
     # Cost units expressed in a base year's currency (parity assumed: US$2017 ≈ USD at default currency_factor=1.0)
     ("US$2017/kW", "USD/MW"): 1e3,      # capex
     ("US$2017/kW/yr", "USD/MW/yr"): 1e3,  # absolute FOM
-    ("US$2017/GJ", "USD/MWh"): 3.6,     # VOM / fuel price (1 MWh = 3.6 GJ)
+    ("US$2017/GJ", "USD/MWh"): 3.6,     # VOM (1 MWh = 3.6 GJ)
+    ("US$2017/GJ", "USD/MWh_th"): 3.6,  # fuel price, thermal-input basis
     ("US$2017/t CO2", "USD/tCO2"): 1.0,  # CO2 price
     # Nuclear is reported on a uranium-mass basis: efficiency as electricity per mass of ore,
     # its fuel price per mass. The mass unit cancels when the two are divided.
