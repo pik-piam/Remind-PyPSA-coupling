@@ -6,7 +6,7 @@ and is the entry point for the coupling workflow.
 - it consumes the resolved quantity specs and the region map, and it contains the reference
  data (population, GDP, etc.) for downscaling.
 
-Concrete subclasses live in ``iampypsa.models.<iam>``; ``iampypsa.open_coupler`` picks the one
+Concrete subclasses live in ``iampypsa.models.<iam>``; ``iampypsa.build_coupler`` picks the one
 matching the source's model and format. A new IAM or output format is added as a further
 ``Coupler`` subclass there, not as a branch here.
 
@@ -91,7 +91,7 @@ class Coupler:
         """
         raise NotImplementedError(
             f"{type(self).__name__} must implement build_regional_demand(). "
-            "Use open_coupler() to get the subclass matching your source, or write one "
+            "Use build_coupler() to get the subclass matching your source, or write one "
             "under iampypsa.models for another IAM."
         )
 
@@ -104,7 +104,7 @@ class Coupler:
         """
         raise NotImplementedError(
             f"{type(self).__name__} must implement build_cost_parameters(). "
-            "Use open_coupler() to get the subclass matching your source, or write one "
+            "Use build_coupler() to get the subclass matching your source, or write one "
             "under iampypsa.models for another IAM."
         )
 

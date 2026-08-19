@@ -87,7 +87,7 @@ code — nothing called them; `disaggregate_demand_to_country` never did).
 
 Seven changes need a human:
 
-**a. `open_coupler` replaces the backend/coupler pairing.** This is the actual win — the stanza
+**a. `build_coupler` replaces the backend/coupler pairing.** This is the actual win — the stanza
 every script repeated:
 
 ```python
@@ -107,9 +107,9 @@ coupler = REMIND_COUPLERS[loader.backend](
 
 ```python
 # after
-from iampypsa import open_coupler
+from iampypsa import build_coupler
 
-coupler = open_coupler(
+coupler = build_coupler(
     snakemake.input.remind_data,
     model="remind",
     region=region,                      # was the 1st positional arg of load_symbol_specs
@@ -123,7 +123,7 @@ Direct construction still works if you need the loader or specs separately:
 `RemindGdxCoupler(loader, quantities, region_map, config)` — note the second argument is
 positional and now called `quantities`.
 
-**b. `open_coupler` raises when it can't tell which regions to couple.** If both `region_map`
+**b. `build_coupler` raises when it can't tell which regions to couple.** If both `region_map`
 and `model_regions` are empty, every builder would silently return an empty frame. Pass at least
 one. Omitting `region_map` entirely now loads REMIND's packaged region → country map, which is
 what `read_region_map(source="model_region", target="country")` returned.
@@ -195,7 +195,7 @@ On `update_remind_coupling` the affected files are:
 
 | File | What it uses |
 |---|---|
-| `workflow/scripts/iam_coupling/import_REMIND_demand.py` | `REMIND_COUPLERS` pairing → `open_coupler` (3a) |
+| `workflow/scripts/iam_coupling/import_REMIND_demand.py` | `REMIND_COUPLERS` pairing → `build_coupler` (3a) |
 | `workflow/scripts/iam_coupling/import_REMIND_config.py` | same pairing |
 | `workflow/scripts/iam_coupling/import_REMIND_costs.py` | same pairing, + `build_technology_sources`, `load_technology_parameters` |
 | `workflow/scripts/iam_coupling/import_REMIND_capacities.py` | `RemindLoader`, `load_symbol_specs`, `rename_technologies`, `prepare_capacities` |
@@ -208,7 +208,7 @@ On `update_remind_coupling` the affected files are:
     `from iampypsa.transforms.capacities import prepare_capacities` and calls
     `prepare_capacities(loader, symbols)`. There is no such function — `prepare_capacities` is a
     **`Coupler` method** taking no arguments. That branch predates the move. Fix it as
-    `open_coupler(...).prepare_capacities()`, which also removes the need to build the loader and
+    `build_coupler(...).prepare_capacities()`, which also removes the need to build the loader and
     specs by hand. Do not treat this as restructure fallout.
 
 ### PyPSA-Eur
@@ -224,7 +224,7 @@ The scripts in scope are `scripts/import_REMIND_{co2price,costs,capacities,deman
 
 Migrate in this order, because it front-loads the risk:
 
-1. `import_REMIND_co2price.py` — the simplest; proves `open_coupler` + the golden CO2 frame.
+1. `import_REMIND_co2price.py` — the simplest; proves `build_coupler` + the golden CO2 frame.
 2. `downscale_REMIND_demand.py` — touches `downscale`/`reference` only, which barely changed.
 3. `import_REMIND_capacities.py` — exercises `prepare_capacities`/`get_capacities`.
 4. `import_REMIND_costs.py` — chains six transforms and carries the model-specific `btin`

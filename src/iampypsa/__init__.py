@@ -1,10 +1,10 @@
 """iampypsa — shared IAM↔PyPSA coupling logic and the ``Coupler`` interface.
 
-The front door is :func:`open_coupler`: give it an IAM output file and it returns the coupler
+The front door is :func:`build_coupler`: give it an IAM output file and it returns the coupler
 matching that file's model and format, with the model's packaged quantity specs and region map
 already resolved. From there, ``build_*``/``extract_*`` produce PyPSA-ready frames.
 
-    >>> coupler = open_coupler("iam_output.gdx", config=cfg)
+    >>> coupler = build_coupler("iam_output.gdx", config=cfg)
     >>> coupler.build_co2_prices()
 
 Everything below this facade is importable but is package internals: :mod:`iampypsa.formats`
@@ -23,10 +23,10 @@ from iampypsa.loader import IamLoader
 from iampypsa.models import DEFAULT_MODEL, get_coupler_class, read_default_region_map
 from iampypsa.quantities.config import load_quantity_specs
 
-__all__ = ["open_coupler", "Coupler", "IamLoader", "load_quantity_specs", "__version__"]
+__all__ = ["build_coupler", "Coupler", "IamLoader", "load_quantity_specs", "__version__"]
 
 
-def open_coupler(
+def build_coupler(
     source: str | PathLike,
     *,
     model: str = DEFAULT_MODEL,

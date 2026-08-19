@@ -48,12 +48,12 @@ live from the IIASA API), `docu` (build these docs locally), `jupyter`. E.g.
 
 ## Usage
 
-`open_coupler` detects the source format, pairs it with the matching coupler for that IAM, and returns it ready to use from PyPSA's Snakemake rules:
+`build_coupler` detects the source format, pairs it with the matching coupler for that IAM, and returns it ready to use from PyPSA's Snakemake rules:
 
 ```python
-from iampypsa import open_coupler
+from iampypsa import build_coupler
 
-coupler = open_coupler(
+coupler = build_coupler(
     "REMIND.mif",          # or REMIND.gdx — the suffix selects the backend and the coupler
     model="remind",
     config={

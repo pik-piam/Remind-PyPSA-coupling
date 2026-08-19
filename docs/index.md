@@ -46,7 +46,7 @@ Get in touch if you'd like to couple another IAM or PyPSA model.
 
 | Operations | Module(s) |
 |---|---|
-| Open an IAM source and get the right coupler | `iampypsa.open_coupler` |
+| Open an IAM source and get the right coupler | `iampypsa.build_coupler` |
 | Read IAM output (GDX / GAMS / IAMC) | `iampypsa.formats`, `iampypsa.loader.IamLoader` |
 | Coupling names, mappings and units | `iampypsa.quantities`, `models/<iam>/quantities_*.yaml`, `iampypsa.units` |
 | Transformations (CO₂, loads, capacities, costs, mapping) | `iampypsa.transforms` |

@@ -12,7 +12,7 @@ def test_facade_is_the_five_curated_names():
     import iampypsa
 
     assert set(iampypsa.__all__) == {
-        "open_coupler", "Coupler", "IamLoader", "load_quantity_specs", "__version__",
+        "build_coupler", "Coupler", "IamLoader", "load_quantity_specs", "__version__",
     }
     for name in iampypsa.__all__:
         assert hasattr(iampypsa, name), name
@@ -35,11 +35,11 @@ def test_no_iam_named_outside_models():
     assert offenders == []
 
 
-def test_open_coupler_rejects_an_unknown_model():
-    from iampypsa import open_coupler
+def test_build_coupler_rejects_an_unknown_model():
+    from iampypsa import build_coupler
 
     with pytest.raises(ValueError, match="Unknown model"):
-        open_coupler("whatever.gdx", model="not-an-iam")
+        build_coupler("whatever.gdx", model="not-an-iam")
 
 
 @pytest.mark.parametrize(
@@ -49,10 +49,10 @@ def test_open_coupler_rejects_an_unknown_model():
         ("remind_generic_amt_filtered.mif", "RemindIamcCoupler"),
     ],
 )
-def test_open_coupler_pairs_the_backend_with_its_coupler(fixture, expected):
+def test_build_coupler_pairs_the_backend_with_its_coupler(fixture, expected):
     """The pairing consumers used to do by hand — one place, driven by the suffix."""
-    from iampypsa import open_coupler
+    from iampypsa import build_coupler
 
-    coupler = open_coupler(pathlib.Path(__file__).parent / "data" / fixture)
+    coupler = build_coupler(pathlib.Path(__file__).parent / "data" / fixture)
     assert type(coupler).__name__ == expected
     assert coupler.quantities["co2_price"]["to_unit"] == "USD/tCO2"

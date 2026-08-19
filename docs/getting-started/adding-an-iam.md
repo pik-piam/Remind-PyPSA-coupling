@@ -6,7 +6,7 @@ touch the generic layers.
 !!! tip "Check first whether you need a coupler at all"
     If the IAM writes a standard IAMC exchange file, `model="iamc"` may already read it — and a
     file that deviates in a few variable names is served by an overlay YAML
-    (`open_coupler(..., quantities_path="my_overlay.yaml")`), not by new code. Write a coupler
+    (`build_coupler(..., quantities_path="my_overlay.yaml")`), not by new code. Write a coupler
     only when the file needs *derived* quantities: residuals, unit bases that must be
     reconstructed, an efficiency chain.
 
@@ -80,7 +80,7 @@ demand — so entries never cycle back into the package. Add the packaged YAML/C
 `[tool.setuptools.package-data]` in `pyproject.toml`, then:
 
 ```python
-coupler = open_coupler("myiam_output.mif", model="myiam", config=cfg)
+coupler = build_coupler("myiam_output.mif", model="myiam", config=cfg)
 ```
 
 ## What must stay out

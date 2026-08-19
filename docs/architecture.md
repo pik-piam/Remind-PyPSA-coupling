@@ -26,7 +26,7 @@ flowchart TB
     src[".gdx / .mif / .csv"]
 
     subgraph pkg["iampypsa — shared package"]
-        facade(["★ open_coupler()<br/>the front door"])
+        facade(["★ build_coupler()<br/>the front door"])
         subgraph building_blocks["generic layers"]
             direction LR
             fmt["formats/<br/>gams · gdx · iamc"] --> qty["quantities/<br/>coupling name → frame + units"] --> tf["transforms/<br/>co2 · capacities · costs"] --> ds["downscale/<br/>region → country"]
@@ -58,7 +58,7 @@ flowchart TB
     class facade,remind,iamc_m pub
 ```
 
-`open_coupler()` is the entry point: it detects the source's format, picks the coupler and
+`build_coupler()` is the entry point: it detects the source's format, picks the coupler and
 packaged quantity specs for that model and backend, and hands back a bound `Coupler`. That
 pairing used to be repeated by hand in every consumer script.
 
@@ -76,7 +76,7 @@ model's own Snakemake rules.
 
 | Module | Component | Responsibility |
 |---|---|---|
-| `__init__` | `open_coupler` | The front door: detect the format, pair it with the model's coupler + packaged specs, return a bound `Coupler`. |
+| `__init__` | `build_coupler` | The front door: detect the format, pair it with the model's coupler + packaged specs, return a bound `Coupler`. |
 | `loader.py` | `IamLoader` | Bind one source and resolve names in it: `backend`, `list_names()`, `resolve()`, `read()`. Nothing else — no units, no spec shapes. |
 | `formats/` | `gdx`, `gams`, `iamc` | One module per container/data model. `gdx` reads the container; `gams` owns set-indexed symbols (`load_indexed`); `iamc` owns the `.mif` model (`read_iamc`, `load_variables`). Each declares the spec shapes it can serve. |
 | `quantities/` | `config`, `load`, `conversion`, `schema` | Map **coupling names** (`co2_price`, `capacity`, `tech_data`, …) to source name(s) + units, layer the YAML, and apply the declared conversion. `load_quantity()` is the single public entry. |
@@ -104,9 +104,9 @@ Most of what used to require a per-model adapter subclass is now just constructo
 `Coupler.__init__` binds the shared inputs:
 
 ```python
-from iampypsa import open_coupler
+from iampypsa import build_coupler
 
-coupler = open_coupler(
+coupler = build_coupler(
     remind_gdx_path,                                       # backend detected from the suffix
     model="remind",                                        # picks the coupler + packaged specs
     config=coupling_config,                                # the model's coupling config dict

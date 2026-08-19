@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from iampypsa import open_coupler
+from iampypsa import build_coupler
 from iampypsa.models.iamc import IamcCoupler
 
 MIF = Path(__file__).parent / "data" / "generic_iamc.mif"
@@ -18,10 +18,10 @@ EJ_PER_YR_TO_MWH = 1e18 / 3.6e9
 
 @pytest.fixture
 def coupler() -> IamcCoupler:
-    return open_coupler(MIF, model="iamc", region_map=REGION_MAP, config={})
+    return build_coupler(MIF, model="iamc", region_map=REGION_MAP, config={})
 
 
-def test_open_coupler_selects_the_generic_coupler(coupler):
+def test_build_coupler_selects_the_generic_coupler(coupler):
     assert isinstance(coupler, IamcCoupler)
     assert coupler.loader.backend == "iamc"
     assert sorted(coupler.model_regions) == ["ASI", "EUR"]
