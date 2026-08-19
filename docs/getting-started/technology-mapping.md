@@ -8,12 +8,12 @@ necessarily be taken from the IAM — this information lives in a single YAML fi
 
 ## Processing
 
-The technology mapping file is read by `iampypsa.quantities.schema`:
+The technology mapping file is read by `iampypsa.quantities`:
 
-- `load_technology_parameters(path)` — parses the YAML, returned as `{"technologies": {...}}`.
-- `get_iam_name(tech, spec)` — the IAM-side technology name an entry pulls values from (defaults to
+- `config.load_technology_parameters(path)` — parses the YAML, returned as `{"technologies": {...}}`.
+- `schema.get_iam_name(tech, spec)` — the IAM-side technology name an entry pulls values from (defaults to
   the model's own key if not given).
-- `build_technology_sources(spec)` — expands one entry into a `{parameter: source}` map across
+- `schema.build_technology_sources(spec)` — expands one entry into a `{parameter: source}` map across
   the seven **standard parameters**: `investment`, `FOM`, `VOM`, `efficiency`, `lifetime`,
   `fuel`, `"CO2 intensity"`.
 

@@ -39,18 +39,19 @@ Get in touch if you'd like to couple another IAM or PyPSA model.
 ## Start here
 
 - **[Getting started](getting-started/index.md)**: A brief tutorial covering data exchange between IAMs and PyPSA and how to set up a new PyPSA model.
-- **[Architecture](architecture.md)**: A deeper explanation of how the components fit together, what belongs in the package versus the model, the full `Coupler` interface, and the symbol/unit config.
-- **[Reference](docs/reference/couplers/base.md)**: The auto-generated API reference for every module (also in the nav).
+- **[Architecture](architecture.md)**: A deeper explanation of how the components fit together, what belongs in the package versus the model, the full `Coupler` interface, and the quantity/unit config.
+- **[Reference](docs/reference/coupler.md)**: The auto-generated API reference for every module (also in the nav).
 
 ## What the package provides
 
 | Operations | Module(s) |
 |---|---|
-| Read REMIND output (GDX / IAMC) | `iampypsa.io` — `IamLoader`, `remind_symbols` |
-| Variable mappings and units | `data/remind_symbols_gdx.yaml` / `data/remind_symbols_mif.yaml`, `iampypsa.units` |
+| Open an IAM source and get the right coupler | `iampypsa.open_coupler` |
+| Read IAM output (GDX / GAMS / IAMC) | `iampypsa.formats`, `iampypsa.loader.IamLoader` |
+| Coupling names, mappings and units | `iampypsa.quantities`, `models/<iam>/quantities_*.yaml`, `iampypsa.units` |
 | Transformations (CO₂, loads, capacities, costs, mapping) | `iampypsa.transforms` |
 | Region → country downscaling | `iampypsa.downscale`, `iampypsa.reference.ssp` |
-| Coupling interface, currently for REMIND | `iampypsa.couplers.Coupler` |
+| Coupling interface | `iampypsa.Coupler`; per-IAM subclasses in `iampypsa.models` |
 
 ## Further reading
 

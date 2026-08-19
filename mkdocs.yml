@@ -97,5 +97,6 @@ nav:
     - Downscaling demand: getting-started/downscaling-demand.md
     - Harmonising capacities: getting-started/harmonising-capacities.md
     - Sector coupling: getting-started/sector-coupling.md
+    - Adding a new IAM: getting-started/adding-an-iam.md
   - Architecture: architecture.md
   - Reference: docs/reference/

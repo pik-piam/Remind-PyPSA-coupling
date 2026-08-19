@@ -18,7 +18,7 @@ A few things worth knowing about all four:
 - All data comes in long-format tables with key columns like `region`, `year`,
   ... and a `value` + `unit` column.
 - Units and the underlying IAM symbol names are declared in a YAML config
-  (e.g. `remind_symbols_gdx.yaml` / `remind_symbols_mif.yaml` for the REMIND backends) and applied
+  (e.g. `models/remind/quantities_gdx.yaml` / `quantities_mif.yaml`) and applied
   once, at load time.
 - **Costs and technical parameters** can be sourced by the IAM, by the PyPSA cost table, or set
   directly to a user-set value. This is governed by a `yaml` mapping (see

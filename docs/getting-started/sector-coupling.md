@@ -9,7 +9,7 @@ loads are in electricity, with no other energy carriers involved. See the REMIND
     [`PyPSA-China`](https://github.com/pik-piam/PyPSA-China-PIK) handles heat differently.
 
 As an example, REMIND currently provides sectoral electricity demand for the following sectors (see
-`remind_symbols_gdx.yaml` / `remind_symbols_mif.yaml`):
+`models/remind/quantities_gdx.yaml` / `quantities_mif.yaml`):
 
 - Hydrogen electrolysis (`electrolysis`)
 - EV passenger (`EV_pass`)
