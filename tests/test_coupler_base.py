@@ -4,6 +4,7 @@ The data-driven checks run against the filtered GDX fixture and reference CSVs i
 (self-contained -- see tests/data/README.md for provenance; no external '/workspace/...' paths).
 """
 
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -31,6 +32,50 @@ def test_adapter_is_directly_instantiable():
     """Coupler has no abstract methods — it can be created without a subclass."""
     adapter = Coupler(loader=None, quantities={}, region_map={}, config={})
     assert isinstance(adapter, Coupler)
+
+
+def test_overriding_the_cost_template_warns(caplog):
+    """A subclass that overrides extract_cost_parameters skips the currency factor and the
+    vocabulary rename, so it is warned about at class-definition time."""
+    with caplog.at_level(logging.WARNING, logger="iampypsa.coupler"):
+
+        class LegacyCoupler(Coupler):
+            def extract_cost_parameters(self, year):
+                return pd.DataFrame()
+
+    assert "build_cost_parameters() instead" in caplog.text
+
+
+def test_implementing_the_hook_does_not_warn(caplog):
+    with caplog.at_level(logging.WARNING, logger="iampypsa.coupler"):
+
+        class ModernCoupler(Coupler):
+            def build_cost_parameters(self, year):
+                return pd.DataFrame()
+
+    assert caplog.text == ""
+
+
+def test_finalise_applies_the_currency_factor_once():
+    """The template is the only path to a cost table, so currency cannot be skipped."""
+    coupler = Coupler(
+        loader=None,
+        quantities={},
+        region_map={"DEU": ["DE"]},
+        config={"currency_factor": 2.0},
+    )
+    raw = pd.DataFrame({
+        "region": ["DEU", "DEU"],
+        "technology": ["nuclear", "nuclear"],
+        "parameter": ["investment", "lifetime"],
+        "value": [100.0, 60.0],
+        "unit": ["USD/MW", "yr"],
+    })
+    out = coupler.finalise_cost_parameters(raw).set_index("parameter")["value"]
+
+    assert out["investment"] == pytest.approx(200.0)  # currency-denominated
+    assert out["lifetime"] == pytest.approx(60.0)  # physical, untouched
+    assert raw["value"].tolist() == [100.0, 60.0]  # caller's frame not mutated
 
 
 def test_technology_mapping_example_matches_examples_dir():

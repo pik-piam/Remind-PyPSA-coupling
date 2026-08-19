@@ -30,6 +30,9 @@ UNIT_CONVERSIONS: dict[tuple[str, str], float] = {
     ("US$2017/kW/yr", "USD/MW/yr"): 1e3,  # absolute FOM
     ("US$2017/GJ", "USD/MWh"): 3.6,     # VOM / fuel price (1 MWh = 3.6 GJ)
     ("US$2017/t CO2", "USD/tCO2"): 1.0,  # CO2 price
+    # Nuclear is reported on a uranium-mass basis: efficiency as electricity per mass of ore,
+    # its fuel price per mass. The mass unit cancels when the two are divided.
+    ("TWa/Mt_Ur", "MWh/g_U"): 1e6 * HOURS_PER_YEAR / 1e12,
     # lifetime unit vs canonical
     ("years", "yr"): 1.0,
     # efficiency reported as a percentage, convert to per-unit for a canonical basis

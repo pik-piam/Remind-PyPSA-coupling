@@ -1,7 +1,7 @@
 """REMIND coupling backends: GDX and IAMC (``.mif``).
 
 Two ``Coupler`` subclasses implementing the source-specific hooks
-(``build_regional_demand`` and ``extract_cost_parameters``) for REMIND output:
+(``build_regional_demand`` and ``build_cost_parameters``) for REMIND output:
 
 - ``RemindGdxCoupler``  — GDX backend (reads ``load_sector``/cost symbols directly).
 - ``RemindIamcCoupler`` — IAMC ``.mif`` backend (derives demand via T&D efficiency + AC
@@ -21,9 +21,9 @@ import pandas as pd
 import country_converter as coco
 
 from iampypsa.coupler import Coupler
-from iampypsa.quantities.load import load_quantity, rename_technologies
-from iampypsa.transforms.costs import broadcast_fuel_prices, annotate_cost_rows, apply_currency_factor
-from iampypsa.units import HOURS_PER_YEAR, unit_factor
+from iampypsa.quantities.load import load_quantity
+from iampypsa.transforms.costs import annotate_cost_rows
+from iampypsa.units import unit_factor
 
 
 logger = logging.getLogger(__name__)
@@ -34,10 +34,13 @@ class RemindGdxCoupler(Coupler):
 
     Implements:
     - ``build_regional_demand``: reads ``load_sector`` GDX symbol (TWa→MWh via spec).
-    - ``extract_cost_parameters``: reads all cost symbols from GDX, applies REMIND-GDX
+    - ``build_cost_parameters``: reads all cost symbols from GDX, applies REMIND-GDX
       tech-facts (tnrs/peur nuclear mass-basis → USD/MWh_el, storage USD/MWh label,
       GAMS-dropped zeros filled).
     """
+
+    #: GDX carries every REMIND technology, most of which PyPSA has no name for.
+    drop_unmapped_technologies = True
 
     def build_regional_demand(self) -> pd.DataFrame:
         """Read REMIND regional sectoral demand as long ``[year, region, sector, value]`` (MWh/yr).
@@ -59,11 +62,12 @@ class RemindGdxCoupler(Coupler):
             .reset_index(drop=True)
         )
 
-    def extract_cost_parameters(self, year: int) -> pd.DataFrame:
-        """Extract REMIND GDX cost parameters as long
+    def build_cost_parameters(self, year: int) -> pd.DataFrame:
+        """Assemble REMIND GDX cost rows as long
         ``[region, technology, parameter, value, unit]``.
 
-        Unit conversions are config-declared (applied at the load seam). The
+        Unit conversions are config-declared (applied at the load seam); the currency factor and
+        the canonical vocabulary are applied by ``Coupler.finalise_cost_parameters``. The
         REMIND-GDX-specific tech-facts encoded here are:
         - ``tnrs`` (nuclear) efficiency is mass-basis (TWa_elec/Mt_Ur); combined with ``peur``'s
           USD/g_U fuel price into a true USD/MWh_el cost + 1.0 p.u. efficiency (see
@@ -111,8 +115,8 @@ class RemindGdxCoupler(Coupler):
         ]
         eff = annotate_cost_rows(pd.concat([dataeta, fallback]), parameter="efficiency")
         # GDX nuclear efficiency is raw TWa_elec/Mt_Ur (mass basis, not thermal %), so the spec's
-        # p.u. does not hold for it. Convert to MWh/g_U via TWa->MWh, Mt->g (8.76e9/1e12).
-        eff.loc[eff["technology"] == "tnrs", "value"] *= HOURS_PER_YEAR / 1e6
+        # p.u. does not hold for it — a per-technology exception the load seam cannot express.
+        eff.loc[eff["technology"] == "tnrs", "value"] *= unit_factor("TWa/Mt_Ur", "MWh/g_U")
         eff.loc[eff["technology"] == "tnrs", "unit"] = "MWh/g_U"
 
         # Fuel: the spec cannot declare to_unit here because peur is already USD/g_U in GDX while
@@ -126,18 +130,11 @@ class RemindGdxCoupler(Coupler):
 
         eff, fuel = self._nuclear_fuel_cost(eff, fuel)
 
-        df = pd.concat([costs, techd, co2i, eff, fuel])[
+        return pd.concat([costs, techd, co2i, eff, fuel])[
             ["region", "technology", "parameter", "value", "unit"]
         ]
-        df = apply_currency_factor(df, self.config.get("currency_factor", 1.0))
-        # Output boundary: raw REMIND tokens -> canonical vocabulary
-        names = self.quantities.get("technology_names", {})
-        df = rename_technologies(df, names)
-        df = broadcast_fuel_prices(df, self._tech_fuel_map_from_pe2se())
-        df = df[df["technology"].isin(set(names.values()))]
-        return df[df["region"].isin(self.model_regions)].reset_index(drop=True)
 
-    def _tech_fuel_map_from_pe2se(self) -> dict[str, str]:
+    def get_tech_fuel_map(self) -> dict[str, str]:
         """Build the canonical ``technology -> fuel`` map from the GDX ``pe2se`` set.
         """
         names = self.quantities.get("technology_names", {})
@@ -203,7 +200,7 @@ class RemindIamcCoupler(Coupler):
 
     Implements:
     - ``build_regional_demand``: FE sector SE-conversion via derived η_td + AC residual.
-    - ``extract_cost_parameters``: loads per-parameter variable-sets, computes FOM%,
+    - ``build_cost_parameters``: loads per-parameter variable-sets, computes FOM%,
       derives nuclear fuel cost/efficiency from mass-basis REMIND variables.
     """
 
@@ -347,18 +344,18 @@ class RemindIamcCoupler(Coupler):
             ac_mwh = 0.0
         return ac_mwh
 
-    def extract_cost_parameters(self, year: int) -> pd.DataFrame:
-        """Extract REMIND mif cost parameters as ``[region, technology, parameter, value, unit]``.
+    def build_cost_parameters(self, year: int) -> pd.DataFrame:
+        """Assemble REMIND mif cost rows as ``[region, technology, parameter, value, unit]``.
 
-        - Computes FOM%/yr = absolute FOM (USD/MW/yr) / capex (USD/MW) × 100, because the
-          mif reports absolute FOM whereas PyPSA uses percent-of-capex.
+        - Computes FOM as percent-of-capex per year, because the mif reports it as an absolute
+          amount whereas PyPSA uses percent-of-capex.
         - Derives nuclear's fuel cost/efficiency from mass-basis price/conversion-factor
           variables (see ``_nuclear_fuel_cost``).
-        - ``currency_factor`` (config) scales ``investment``/``VOM``/``fuel`` (REMIND reports
-          USD) into the PyPSA baseline's currency.
+
+        The currency factor and the canonical vocabulary are applied by
+        ``Coupler.finalise_cost_parameters``.
         """
         y = str(year)
-        currency_factor: float = self.config.get("currency_factor", 1.0)
 
         def load(name: str) -> pd.DataFrame:
             df = load_quantity(self.loader, self.quantities[name])
@@ -391,28 +388,28 @@ class RemindIamcCoupler(Coupler):
         # --- assemble ---
         frames = [capex, lifetime, fom_pct, vom, eff, fuel, co2i]
         keep = ["region", "technology", "parameter", "value", "unit"]
-        df = pd.concat(
+        return pd.concat(
             [f[keep] for f in frames if set(keep).issubset(f.columns)],
             ignore_index=True,
         )
-        df = apply_currency_factor(df, currency_factor)
-        # Output boundary (mirrors RemindGdxCoupler): rename is a no-op here — mif labels are
-        # already canonical — then per-fuel price rows become one `fuel` row per technology.
-        df = rename_technologies(df, self.quantities.get("technology_names"))
-        df = broadcast_fuel_prices(df, self.quantities.get("tech_fuel_map"))
-        return df[df["region"].isin(set(self.model_regions))].reset_index(drop=True)
 
-    # -- extract_cost_parameters helpers ------------------------------------
+    # -- build_cost_parameters helpers --------------------------------------
 
     @staticmethod
     def _compute_fom_pct(capex: pd.DataFrame, fom_abs: pd.DataFrame) -> pd.DataFrame:
-        """FOM %/yr = absolute FOM (USD/MW/yr) / capex (USD/MW) × 100, joined on tech/region/year."""
+        """FOM %/yr = absolute FOM (USD/MW/yr) / capex (USD/MW), as a percent of capex per year.
+
+        The ratio is dimensionless, so the p.u.→%/yr step goes through the central table — the
+        same conversion the GDX backend gets declaratively from ``tech_data``'s schema.
+        """
         fom_pct = capex[["year", "region", "technology", "value"]].merge(
             fom_abs[["year", "region", "technology", "value"]],
             on=["year", "region", "technology"],
             suffixes=("_cap", "_fom"),
         )
-        fom_pct["value"] = fom_pct["value_fom"] / fom_pct["value_cap"] * 100
+        fom_pct["value"] = (
+            fom_pct["value_fom"] / fom_pct["value_cap"] * unit_factor("p.u.", "%/yr")
+        )
         fom_pct["parameter"] = "FOM"
         fom_pct["unit"] = "%/yr"
         return fom_pct

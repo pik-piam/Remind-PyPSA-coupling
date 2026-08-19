@@ -81,6 +81,7 @@ def aggregate_capacities_to_carriers(
     return grouped.sort_values([*group_cols, "carrier"]).reset_index(drop=True)
 
 
+# TODO symbol still referenced
 def apply_postprocessing(
     caps: pd.DataFrame,
     *,

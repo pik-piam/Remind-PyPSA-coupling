@@ -1,12 +1,14 @@
 """Bind one IAM source file and resolve quantity names against it.
 
-``IamLoader`` answers three questions and nothing else: what kind of source is this
-(``backend``), what names does it contain (``list_names``), and which of a spec's candidate
-names is actually present (``resolve``). Units, coupling names, spec shapes, renames and
-fallbacks all belong to :mod:`iampypsa.quantities`.
+``IamLoader`` answers three questions and nothing else: 
+1. what kind of source is this (``backend``)
+2. what names does it contain (``list_names``)
+3. which of a spec's candidate names is actually present (``resolve``).
 
-Vocabulary: ``read_*`` is raw access by the source's own native name; ``load_*`` is
-spec-driven, canonical and unit-converted.
+Units, coupling names, spec shapes, renames and fallbacks belong to :mod:`iampypsa.quantities`.
+
+Vocabulary: ``read_*`` is raw access by the source's own native name; 
+``load_*`` is spec-driven, canonical and unit-converted.
 """
 
 from collections.abc import Mapping, Sequence
@@ -64,7 +66,8 @@ class IamLoader:
         return df.rename(columns=dict(rename_columns)) if rename_columns else df
 
     def read_scalar(self, ref: QuantityRef) -> float | str:
-        """Read a scalar/string quantity (e.g. model version, run name)."""
+        """Read a scalar/string quantity (e.g. model version, run name).
+        Required due to GDX format"""
         name = self.resolve(ref)
         if self.backend == "gdx":
             return read_gdx_scalar(self.source, name)

@@ -1,6 +1,8 @@
 """Read cooling/heating degree-day (CDD/HDD) proxy datasets used to weight downscaling.
+Tested with the climbed package csvs
 
-Degree-day CSVs carry columns ``[year, country, type, tlim_setpoint, rcp, ssp, value]`` with
+EXPECTED FORMAT
+CSVs ``[year, country, type, tlim_setpoint, rcp, ssp, value]`` with
 ``country`` as ISO3 and ``type`` one of ``CDD``/``HDD``. ``read_degree_days`` selects one
 ``(type, tlim_setpoint, rcp, ssp)`` combination and returns the ``[iso2, year, value]`` frame
 used as a downscaling proxy — the same shape as :func:`iampypsa.io.ssp.read_ssp_data`, so callers do

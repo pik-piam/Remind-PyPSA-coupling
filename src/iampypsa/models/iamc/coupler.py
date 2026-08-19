@@ -13,12 +13,8 @@ losses to unwind), FOM already as percent-of-capex per year, and one variable pe
 import pandas as pd
 
 from iampypsa.coupler import Coupler
-from iampypsa.quantities.load import load_quantity, rename_technologies
-from iampypsa.transforms.costs import (
-    annotate_cost_rows,
-    apply_currency_factor,
-    broadcast_fuel_prices,
-)
+from iampypsa.quantities.load import load_quantity
+from iampypsa.transforms.costs import annotate_cost_rows
 
 #: Columns of the long cost frame the coupling contract requires.
 COST_COLUMNS = ["region", "technology", "parameter", "value", "unit"]
@@ -44,12 +40,12 @@ class IamcCoupler(Coupler):
             .reset_index(drop=True)
         )
 
-    def extract_cost_parameters(self, year: int) -> pd.DataFrame:
-        """Extract cost parameters as long ``[region, technology, parameter, value, unit]``.
+    def build_cost_parameters(self, year: int) -> pd.DataFrame:
+        """Assemble cost rows as long ``[region, technology, parameter, value, unit]``.
 
         One quantity spec per parameter, named by the config's ``cost_parameters:`` block. Units
-        come from each spec's ``to_unit:``, stamped at the load seam; ``currency_factor`` then
-        scales the currency-denominated ones into the PyPSA baseline's currency.
+        come from each spec's ``to_unit:``, stamped at the load seam; the currency factor and the
+        canonical vocabulary are applied by ``Coupler.finalise_cost_parameters``.
         """
         frames = []
         for parameter, name in self.quantities["cost_parameters"].items():
@@ -57,8 +53,4 @@ class IamcCoupler(Coupler):
             df = df[df["year"].astype(int) == int(year)]
             frames.append(annotate_cost_rows(df, parameter=parameter))
 
-        df = pd.concat([f[COST_COLUMNS] for f in frames], ignore_index=True)
-        df = apply_currency_factor(df, self.config.get("currency_factor", 1.0))
-        df = rename_technologies(df, self.quantities.get("technology_names"))
-        df = broadcast_fuel_prices(df, self.quantities.get("tech_fuel_map"))
-        return df[df["region"].isin(set(self.model_regions))].reset_index(drop=True)
+        return pd.concat([f[COST_COLUMNS] for f in frames], ignore_index=True)

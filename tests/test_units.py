@@ -1,5 +1,8 @@
 """Tests for the central unit-conversion table and resolver."""
 
+import pathlib
+import re
+
 import pytest
 
 from iampypsa.units import (
@@ -8,6 +11,8 @@ from iampypsa.units import (
     UNIT_CONVERSIONS,
     unit_factor,
 )
+
+MODELS = pathlib.Path(__file__).parent.parent / "src" / "iampypsa" / "models"
 
 
 def test_identity_is_one_without_a_table_entry():
@@ -21,6 +26,20 @@ def test_known_pairs_match_remind_conventions():
     assert unit_factor("TWa", "MWh") == pytest.approx(1e6 * HOURS_PER_YEAR)
     assert unit_factor("TUSD/TWa", "USD/MWh") == pytest.approx(1e6 / HOURS_PER_YEAR)
     assert unit_factor("p.u.", "%/yr") == 100.0
+    # Nuclear's mass basis: TWa->MWh over Mt->g.
+    assert unit_factor("TWa/Mt_Ur", "MWh/g_U") == pytest.approx(HOURS_PER_YEAR / 1e6)
+
+
+def test_no_conversion_arithmetic_in_the_couplers():
+    """Every unit number comes from the table — a coupler may call ``unit_factor`` for a
+    quantity whose unit is only known after loading, but never spell the factor out."""
+    literal = re.compile(r"HOURS_PER_YEAR|(?<![\w.])\d+(\.\d+)?e-?\d+")
+    offenders = [
+        path.relative_to(MODELS).as_posix()
+        for path in MODELS.rglob("*.py")
+        if literal.search(path.read_text())
+    ]
+    assert offenders == []
 
 
 def test_currency_targets_use_one_token():

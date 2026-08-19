@@ -70,7 +70,7 @@ def apply_currency_factor(
             pathway, which has no ``parameter`` column — then every row is scaled.
     """
     if currency_factor == 1.0:
-        return values
+        return values.copy()  # copy even when a no-op: never alias the caller's frame
     values = values.copy()
     if parameters is None:
         values["value"] *= currency_factor
@@ -321,6 +321,7 @@ def build_fixed_value_overrides(
     return set_df[["technology", "parameter", "value", "unit", "further description", "source"]]
 
 
+# TODO is overrides transaprent enough?
 def apply_overrides(
     costs: pd.DataFrame,
     overrides: pd.DataFrame,

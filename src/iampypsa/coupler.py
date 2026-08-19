@@ -35,14 +35,35 @@ from iampypsa.transforms.capacities import (
     apply_postprocessing,
 )
 from iampypsa.transforms.co2_prices import extract_co2_prices
-from iampypsa.transforms.costs import apply_currency_factor, select_discount_rate
+from iampypsa.transforms.costs import (
+    apply_currency_factor,
+    broadcast_fuel_prices,
+    select_discount_rate,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class Coupler:
-    """Backend-neutral base: shared builders + source-specific hook declarations."""
+    """IAM Backend-neutral base: shared builders + source-specific hook declarations."""
 
+    #: Drop rows whose technology has no ``technology_names`` entry — raw source tokens that
+    #: ``rename_technologies`` deliberately kept as-is. Only backends with a token vocabulary
+    #: to map from need this.
+    drop_unmapped_technologies: bool = False
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        """Warn when a subclass overrides the cost template instead of implementing its hook."""
+        super().__init_subclass__(**kwargs)
+        if "extract_cost_parameters" in cls.__dict__:
+            logger.warning(
+                "%s overrides extract_cost_parameters(); the currency factor, technology "
+                "renaming and fuel-price broadcast will NOT be applied. Implement "
+                "build_cost_parameters() instead and let Coupler finalise the frame.",
+                cls.__name__,
+            )
+
+    # TODO type loader
     def __init__(
         self,
         loader,
@@ -74,18 +95,49 @@ class Coupler:
             "under iampypsa.models for another IAM."
         )
 
-    def extract_cost_parameters(self, year: int) -> pd.DataFrame:
-        """Extract cost parameters as long ``[region, reference, parameter, value, unit]``.
+    def build_cost_parameters(self, year: int) -> pd.DataFrame:
+        """Assemble the raw cost rows for ``year``, one group per techno-economic parameter.
 
-        Implemented per IAM in ``iampypsa.models``.
+        Source-specific: units and per-technology facts are resolved here, but the currency
+        factor and the canonical vocabulary are not — ``extract_cost_parameters`` applies those
+        to whatever this returns. Implemented per IAM in ``iampypsa.models``.
         """
         raise NotImplementedError(
-            f"{type(self).__name__} must implement extract_cost_parameters(). "
+            f"{type(self).__name__} must implement build_cost_parameters(). "
             "Use open_coupler() to get the subclass matching your source, or write one "
             "under iampypsa.models for another IAM."
         )
 
     # -- Shared concrete builders -------------------------------------------
+
+    def extract_cost_parameters(self, year: int) -> pd.DataFrame:
+        """Extract cost parameters as long ``[region, technology, parameter, value, unit]``,
+        currency-converted and on the canonical technology vocabulary.
+        """
+        return self.finalise_cost_parameters(self.build_cost_parameters(year))
+
+    def get_tech_fuel_map(self) -> dict[str, str] | None:
+        """Return the canonical ``technology -> priced fuel`` map, or None if the IAM has none.
+
+        Config-driven by default; override it where the map has to be derived from the source
+        rather than declared in the YAML.
+        """
+        return self.quantities.get("tech_fuel_map")
+
+    def finalise_cost_parameters(self, costs: pd.DataFrame) -> pd.DataFrame:
+        """Apply the currency factor, canonicalise technologies, broadcast fuel prices and
+        restrict to the coupled regions.
+
+        The single output boundary for every cost table, so no coupler can emit one that skipped
+        the currency conversion or the vocabulary rename.
+        """
+        costs = apply_currency_factor(costs, self.config.get("currency_factor", 1.0))
+        names = self.quantities.get("technology_names")
+        costs = rename_technologies(costs, names)
+        costs = broadcast_fuel_prices(costs, self.get_tech_fuel_map())
+        if self.drop_unmapped_technologies and names:
+            costs = costs[costs["technology"].isin(set(names.values()))]
+        return costs[costs["region"].isin(set(self.model_regions))].reset_index(drop=True)
 
     def build_co2_prices(self, years: Sequence[int] | None = None) -> pd.DataFrame:
         """Build the per-(region, year) CO2 price pathway, converted to the runtime currency.
@@ -126,6 +178,8 @@ class Coupler:
         rates = rates[rates["region"].isin(self.model_regions)]
         return select_discount_rate(rates, year, self.model_regions)
 
+    # TODO model-tech resolution? is unclear -> which model, IAM?
+    # TODO Resolution is reserved for space and time, why does it come in here?
     def prepare_capacities(self) -> pd.DataFrame:
         """Read installed capacities at model-tech resolution, before carrier aggregation.
 

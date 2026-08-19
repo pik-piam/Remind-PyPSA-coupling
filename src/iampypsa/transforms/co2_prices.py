@@ -10,7 +10,7 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-
+# TODO why is this in transforms? is it not just a reader?
 def extract_co2_prices(
     raw: pd.DataFrame,
     regions: Sequence[str] | None = None,
