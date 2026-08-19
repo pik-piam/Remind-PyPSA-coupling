@@ -5,9 +5,14 @@ __pycache__/
 
 # project
 output/**
+data/development_data/**
 data/dev/**
 # C extensions
 *.so
+claude.md
+*PLAN*.md
+*plan*.md
+
 
 # Distribution / packaging
 .Python
@@ -176,3 +181,4 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+ISSUES.md
