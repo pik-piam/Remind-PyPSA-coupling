@@ -99,4 +99,5 @@ nav:
     - Sector coupling: getting-started/sector-coupling.md
     - Adding a new IAM: getting-started/adding-an-iam.md
   - Architecture: architecture.md
+  - Migrating a consumer: migration.md
   - Reference: docs/reference/

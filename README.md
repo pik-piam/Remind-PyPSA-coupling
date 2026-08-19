@@ -87,6 +87,10 @@ co2_prices = apply_currency_factor(prices, currency_factor=1.0, parameters=None)
 
 See [Getting started](https://pik-piam.github.io/IAM-PyPSA-coupling/getting-started/) for a more complete tutorial.
 
+> [!IMPORTANT]
+> Upgrading a consumer from before the 2026-08 restructure (`iampypsa.io`, `RemindLoader`,
+> `load_symbol_specs`)? There are no shims — see [`docs/migration.md`](docs/migration.md).
+
 ## Documentation
 
 https://pik-piam.github.io/IAM-PyPSA-coupling/ — start at
