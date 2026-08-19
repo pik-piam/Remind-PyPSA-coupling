@@ -44,12 +44,17 @@ class MyIamCoupler(Coupler):
         """Read regional sectoral demand as [year, region, sector, value, unit] in MWh."""
         return load_quantity(self.loader, self.quantities["demand_fe_sectors"])
 
-    def extract_cost_parameters(self, year: int):
-        """Extract [region, technology, parameter, value, unit] for one year."""
+    def build_cost_parameters(self, year: int):
+        """Assemble [region, technology, parameter, value, unit] for one year."""
         ...
 ```
 
-Those are the only two. `build_co2_prices`, `build_discount_rates`,
+Those are the only two. Return the raw rows from `build_cost_parameters`: the currency factor,
+the technology rename and the fuel-price broadcast are applied for you by
+`Coupler.finalise_cost_parameters`, which every cost table goes through. Override
+`extract_cost_parameters` itself and you skip all three — the base class warns if you do.
+
+`build_co2_prices`, `build_discount_rates`,
 `downscale_country_demand`, `prepare_capacities` and `get_capacities` are inherited and
 IAM-agnostic — if you find yourself overriding one, the divergence probably belongs in your
 YAML or in the PyPSA model, not here.
@@ -84,4 +89,6 @@ coupler = open_coupler("myiam_output.mif", model="myiam", config=cfg)
   erodes silently otherwise.
 - **No PyPSA carrier vocabulary in the package.** `tech_map` stays an argument to
   `get_capacities` — carriers are the model's business.
-- **No unit literals.** One row in `UNIT_CONVERSIONS`, applied once at the load seam.
+- **No unit literals.** One row in `UNIT_CONVERSIONS`, applied once at the load seam. Declare
+  per-row unit differences as an `indexed` spec rather than patching them in the coupler.
+- **Declare `currency: {name, year}`** in the YAML. Nothing deflates between currency years.

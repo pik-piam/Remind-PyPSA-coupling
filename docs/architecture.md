@@ -183,10 +183,26 @@ Two layering mechanisms let a model adjust symbols without forking the package:
   default.
 - the `overrides:` block — per-IAM-region deltas inside one config.
 
-**Unit conversions:** `load_simple`/`load_indexed` apply the declared conversion *at
-the moment of loading* (the "Coupler seam") and stamp the resulting unit onto a `unit` column.
-The downstream transforms are therefore called with conversion disabled so units are never
-applied twice. Add a new conversion by adding one row to `UNIT_CONVERSIONS` in `units.py`.
+**Unit conversions** happen *once*, at the load seam: `load_simple`/`load_indexed` apply the
+declared conversion and stamp the resulting unit onto a `unit` column, so downstream transforms
+never re-scale. The rule, in order of preference:
+
+1. Declare `unit:`/`to_unit:` in the YAML and let the load seam do it. A symbol whose rows carry
+   different units (REMIND's `fuel_price`, where uranium is priced per mass) is an `indexed`
+   spec with per-value units — not a special case in a coupler.
+2. A quantity whose unit is only known *after* loading (a derived ratio) may convert in the
+   coupler, but must call `unit_factor(...)`.
+3. Never write the factor out. `tests/test_units.py` fails on a scaling literal under `models/`.
+
+Add a conversion as one row in `UNIT_CONVERSIONS` in `units.py`.
+
+**Currency** is separate from units and has two parts. The *factor* — `config["currency_factor"]`,
+a flat multiplier into the PyPSA baseline's currency — is applied to `investment`/`VOM`/`fuel`
+rows by `Coupler.finalise_cost_parameters`, the single output boundary every cost table passes
+through, so no coupler can skip it. The *currency year* is declared by the model
+(`currency: {name, year}` in its quantities YAML) because the GDX backend's unit strings carry
+no year. Values are **not** deflated between currency years; `load_quantity_specs` warns if a
+spec declares a year other than the config's.
 
 ---
 

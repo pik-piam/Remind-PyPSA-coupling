@@ -70,7 +70,8 @@ the package was four unrelated things under one label, which is why it was split
 | `from iampypsa.io.technology_mapping import STANDARD_PARAMETERS` | `from iampypsa.quantities.schema import STANDARD_PARAMETERS` |
 | `from iampypsa.io import read_gdx_symbol, read_gdx_scalar, list_gdx_symbols` | `from iampypsa.formats.gdx import …` |
 | `from iampypsa.io import read_iamc, list_iamc_variables` | `from iampypsa.formats.iamc import …` |
-| `from iampypsa.io.iamc import build_variable_set, parse_currency_year` | `from iampypsa.formats.iamc import …` |
+| `from iampypsa.io.iamc import build_variable_set` | `from iampypsa.formats.iamc import build_variable_set` |
+| `from iampypsa.io.iamc import parse_currency_year` | `from iampypsa.units import parse_currency_year` |
 | `from iampypsa.io import read_ssp_data, fetch_ssp_data, fetch_ssp_variable` | `from iampypsa.reference import …` (or `reference.ssp`) |
 | `from iampypsa.io import read_degree_days` | `from iampypsa.reference import read_degree_days` |
 | `from iampypsa.io import build_capacity_reporting_technologies` | `from iampypsa.models.remind import build_capacity_reporting_technologies` |
@@ -84,7 +85,7 @@ code — nothing called them; `disaggregate_demand_to_country` never did).
 
 ## 3. The part that isn't a rename
 
-Six changes need a human:
+Seven changes need a human:
 
 **a. `open_coupler` replaces the backend/coupler pairing.** This is the actual win — the stanza
 every script repeated:
@@ -158,6 +159,30 @@ Pass the IAMC specs to keep the old behaviour — the tokens live in that config
 over a hand-built path. **The YAML schema itself is unchanged** — your overlay files and
 `overrides:` blocks need no edits.
 
+**g. A `Coupler` subclass implements `build_cost_parameters`, not `extract_cost_parameters`.**
+Only relevant if you subclass `Coupler` in your model repo — consumers that merely *call* it are
+unaffected. `extract_cost_parameters` is now a concrete template that applies the currency
+factor, the technology rename and the fuel-price broadcast to whatever the hook returns, so
+those three can no longer be forgotten:
+
+```python
+# before                              # after
+class MyCoupler(Coupler):             class MyCoupler(Coupler):
+    def extract_cost_parameters(          def build_cost_parameters(
+        self, year                            self, year
+    ):                                    ):
+        df = ...                              return ...   # raw rows; no currency,
+        df = apply_currency_factor(...)                    # no rename, no broadcast
+        df = rename_technologies(...)
+        df = broadcast_fuel_prices(...)
+        return df
+```
+
+Keep overriding `extract_cost_parameters` and you silently skip all three — the base class emits
+a warning at import time saying so. If your subclass derives its `tech_fuel_map` from the source
+rather than the YAML, override `get_tech_fuel_map()`; if it needs to drop technologies with no
+`technology_names` entry, set `drop_unmapped_technologies = True`.
+
 ## 4. Per-consumer notes
 
 ### PyPSA-China-PIK
@@ -226,9 +251,10 @@ during — a third rename on top of a restructure makes both harder to review.
 
 Worth knowing so you don't go looking:
 
-- Every `Coupler` method name, signature and semantic — `build_regional_demand`,
-  `extract_cost_parameters`, `build_co2_prices`, `downscale_country_demand`,
-  `build_discount_rates`, `prepare_capacities`, `get_capacities`.
+- Every `Coupler` method you *call* — `build_regional_demand`, `extract_cost_parameters`,
+  `build_co2_prices`, `downscale_country_demand`, `build_discount_rates`,
+  `prepare_capacities`, `get_capacities` — same names, signatures and semantics.
+  (One exception for anyone who *subclasses* `Coupler`: see below.)
 - `tech_map` is still an **argument** to `get_capacities` — the carrier vocabulary stays
   PyPSA-side.
 - The whole `transforms/` API, and `downscale.disaggregate_demand_to_country` /
