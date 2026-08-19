@@ -46,11 +46,13 @@ def test_currency_factor_scales_every_row_of_a_single_quantity_frame():
 
 def test_against_real_amt_gdx():
     """Load through the seam, as production does: the spec's USD/tC -> USD/tCO2 conversion is
-    applied by load_frame, and the currency factor only rescales."""
-    from iampypsa.io import RemindLoader, load_frame, load_symbol_specs, read_gdx_symbol
+    applied by load_simple, and the currency factor only rescales."""
+    from iampypsa import IamLoader
+    from iampypsa.formats.gdx import read_gdx_symbol
+    from iampypsa.quantities import load_quantity_specs, load_simple
 
-    loader = RemindLoader(str(GDX))
-    raw = load_frame(loader, load_symbol_specs(backend="gdx")["co2_price"])
+    loader = IamLoader(str(GDX))
+    raw = load_simple(loader, load_quantity_specs(backend="gdx")["co2_price"])
     prices = apply_currency_factor(
         extract_co2_prices(raw, regions=["DEU", "EWN"], years=[2090, 2100]),
         1.0,

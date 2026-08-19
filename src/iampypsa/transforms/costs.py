@@ -13,7 +13,7 @@ from typing import Any
 
 import pandas as pd
 
-from iampypsa.io.technology_mapping import build_technology_sources, iam_name
+from iampypsa.quantities.schema import build_technology_sources, get_iam_name
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def apply_currency_factor(
 
     The single seam for currency on every monetary quantity — cost parameters and the CO2
     price pathway alike. One-directional (IAM USD -> PyPSA baseline currency); it converts
-    between currencies, not between currency *years* (e.g. REMIND's US$2017 vs the baseline's
+    between currencies, not between currency *years* (e.g. an IAM's US$2017 vs the baseline's
     own reporting year), which nothing handles yet.
 
     Args:
@@ -187,7 +187,7 @@ def _flatten_technology_mapping(technology_mapping: Mapping[str, Any]) -> pd.Dat
     ``source_spec`` holds the raw per-parameter spec: the strings ``"IAM"``/``"PyPSA"`` or a
     ``{value: ...}`` dict — resolved from each entry's ``source:``/``overrides:`` (or bare
     string) via ``build_technology_sources``. ``canonical`` resolves the entry's ``iam_name:`` key
-    (defaults to the entry name) via ``iam_name``.
+    (defaults to the entry name) via ``get_iam_name``.
 
     Args:
         technology_mapping: The parsed technology-mapping YAML (``{"technologies": {...}}``'s
@@ -196,7 +196,7 @@ def _flatten_technology_mapping(technology_mapping: Mapping[str, Any]) -> pd.Dat
     rows = [
         {
             "technology": tech,
-            "canonical": iam_name(tech, spec),
+            "canonical": get_iam_name(tech, spec),
             "parameter": param,
             "source_spec": src,
         }

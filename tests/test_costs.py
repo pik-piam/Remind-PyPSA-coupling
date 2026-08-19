@@ -71,7 +71,7 @@ def test_build_baseline_overrides_drops_parameters_missing_from_baseline():
 
 def test_bare_string_shorthand_and_source_plus_overrides():
     """gas-ccgt: IAM is shorthand; entries with source:+overrides: resolve correctly."""
-    from iampypsa.io.technology_mapping import iam_name, build_technology_sources
+    from iampypsa.quantities.schema import get_iam_name, build_technology_sources
 
     assert build_technology_sources("IAM") == {
         p: "IAM" for p in
@@ -79,7 +79,7 @@ def test_bare_string_shorthand_and_source_plus_overrides():
     }
 
     spec = {"iam_name": "solar-pv", "source": "IAM", "overrides": {"fuel": {"value": 0}}}
-    assert iam_name("solar", spec) == "solar-pv"
+    assert get_iam_name("solar", spec) == "solar-pv"
     sources = build_technology_sources(spec)
     assert sources["investment"] == "IAM"
     assert sources["fuel"] == {"value": 0}
@@ -91,7 +91,7 @@ def test_bare_string_shorthand_and_source_plus_overrides():
 
 def test_load_technology_parameters_reads_file_directly(tmp_path):
     """load_technology_parameters is a plain YAML read — no merge, no renamed_from magic."""
-    from iampypsa.io import load_technology_parameters
+    from iampypsa.quantities import load_technology_parameters
 
     config = tmp_path / "technology_parameters.yaml"
     config.write_text(
@@ -221,13 +221,13 @@ def test_battery_inverter_squaring_matches_iam_sourced_convention():
 
 
 def test_investment_basis_matches_reference_for_electrolysis():
-    from iampypsa.couplers.remind import RemindGdxCoupler
-    from iampypsa.io import RemindLoader
-    from iampypsa.io.remind_symbols import load_symbol_specs
+    from iampypsa.models.remind import RemindGdxCoupler
+    from iampypsa import IamLoader
+    from iampypsa.quantities import load_quantity_specs
 
-    loader = RemindLoader(str(GDX))
-    symbols = load_symbol_specs(backend=loader.backend)
-    coupler = RemindGdxCoupler(loader, symbols, region_map={}, config={}, model_regions=["DEU"])
+    loader = IamLoader(str(GDX))
+    quantities = load_quantity_specs(backend=loader.backend)
+    coupler = RemindGdxCoupler(loader, quantities, region_map={}, config={}, model_regions=["DEU"])
     remind_long = coupler.extract_cost_parameters(2090)
     electrolysis = remind_long.query("region=='DEU' and technology=='electrolysis'")
 

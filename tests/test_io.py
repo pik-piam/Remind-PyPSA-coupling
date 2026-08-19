@@ -4,18 +4,23 @@ from pathlib import Path
 
 import pytest
 
-from iampypsa.io import RemindLoader, read_iamc
-from iampypsa.io.iamc import parse_currency_year
+from iampypsa import IamLoader
+from iampypsa.formats.iamc import read_iamc
+from iampypsa.formats.iamc import parse_currency_year
 
 GDX = Path(__file__).parent / "data" / "remind2pypsa_amt_filtered.gdx"
 
 
 def test_detect_backend():
-    assert RemindLoader.detect_backend("x.gdx") == "gdx"
-    assert RemindLoader.detect_backend("x.mif") == "iamc"
-    assert RemindLoader.detect_backend("x.csv") == "iamc"
+    """The suffix→backend mapping lives in the formats registry, not in the loader."""
+    from iampypsa.formats import detect_backend
+
+    assert detect_backend("x.gdx") == "gdx"
+    assert detect_backend("x.mif") == "iamc"
+    assert detect_backend("x.csv") == "iamc"
+    assert IamLoader("x.gdx").backend == "gdx"
     with pytest.raises(ValueError):
-        RemindLoader.detect_backend("x.nc")
+        detect_backend("x.nc")
 
 
 def test_iamc_read_and_melt(tmp_path):
@@ -26,7 +31,7 @@ def test_iamc_read_and_melt(tmp_path):
         "REMIND;SSP2;DEU;Cap|Electricity|Gas|GT;GW;1.2;2.4\n"
         "REMIND;SSP2;DEU;Cap|Electricity|Nuclear;GW;NA;10.0\n"
     )
-    assert RemindLoader(mif).backend == "iamc"
+    assert IamLoader(mif).backend == "iamc"
     df = read_iamc(mif)
     assert set(df.columns) >= {"model", "scenario", "region", "variable", "unit", "year", "value"}
     # NA rows are dropped; 2025 Nuclear is NaN → only 3 rows remain.
@@ -46,12 +51,12 @@ def test_parse_currency_year():
 
 
 def test_gdx_candidate_resolution_and_load():
-    loader = RemindLoader(str(GDX))
+    loader = IamLoader(str(GDX))
     assert loader.backend == "gdx"
     # first candidate absent (run/version rename), falls back to the present name
-    assert loader.resolve_symbol(["v32_taxCO2eq", "p_priceCO2"]) == "p_priceCO2"
+    assert loader.resolve(["v32_taxCO2eq", "p_priceCO2"]) == "p_priceCO2"
     with pytest.raises(KeyError):
-        loader.resolve_symbol(["does_not_exist", "nor_this"])
-    df = loader.load_symbol("p_priceCO2", rename_columns={"tall": "year", "all_regi": "region"})
+        loader.resolve(["does_not_exist", "nor_this"])
+    df = loader.read("p_priceCO2", rename_columns={"tall": "year", "all_regi": "region"})
     assert {"year", "region", "value"} <= set(df.columns)
     assert "DEU" in set(df["region"])

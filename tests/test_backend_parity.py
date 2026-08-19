@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from iampypsa.couplers.remind import RemindGdxCoupler, RemindIamcCoupler
-from iampypsa.io import RemindLoader
-from iampypsa.io.remind_symbols import load_symbol_specs
+from iampypsa.models.remind import RemindGdxCoupler, RemindIamcCoupler
+from iampypsa import IamLoader
+from iampypsa.quantities import load_quantity_specs
 
 DATA = Path(__file__).parent / "data"
 GDX = DATA / "remind2pypsa_amt_filtered.gdx"
@@ -33,17 +33,17 @@ def _units_by_parameter(coupler) -> dict[str, set[str]]:
 
 @pytest.fixture
 def gdx_units() -> dict[str, set[str]]:
-    loader = RemindLoader(str(GDX))
+    loader = IamLoader(str(GDX))
     return _units_by_parameter(
-        RemindGdxCoupler(loader, load_symbol_specs(backend="gdx"), {}, {}, model_regions=REGIONS)
+        RemindGdxCoupler(loader, load_quantity_specs(backend="gdx"), {}, {}, model_regions=REGIONS)
     )
 
 
 @pytest.fixture
 def iamc_units() -> dict[str, set[str]]:
-    loader = RemindLoader(str(MIF))
+    loader = IamLoader(str(MIF))
     return _units_by_parameter(
-        RemindIamcCoupler(loader, load_symbol_specs(backend="iamc"), {}, {}, model_regions=REGIONS)
+        RemindIamcCoupler(loader, load_quantity_specs(backend="iamc"), {}, {}, model_regions=REGIONS)
     )
 
 

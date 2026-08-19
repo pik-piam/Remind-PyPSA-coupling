@@ -1,4 +1,4 @@
-"""Read REMIND symbols from a GDX container (via ``gamspy``).
+"""Read symbols from a GDX container (via ``gamspy``).
 
 Provides symbol/scalar readers and a symbol-name listing, with the opened container cached
 per path so repeated reads against the same GDX file don't re-open it.

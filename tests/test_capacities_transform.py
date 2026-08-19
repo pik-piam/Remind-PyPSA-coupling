@@ -96,19 +96,19 @@ def test_apply_postprocessing_uses_target_directly_when_present():
 
 def test_get_capacities_reads_postprocessing_from_symbols():
     """get_capacities applies the postprocessing block declared in the capacity spec."""
-    from iampypsa.couplers.base import Coupler
+    from iampypsa.coupler import Coupler
 
     class _FakeLoader:
-        def load_symbol(self, ref, rename_columns=None):
+        def read(self, ref, rename_columns=None):
             if ref == "p32_capAvg":
                 return pd.DataFrame({"year": [2050], "region": ["DEU"],
                                      "technology": ["storspv"], "value": [5.0]})
             return pd.DataFrame({"year": [], "region": [], "technology": [], "value": []})
 
-        def resolve_symbol(self, ref):
+        def resolve(self, ref):
             return ref
 
-    symbols = {
+    quantities = {
         "capacity": {
             "symbol": "p32_capAvg",
             "postprocessing": {
@@ -119,7 +119,7 @@ def test_get_capacities_reads_postprocessing_from_symbols():
         },
     }
     tmap = pd.DataFrame({"model_tech": ["btin"], "target_carrier": ["battery charger"]})
-    coupler = Coupler(_FakeLoader(), symbols, {}, {}, model_regions=["DEU"])
+    coupler = Coupler(_FakeLoader(), quantities, {}, {}, model_regions=["DEU"])
     out = coupler.get_capacities(
         tmap, map_tech_col="model_tech", map_carrier_col="target_carrier",
     )
@@ -127,25 +127,27 @@ def test_get_capacities_reads_postprocessing_from_symbols():
 
 
 def test_generator_targets_match_reference():
-    from iampypsa.io import RemindLoader, build_capacity_reporting_technologies, load_technology_parameters
-    from iampypsa.io.remind_symbols import load_symbol_specs
-    from iampypsa.io.technology_mapping import iam_name
-    from iampypsa.couplers.base import Coupler
-    from iampypsa.io.remind_symbols import rename_technologies
+    from iampypsa import IamLoader
+    from iampypsa.models.remind import build_capacity_reporting_technologies
+    from iampypsa.quantities import load_technology_parameters
+    from iampypsa.quantities import load_quantity_specs
+    from iampypsa.quantities.schema import get_iam_name
+    from iampypsa.coupler import Coupler
+    from iampypsa.quantities import rename_technologies
 
-    loader = RemindLoader(str(GDX))
-    symbols = load_symbol_specs(backend=loader.backend)
-    raw = Coupler(loader, symbols, {}, {}).prepare_capacities()
-    raw = rename_technologies(raw, symbols.get("technology_names"))
+    loader = IamLoader(str(GDX))
+    quantities = load_quantity_specs(backend=loader.backend)
+    raw = Coupler(loader, quantities, {}, {}).prepare_capacities()
+    raw = rename_technologies(raw, quantities.get("technology_names"))
     raw["year"] = raw["year"].astype(int)
 
     technology_mapping = load_technology_parameters(str(TECH_MAPPING))["technologies"]
-    reports_capacity = build_capacity_reporting_technologies()
+    reports_capacity = build_capacity_reporting_technologies(load_quantity_specs(backend="iamc"))
     tmap = pd.DataFrame(
         [
-            {"PyPSA": tech, "IAM": iam_name(tech, spec)}
+            {"PyPSA": tech, "IAM": get_iam_name(tech, spec)}
             for tech, spec in technology_mapping.items()
-            if iam_name(tech, spec) in reports_capacity
+            if get_iam_name(tech, spec) in reports_capacity
         ]
     )
 

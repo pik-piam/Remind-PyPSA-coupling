@@ -20,8 +20,8 @@ from os import PathLike
 import pandas as pd
 import country_converter as coco
 
-from iampypsa.couplers.base import Coupler
-from iampypsa.io.remind_symbols import load_frame, load_set, load_spec, load_variable_set, rename_technologies
+from iampypsa.coupler import Coupler
+from iampypsa.quantities.load import load_quantity, rename_technologies
 from iampypsa.transforms.costs import broadcast_fuel_prices, annotate_cost_rows, apply_currency_factor
 from iampypsa.units import HOURS_PER_YEAR, unit_factor
 
@@ -43,11 +43,11 @@ class RemindGdxCoupler(Coupler):
         """Read REMIND regional sectoral demand as long ``[year, region, sector, value]`` (MWh/yr).
 
         Reads ``demand_fe_sectors`` (``p32_load_sector``), with TWa→MWh conversion applied by
-        ``load_frame``, and restricts to the configured REMIND regions. All available years are
+        ``load_quantity``, and restricts to the configured REMIND regions. All available years are
         returned; the year filter to planning horizons happens in ``downscale_country_demand``.
         Sums rows sharing a key as a guard against an unexpected extra source dimension.
         """
-        raw = load_frame(self.loader, self.symbols["demand_fe_sectors"])
+        raw = load_quantity(self.loader, self.quantities["demand_fe_sectors"])
         raw["year"] = raw["year"].astype(int)
         df = raw[["year", "region", "sector", "value"]].copy()
         df["unit"] = "MWh_el"
@@ -63,7 +63,7 @@ class RemindGdxCoupler(Coupler):
         """Extract REMIND GDX cost parameters as long
         ``[region, technology, parameter, value, unit]``.
 
-        Unit conversions are config-declared (applied by ``load_frame``/``load_set``). The
+        Unit conversions are config-declared (applied at the load seam). The
         REMIND-GDX-specific tech-facts encoded here are:
         - ``tnrs`` (nuclear) efficiency is mass-basis (TWa_elec/Mt_Ur); combined with ``peur``'s
           USD/g_U fuel price into a true USD/MWh_el cost + 1.0 p.u. efficiency (see
@@ -76,19 +76,19 @@ class RemindGdxCoupler(Coupler):
           USD) into the PyPSA baseline's currency.
         """
         year_str = str(year)
-        load = lambda name: load_frame(self.loader, self.symbols[name])  # noqa: E731
+        load = lambda name: load_quantity(self.loader, self.quantities[name])  # noqa: E731
 
-        # Investment: unit conversion applied in load_frame. Storage capex is per MWh of store,
+        # Investment: unit conversion applied at the load seam. Storage capex is per MWh of store,
         # not per MW of converter, but shares the same GDX symbol — so relabel only.
         costs = load("cost_investment")
         costs = costs.loc[costs["year"].astype(str) == year_str].copy()
         costs = annotate_cost_rows(costs, parameter="investment")
         costs.loc[costs["technology"].isin(["h2stor", "btstor"]), "unit"] = "USD/MWh"
 
-        # tech_data: mixed-unit set (lifetime/FOM/VOM) - split + converted per YAML schema.
-        techd = load_set(self.loader, self.symbols["tech_data"])
+        # tech_data: mixed-unit indexed symbol (lifetime/FOM/VOM) - split + converted per schema.
+        techd = load("tech_data")
 
-        # CO2 intensity: unit conversion and the carrier/emission-type slice applied in load_frame.
+        # CO2 intensity: unit conversion and the carrier/emission-type slice applied at the load seam.
         co2i = load("emission_factor")
         co2i = co2i.loc[co2i["year"].astype(str) == year_str].copy()
         co2i = annotate_cost_rows(co2i, parameter="CO2 intensity")
@@ -131,7 +131,7 @@ class RemindGdxCoupler(Coupler):
         ]
         df = apply_currency_factor(df, self.config.get("currency_factor", 1.0))
         # Output boundary: raw REMIND tokens -> canonical vocabulary
-        names = self.symbols.get("technology_names", {})
+        names = self.quantities.get("technology_names", {})
         df = rename_technologies(df, names)
         df = broadcast_fuel_prices(df, self._tech_fuel_map_from_pe2se())
         df = df[df["technology"].isin(set(names.values()))]
@@ -140,8 +140,8 @@ class RemindGdxCoupler(Coupler):
     def _tech_fuel_map_from_pe2se(self) -> dict[str, str]:
         """Build the canonical ``technology -> fuel`` map from the GDX ``pe2se`` set.
         """
-        names = self.symbols.get("technology_names", {})
-        seel = load_frame(self.loader, self.symbols["pe2se"])
+        names = self.quantities.get("technology_names", {})
+        seel = load_quantity(self.loader, self.quantities["pe2se"])
         return {
             names.get(row["all_te_2"], row["all_te_2"]): names[row["all_enty_0"]]
             for _, row in seel.iterrows()
@@ -210,7 +210,7 @@ class RemindIamcCoupler(Coupler):
     def build_regional_demand(self) -> pd.DataFrame:
         """Derive regional sectoral electricity demand from IAMC mif variables (MWh/yr).
 
-        Variable names and sector token labels come from the symbol config; unit conversion is
+        Variable names and sector token labels come from the quantity config; unit conversion is
         config-driven (``to_unit:`` on ``demand_energy_balance``/``demand_fe_sectors``/
         ``demand_electrolysis_efficiency``). The algorithm applied on top is REMIND-specific:
 
@@ -227,13 +227,13 @@ class RemindIamcCoupler(Coupler):
 
         Returns ``[year, region, sector, value, unit]`` matching the GDX path.
         """
-        fe_df = load_spec(self.loader, self.symbols["demand_fe_sectors"])
+        fe_df = load_quantity(self.loader, self.quantities["demand_fe_sectors"])
         fe_df = fe_df[fe_df["region"].isin(set(self.model_regions))]
 
-        energy_balance = load_variable_set(self.loader, self.symbols["demand_energy_balance"])
+        energy_balance = load_quantity(self.loader, self.quantities["demand_energy_balance"])
         energy_balance = energy_balance[energy_balance["region"].isin(set(self.model_regions))]
 
-        eta_df = load_frame(self.loader, self.symbols["demand_electrolysis_efficiency"])
+        eta_df = load_quantity(self.loader, self.quantities["demand_electrolysis_efficiency"])
         eta_df = eta_df[eta_df["region"].isin(set(self.model_regions))]
         eta_lookup = eta_df.groupby(["region", "year"])["value"].sum()
 
@@ -361,7 +361,7 @@ class RemindIamcCoupler(Coupler):
         currency_factor: float = self.config.get("currency_factor", 1.0)
 
         def load(name: str) -> pd.DataFrame:
-            df = load_variable_set(self.loader, self.symbols[name])
+            df = load_quantity(self.loader, self.quantities[name])
             return df[df["year"].astype(str) == y].copy()
 
         # Units below come from each spec's to_unit:, stamped at the load seam.
@@ -398,8 +398,8 @@ class RemindIamcCoupler(Coupler):
         df = apply_currency_factor(df, currency_factor)
         # Output boundary (mirrors RemindGdxCoupler): rename is a no-op here — mif labels are
         # already canonical — then per-fuel price rows become one `fuel` row per technology.
-        df = rename_technologies(df, self.symbols.get("technology_names"))
-        df = broadcast_fuel_prices(df, self.symbols.get("tech_fuel_map"))
+        df = rename_technologies(df, self.quantities.get("technology_names"))
+        df = broadcast_fuel_prices(df, self.quantities.get("tech_fuel_map"))
         return df[df["region"].isin(set(self.model_regions))].reset_index(drop=True)
 
     # -- extract_cost_parameters helpers ------------------------------------
@@ -425,8 +425,8 @@ class RemindIamcCoupler(Coupler):
         (marginal_cost = fuel / efficiency, Generator.efficiency) stay consistent.
         """
         y = str(year)
-        conversion = load_frame(self.loader, self.symbols["nuclear_conversion_factor"])
-        price = load_frame(self.loader, self.symbols["nuclear_price"])
+        conversion = load_quantity(self.loader, self.quantities["nuclear_conversion_factor"])
+        price = load_quantity(self.loader, self.quantities["nuclear_price"])
         conversion = conversion[conversion["year"].astype(str) == y]
         price = price[price["year"].astype(str) == y]
 
@@ -467,7 +467,7 @@ def read_region_map(
     if file_path is None:
         # importlib.resources, not a path walk from __file__: the CSV is package data and must
         # resolve the same way for an editable checkout and an installed wheel.
-        file_path = importlib.resources.files("iampypsa.data").joinpath("remind", "regions.csv")
+        file_path = importlib.resources.files("iampypsa.models.remind").joinpath("regions.csv")
     region_mapping = pd.read_csv(file_path, sep=";").rename(columns={"RegionCode": "model_region"})
     region_mapping["country"] = coco.convert(names=region_mapping["CountryCode"], to="ISO2")
     region_mapping = region_mapping[["country", "model_region"]]
@@ -481,4 +481,14 @@ def read_region_map(
     if flatten:
         grouped = grouped.apply(lambda x: x[0])
     return grouped.to_dict()
+
+
+def build_capacity_reporting_technologies(quantities: dict) -> set[str]:
+    """Return every canonical technology the ``capacity`` spec reports installed capacity for.
+
+    Reads the spec's ``variables:``/``derived:`` tokens (``hydro`` is included there), so it is
+    meaningful only for a backend whose capacity spec has that shape — the IAMC one.
+    """
+    cap_spec = quantities["capacity"]
+    return set(cap_spec.get("variables", {}).values()) | set(cap_spec.get("derived", {}))
 

@@ -1,56 +1,75 @@
 """iampypsa — shared IAM↔PyPSA coupling logic and the ``Coupler`` interface.
 
-Concrete ``Coupler`` subclasses are per-IAM-backend (``RemindGdxCoupler``, ``RemindIamcCoupler``
-for REMIND today); most PyPSA models construct one directly. A model may further subclass
-``Coupler`` in its own repository for tweaks that genuinely differ.
+The front door is :func:`open_coupler`: give it an IAM output file and it returns the coupler
+matching that file's model and format, with the model's packaged quantity specs and region map
+already resolved. From there, ``build_*``/``extract_*`` produce PyPSA-ready frames.
+
+    >>> coupler = open_coupler("iam_output.gdx", config=cfg)
+    >>> coupler.build_co2_prices()
+
+Everything below this facade is importable but is package internals: :mod:`iampypsa.formats`
+(how a source is read), :mod:`iampypsa.quantities` (what a coupling name means),
+:mod:`iampypsa.transforms` (pure frame→frame), :mod:`iampypsa.models` (per-IAM knowledge).
 """
 
 import importlib.metadata
+from os import PathLike
+from typing import Any
 
-from .couplers.base import Coupler
-from .couplers.remind import RemindGdxCoupler, RemindIamcCoupler
-from .io import (
-    RemindLoader,
-    iam_name,
-    build_capacity_reporting_technologies,
-    default_symbol_config_path,
-    load_frame,
-    load_set,
-    load_symbol_specs,
-    load_spec,
-    load_technology_parameters,
-    load_variable_set,
-    merge_region_overrides,
-    read_gdx_symbol,
-    read_symbol_config,
-    read_ssp_data,
-    rename_technologies,
-    report_fallbacks,
-    build_technology_sources,
-)
+import pandas as pd
 
-__all__ = [
-    "Coupler",
-    "RemindGdxCoupler",
-    "RemindIamcCoupler",
-    "RemindLoader",
-    "read_gdx_symbol",
-    "read_ssp_data",
-    "load_symbol_specs",
-    "load_frame",
-    "load_set",
-    "load_spec",
-    "load_variable_set",
-    "read_symbol_config",
-    "merge_region_overrides",
-    "default_symbol_config_path",
-    "rename_technologies",
-    "report_fallbacks",
-    "load_technology_parameters",
-    "iam_name",
-    "build_technology_sources",
-    "build_capacity_reporting_technologies",
-]
+from iampypsa.coupler import Coupler
+from iampypsa.loader import IamLoader
+from iampypsa.models import DEFAULT_MODEL, get_coupler_class, read_default_region_map
+from iampypsa.quantities.config import load_quantity_specs
+
+__all__ = ["open_coupler", "Coupler", "IamLoader", "load_quantity_specs", "__version__"]
+
+
+def open_coupler(
+    source: str | PathLike,
+    *,
+    model: str = DEFAULT_MODEL,
+    region: str | None = None,
+    quantities_path: str | PathLike | None = None,
+    region_map: dict[str, list[str]] | None = None,
+    config: dict[str, Any] | None = None,
+    model_regions: list[str] | None = None,
+    reference_data: dict[str, pd.DataFrame] | None = None,
+) -> Coupler:
+    """Open an IAM source and return the coupler matching its model and format.
+
+    Pairs the detected backend with its coupler class and packaged quantity-spec YAML, so
+    callers never select the two by hand. Direct construction stays available — this is a
+    convenience, not a gate.
+
+    Args:
+        source: IAM output file; the suffix selects the backend (``.gdx`` / ``.mif`` / ``.csv``).
+        model: Registered IAM, see :data:`iampypsa.models.MODELS`.
+        region: IAM region whose ``overrides:`` block wins over ``default:``.
+        quantities_path: Overlay YAML deep-merged onto the model's packaged specs.
+        region_map: ``{region: [country, ...]}``; defaults to the model's packaged map.
+        config: Coupling config (``currency_factor``, ``sector_weights``, ``countries``,
+            ``planning_horizons``).
+        model_regions: IAM regions to keep; defaults to every region in ``region_map``.
+        reference_data: Downscaling proxies (``population``, ``gdp``, degree days, ...).
+    """
+    loader = IamLoader(source)
+    quantities = load_quantity_specs(
+        region, quantities_path, backend=loader.backend, model=model
+    )
+    if region_map is None:
+        region_map = read_default_region_map(model)
+    coupler_cls = get_coupler_class(model, loader.backend)
+    return coupler_cls(
+        loader,
+        quantities,
+        region_map,
+        config or {},
+        model_regions=model_regions,
+        reference_data=reference_data,
+    )
+
 
 try:
     __version__ = importlib.metadata.version("iam-pypsa-coupling")

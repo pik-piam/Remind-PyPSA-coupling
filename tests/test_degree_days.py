@@ -11,7 +11,7 @@ from iampypsa.downscale import (
     disaggregate_demand_to_country,
     normalise,
 )
-from iampypsa.io import read_degree_days
+from iampypsa.reference import read_degree_days
 
 CDD = Path(__file__).parent / "data" / "cdd_filtered.csv"
 HDD = Path(__file__).parent / "data" / "hdd_filtered.csv"
@@ -147,10 +147,10 @@ def test_read_degree_days_bad_selector_raises():
         read_degree_days(CDD, dd_type="XDD", tlim_setpoint=22, rcp="4_5", ssp="SSP2")
 
 
-def test_iamc_symbols_include_space_cooling():
+def test_iamc_quantities_include_space_cooling():
     """The Space Cooling FE variable is mapped to the `space_cooling` sector token."""
-    from iampypsa.io.remind_symbols import load_symbol_specs
+    from iampypsa.quantities import load_quantity_specs
 
-    variables = load_symbol_specs(backend="iamc")["demand_fe_sectors"]["variables"]
+    variables = load_quantity_specs(backend="iamc")["demand_fe_sectors"]["variables"]
     key = "FE|Buildings|non-Heating|Electricity|Space Cooling"
     assert variables.get(key) == "space_cooling"

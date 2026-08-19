@@ -29,7 +29,7 @@ flowchart TB
     subgraph pkg["iampypsa — shared package"]
         subgraph building_blocks["io / transforms / downscale — IAM-side building blocks"]
             direction LR
-            io["io/<br/>RemindLoader · remind_symbols"] --> tf["transforms/<br/>co2 · loads · capacities · costs"] --> ds["downscale/<br/>region → country (SSP)"]
+            io["io/<br/>IamLoader · remind_symbols"] --> tf["transforms/<br/>co2 · loads · capacities · costs"] --> ds["downscale/<br/>region → country (SSP)"]
             units["units.py"] -.-> io
         end
         base(["Coupler (base)<br/>shared concrete builders"])
@@ -75,7 +75,7 @@ or assembled step-by-step in the model's own Snakemake rules.
 | Subpackage | Component | Responsibility |
 |---|---|---|
 | `io/` | `loader.RemindLoader` | Open an IAM source and resolve/read symbols. Backend (`gdx` via `gamspy`, or `iamc` `.mif`/`.csv`) is auto-detected; `lru`-cached. |
-| `io/` | `remind_symbols` (+ `data/remind_symbols_gdx.yaml` / `data/remind_symbols_mif.yaml`) | Map **coupling names** — iampypsa's own stable names for a quantity (`co2_price`, `capacity`, `tech_data`, …) → the actual IAM symbol name(s), plus the unit each carries. `load_frame()` / `load_set()` read a symbol and apply the declared unit conversion. |
+| `io/` | `remind_symbols` (+ `data/remind_symbols_gdx.yaml` / `data/remind_symbols_mif.yaml`) | Map **coupling names** — iampypsa's own stable names for a quantity (`co2_price`, `capacity`, `tech_data`, …) → the actual IAM symbol name(s), plus the unit each carries. `load_simple()` / `load_indexed()` read a symbol and apply the declared unit conversion. |
 | `io/` | `technology_mapping` | Parse the model's technology-mapping YAML into a `{parameter: source}` map per technology — see [Technology mapping](getting-started/technology-mapping.md). |
 | `io/` | `ssp` | Fetch / read the SSP population & GDP proxy datasets used by downscaling. |
 | `units` | `units.py` | Unit conversions `(from_unit, to_unit) → factor`. |
@@ -102,8 +102,8 @@ Most of what used to require a per-model adapter subclass is now just constructo
 
 ```python
 coupler = RemindGdxCoupler(
-    loader=RemindLoader(remind_gdx_path),       # the REMIND source
-    symbols=load_symbol_specs(backend="gdx"),   # coupling-name → REMIND symbol map (+ region overrides)
+    loader=IamLoader(remind_gdx_path),       # the REMIND source
+    symbols=load_quantity_specs(backend="gdx"),   # coupling-name → REMIND symbol map (+ region overrides)
     region_map=read_region_map(),               # REMIND region → [country, ...]
     config=coupling_config,                     # the model's coupling config dict
     model_regions=[...],                        # REMIND regions in scope
@@ -148,7 +148,7 @@ co2_price:
   symbol: [v32_taxCO2eq, p_priceCO2]   # try v32_… first, fall back to p_priceCO2
   rename: {tall: year, all_regi: region}
   units: [USD/tC, USD/tC]              # per-candidate source unit
-  to_unit: USD/tCO2                    # load_frame() applies the (units, to_unit) factor
+  to_unit: USD/tCO2                    # load_simple() applies the (units, to_unit) factor
 ```
 
 A **mixed-unit set** — one IAM symbol whose `index` column selects several quantities
@@ -167,15 +167,15 @@ tech_data:
 
 Per-region differences go under `overrides:` (e.g. `CHA:`) and need to list **only the entries
 that differ** — everything else is inherited from `default:`. Resolve with
-`load_symbol_specs(region="CHA", backend="gdx")`.
+`load_quantity_specs(region="CHA", backend="gdx")`.
 
 Two layering mechanisms let a model adjust symbols without forking the package:
 
-- `load_symbol_specs(path=…, backend=…)` — overlay a model-local YAML on top of the packaged
+- `load_quantity_specs(path=…, backend=…)` — overlay a model-local YAML on top of the packaged
   default.
 - the `overrides:` block — per-IAM-region deltas inside one config.
 
-**Unit conversions:** `load_frame`/`load_set` apply the declared conversion *at
+**Unit conversions:** `load_simple`/`load_indexed` apply the declared conversion *at
 the moment of loading* (the "Coupler seam") and stamp the resulting unit onto a `unit` column.
 The downstream transforms are therefore called with conversion disabled so units are never
 applied twice. Add a new conversion by adding one row to `UNIT_CONVERSIONS` in `units.py`.

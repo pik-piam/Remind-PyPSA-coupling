@@ -4,7 +4,7 @@ A *proxy* is the reference distribution used to split a coarse IAM regional valu
 country-level members.  Proxies are supplied as a name→frame registry
 (``{"population": ..., "gdp": ..., "heating_demand": ..., "cooling_demand": ...}``); each proxy
 frame is a ``MultiIndex[(iso2, year)]`` with a ``value`` column (the shape produced by
-``io.ssp.read_ssp_data`` and — via :func:`build_demand_proxy_from_dd` — ``io.degree_days.read_degree_days``).
+``reference.ssp.read_ssp_data`` and — via :func:`build_demand_proxy_from_dd` — ``reference.degree_days.read_degree_days``).
 A sector's weight dict names which proxies to blend and with what weight (e.g.
 ``{"gdp": 0.6, "population": 0.4}`` for AC, ``{"heating_demand": 1.0}`` for heating,
 ``{"cooling_demand": 1.0}`` for cooling). No proxy is privileged.

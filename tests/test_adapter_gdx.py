@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from iampypsa.couplers.remind import RemindGdxCoupler
+from iampypsa.models.remind import RemindGdxCoupler
 
 
 def test_fill_missing_with_zero_fills_only_modeled_technologies():

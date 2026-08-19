@@ -9,8 +9,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from iampypsa.couplers.base import Coupler
-from iampypsa.couplers.remind import RemindGdxCoupler
+from iampypsa.coupler import Coupler
+from iampypsa.models.remind import RemindGdxCoupler
 
 DATA = Path(__file__).parent / "data"
 GDX = DATA / "remind2pypsa_amt_filtered.gdx"
@@ -29,7 +29,7 @@ YEARS = [2090, 2100]
 
 def test_adapter_is_directly_instantiable():
     """Coupler has no abstract methods — it can be created without a subclass."""
-    adapter = Coupler(loader=None, symbols={}, region_map={}, config={})
+    adapter = Coupler(loader=None, quantities={}, region_map={}, config={})
     assert isinstance(adapter, Coupler)
 
 
@@ -42,13 +42,13 @@ def test_technology_mapping_example_matches_examples_dir():
 
 
 def _coupler(currency_factor: float = 1.0) -> RemindGdxCoupler:
-    from iampypsa.io import RemindLoader
-    from iampypsa.io.remind_symbols import load_symbol_specs
+    from iampypsa import IamLoader
+    from iampypsa.quantities import load_quantity_specs
 
-    loader = RemindLoader(str(GDX))
+    loader = IamLoader(str(GDX))
     return RemindGdxCoupler(
         loader,
-        load_symbol_specs(backend=loader.backend),
+        load_quantity_specs(backend=loader.backend),
         region_map=REGION_MAP,
         config={
             "sector_weights": SECTOR_WEIGHTS,
@@ -83,7 +83,7 @@ def test_build_country_loads_matches_reference():
 
 def test_cost_overrides_match_reference_remind_rows():
     """extract_cost_parameters (+ inline battery-inverter² as the EUR script does) vs the raw cost reference."""
-    from iampypsa.io import load_technology_parameters
+    from iampypsa.quantities import load_technology_parameters
     from iampypsa.transforms.costs import (
         build_iam_techdata,
         convert_investment_to_input_capacity_basis,
@@ -133,16 +133,17 @@ def test_currency_factor_scales_gdx_cost_parameters():
 
 
 def test_full_capacity_targets_match_reference():
-    from iampypsa.io import build_capacity_reporting_technologies, load_technology_parameters
-    from iampypsa.io.technology_mapping import iam_name
+    from iampypsa.models.remind import build_capacity_reporting_technologies
+    from iampypsa.quantities import load_quantity_specs, load_technology_parameters
+    from iampypsa.quantities.schema import get_iam_name
 
     technology_mapping = load_technology_parameters(str(TECH_MAPPING))["technologies"]
-    reports_capacity = build_capacity_reporting_technologies()
+    reports_capacity = build_capacity_reporting_technologies(load_quantity_specs(backend="iamc"))
     tmap = pd.DataFrame(
         [
-            {"PyPSA": tech, "IAM": iam_name(tech, spec)}
+            {"PyPSA": tech, "IAM": get_iam_name(tech, spec)}
             for tech, spec in technology_mapping.items()
-            if iam_name(tech, spec) in reports_capacity
+            if get_iam_name(tech, spec) in reports_capacity
         ]
     )
     a = _coupler()

@@ -1,0 +1,139 @@
+# gdx symbol map for the REMIND→PyPSA coupling
+#
+# Spec shapes:
+#
+# (1) Single-quantity symbol:
+#       symbol:  a source-symbol name OR an ordered candidate list (first present wins —
+#                absorbs run/version renames). Backend-neutral: the same key can address
+#                a GDX symbol or an IAMC `.mif` variable.
+#       rename:  source domain column -> canonical column ({year, region, technology, ...})
+#       unit / units / to_unit: optional unit conversion, resolved via the central table
+#                in iampypsa.units and applied by `load_frame`.
+#
+# (2) Mixed-unit set symbol — ONE symbol whose `index` column selects several quantities with
+#     different units (e.g. pm_data indexed by `char` -> lifetime/FOM/VOM). Loaded by `load_set`:
+#       index:   the (renamed) column whose value selects the quantity
+#       schema:  index-value -> {parameter, unit, to_unit}
+#
+# `overrides` (keyed by REMIND region) lists only the logical names that differ from `default`.
+# A model may overlay its own YAML via load_symbol_specs(path=...) (deep-merged).
+
+default:
+  # --- Canonical technology vocabulary --------------------------------------
+  # REMIND all_te/all_enty token -> canonical name; applied by rename_technologies()
+  technology_names:
+    ngt: gas-ocgt
+    ngcc: gas-ccgt
+    ngccc: gas-ccgt-ccs
+    gaschp: gas-chp
+    pc: coal-pulverised
+    igcc: coal-igcc
+    igccc: coal-igcc-ccs
+    coalchp: coal-chp
+    biochp: biomass-chp
+    bioigcc: biomass-igcc
+    bioigccc: biomass-igcc-ccs
+    tnrs: nuclear
+    dot: oil
+    csp: solar-csp
+    geohdr: geothermal
+    spv: solar-pv
+    windon: wind-onshore
+    windoff: wind-offshore
+    hydro: hydro
+    elh2: electrolysis
+    h2turb: hydrogen-turbine
+    btin: battery-inverter
+    btstor: battery-storage
+    h2stor: hydrogen-storage
+    pecoal: coal-fuel        # fuel-price tokens; only surface before the per-tech broadcast
+    pegas: gas-fuel
+    peoil: oil-fuel
+    pebiolc: biomass-fuel
+    peur: uranium
+
+  # --- Technology -> fuel map ------------------------------------------------
+  # The tech->fuel map is derived from the `pe2se` set
+  pe2se:
+    symbol: pe2se
+    filter: {all_enty_1: seel}
+
+  co2_price:
+    symbol: p_priceCO2
+    rename: {tall: year, all_regi: region}
+    unit: USD/tC
+    to_unit: USD/tCO2
+  # TODO: gdx currently doesn't have space cooling demand yet
+  demand_fe_sectors:
+    symbol: p32_load_sector
+    rename: {ttot: year, all_regi: region, loadPy32: sector}
+    unit: TWa
+    to_unit: MWh 
+  capacity:
+    symbol: vm_cap
+    rename: {tall: year, all_regi: region, all_te: technology, level: value}
+    filter: {rlf: 1}
+    unit: TW
+    to_unit: MW
+    # Electrolysis, hydrogen turbine and battery need postprocessing from gdx
+    postprocessing:
+      # merge coupled variants into their primary token; storX -> btin is the scaling target below
+      merge:
+        elh2: [elh2, elh2VRE]
+        h2turb: [h2turb, h2turbVRE]
+        btin: [btin, storspv, storwindon, storwindoff]
+      scale: {storspv: 4.0, storwindon: 1.2, storwindoff: 1.2}  # scale factor per source
+      link_techs: [elh2, h2turb, btin, elh2VRE, h2turbVRE]  # output->input capacity adjustment
+  cost_investment:
+    symbol: vm_costTeCapital
+    rename: {ttot: year, all_regi: region, all_te: technology, level: value}
+    unit: TUSD/TW
+    to_unit: USD/MW
+  efficiency_conv:
+    symbol: pm_eta_conv
+    rename: {tall: year, all_regi: region, all_te: technology}
+    # p.u. holds for every tech except tnrs (raw TWa_elec/Mt_Ur) — handled in the coupler.
+    unit: p.u.
+  efficiency_data:
+    symbol: pm_dataeta
+    rename: {tall: year, all_regi: region, all_te: technology}
+    unit: p.u.
+  tech_data:
+    symbol: pm_data
+    rename: {all_regi: region, all_te: technology}
+    index: char
+    schema:
+      lifetime: {parameter: lifetime, unit: yr,     to_unit: yr}
+      omf:      {parameter: FOM,      unit: p.u.,   to_unit: "%/yr"}
+      omv:      {parameter: VOM,      unit: TUSD/TWa, to_unit: USD/MWh}
+  emission_factor:
+    symbol: pm_emifac
+    rename:
+      tall_0: year
+      all_regi_1: region
+      all_enty_2: from_carrier
+      all_enty_3: to_carrier
+      all_te_4: technology
+      all_enty_5: emission_type
+    filter: {to_carrier: seel, emission_type: co2}
+    unit: Gt_C/TWa
+    to_unit: t_CO2/MWh_th
+  fuel_price:
+    symbol: pm_PEPrice
+    rename: {ttot: year, all_regi: region, all_enty: technology}
+    # TUSD/TWa holds for every fuel except peur (raw TUSD/Mt_Ur) — handled in the coupler.
+    unit: TUSD/TWa
+  discount_rate:
+    symbol: p_r
+    rename: {ttot: year, all_regi: region}
+  coupled_years:
+    symbol: t
+    rename: {ttot: year}
+  # Hydro treated as special case in PyPSA-Eur
+  hydro_generation:
+    symbol: p32_prodSeHydro
+    rename: {ttot: year, all_regi: region}
+    unit: TWa
+    to_unit: MWh
+
+overrides: {}

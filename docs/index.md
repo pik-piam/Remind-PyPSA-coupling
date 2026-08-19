@@ -46,10 +46,10 @@ Get in touch if you'd like to couple another IAM or PyPSA model.
 
 | Operations | Module(s) |
 |---|---|
-| Read REMIND output (GDX / IAMC) | `iampypsa.io` — `RemindLoader`, `remind_symbols` |
+| Read REMIND output (GDX / IAMC) | `iampypsa.io` — `IamLoader`, `remind_symbols` |
 | Variable mappings and units | `data/remind_symbols_gdx.yaml` / `data/remind_symbols_mif.yaml`, `iampypsa.units` |
 | Transformations (CO₂, loads, capacities, costs, mapping) | `iampypsa.transforms` |
-| Region → country downscaling | `iampypsa.downscale`, `iampypsa.io.ssp` |
+| Region → country downscaling | `iampypsa.downscale`, `iampypsa.reference.ssp` |
 | Coupling interface, currently for REMIND | `iampypsa.couplers.Coupler` |
 
 ## Further reading
