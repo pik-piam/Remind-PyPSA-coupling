@@ -27,10 +27,14 @@ def find_spec_shape(spec: dict[str, Any]) -> str:
 
 
 def get_quantity_ref(spec: dict[str, Any]) -> str | Sequence[str]:
-    """Return the spec's source-name reference (a name or a candidate list)."""
-    ref = spec.get("symbol")
+    """Return the spec's source-name reference (a name or a candidate list).
+
+    ``name:`` is the backend-neutral key; ``symbol:`` is the GDX-flavoured alias the shipped
+    YAMLs still use, accepted until they are migrated.
+    """
+    ref = spec.get("name", spec.get("symbol"))
     if ref is None:
-        raise KeyError(f"Quantity spec has no 'symbol': {spec}")
+        raise KeyError(f"Quantity spec has no 'name'/'symbol': {spec}")
     return ref
 
 

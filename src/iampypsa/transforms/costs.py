@@ -49,6 +49,7 @@ def annotate_cost_rows(
 CURRENCY_COST_PARAMETERS = {"investment", "VOM", "fuel"}
 
 
+# see ISSUES.md P3-1 for the missing deflator 
 def apply_currency_factor(
     values: pd.DataFrame,
     currency_factor: float,
@@ -60,7 +61,6 @@ def apply_currency_factor(
     price pathway alike. One-directional (IAM USD -> PyPSA baseline currency); it converts
     between currencies, not between currency *years* (e.g. an IAM's US$2017 vs the baseline's
     own reporting year), which nothing handles yet.
-
     Args:
         values: Long frame with a ``value`` column, and a ``parameter`` column if selecting.
         currency_factor: Multiplier into the baseline currency; ``1.0`` is a no-op.
@@ -320,30 +320,40 @@ def build_fixed_value_overrides(
     return set_df[["technology", "parameter", "value", "unit", "further description", "source"]]
 
 
-# TODO is overrides transaprent enough?
 def apply_overrides(
     costs: pd.DataFrame,
     overrides: pd.DataFrame,
 ) -> pd.DataFrame:
     """Update and insert ``overrides`` onto ``costs`` by ``(technology, parameter)``.
 
-    Rows whose key is absent from ``costs`` are added; for keys present in both,
-    ``value``/``unit``/``source``/``further description`` are overwritten from ``overrides``.
+    In the default pipeline  ``costs`` is the PyPSA baseline from :func:`build_pypsa_techdata` and ``overrides`` is the IAM 
+    table from :func:`build_iam_techdata`, or the mapping YAML's fixed values from :func:`build_fixed_value_overrides` 
+    (see docs/getting-started/technology-mapping.md)
+
+    NOTE: ``overrides`` overwrites baseline costs. `source` is kept.
+
+    Args:
+        costs: The frame being overridden — the baseline whose values lose on a key clash.
+        overrides: The frame that wins, and whose unmatched keys are inserted.
+
+    Returns:
+        The merged long frame, one row per ``(technology, parameter)``.
     """
     base = costs.set_index(["technology", "parameter"]).copy()
-    ov = overrides.set_index(["technology", "parameter"]).copy()
-    if ov.index.duplicated().any():
+    ovr = overrides.set_index(["technology", "parameter"]).copy()
+    if ovr.index.duplicated().any():
         raise ValueError(
             f"Duplicate overrides for (technology, parameter): "
-            f"{ov.index[ov.index.duplicated()].tolist()}"
+            f"{ovr.index[ovr.index.duplicated()].tolist()}"
         )
-    extra = ov.index.difference(base.index)
+
+    extra = ovr.index.difference(base.index)
     if len(extra) > 0:
-        base = pd.concat([base, ov.loc[extra, base.columns.intersection(ov.columns)]])
-    shared = ov.index.intersection(base.index)
+        base = pd.concat([base, ovr.loc[extra, base.columns.intersection(ovr.columns)]])
+    shared = ovr.index.intersection(base.index)
     for col in ["value", "unit", "source", "further description"]:
-        if col in ov.columns:
-            base.loc[shared, col] = ov.loc[shared, col]
+        if col in ovr.columns:
+            base.loc[shared, col] = ovr.loc[shared, col]
     merged = base.reset_index()
     if merged.duplicated(subset=["technology", "parameter"]).any():
         dups = merged[merged.duplicated(subset=["technology", "parameter"], keep=False)]
