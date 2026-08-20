@@ -16,9 +16,6 @@ config keys used: ``currency_factor``, ``sector_weights``, ``countries``, ``plan
 convert IAM-sourced monetary values into the target PyPSA baseline's currency — it is not
 looked up or computed here. It converts between currencies only, not between currency *years*
 (e.g. an IAM reporting US$2017 against a baseline with its own reporting year).
-
-TODO: once other IAMs are coupled, add a general pre-run validator confirming all data PyPSA
-needs is actually present in the source (quantities, declared regions/years).
 """
 
 import logging
@@ -28,6 +25,7 @@ from typing import Any
 import pandas as pd
 
 from iampypsa.downscale.demand import disaggregate_demand_to_country
+from iampypsa.loader import IamLoader
 from iampypsa.quantities.load import load_quantity, rename_technologies
 from iampypsa.transforms.capacities import (
     adjust_link_capacities_to_input,
@@ -63,10 +61,9 @@ class Coupler:
                 cls.__name__,
             )
 
-    # TODO type loader
     def __init__(
         self,
-        loader,
+        loader: IamLoader,
         quantities: dict[str, Any],
         region_map: dict[str, list[str]],
         config: dict[str, Any],
@@ -178,15 +175,13 @@ class Coupler:
         rates = rates[rates["region"].isin(self.model_regions)]
         return select_discount_rate(rates, year, self.model_regions)
 
-    # TODO model-tech resolution? is unclear -> which model, IAM?
-    # TODO Resolution is reserved for space and time, why does it come in here?
     def prepare_capacities(self) -> pd.DataFrame:
-        """Read installed capacities at model-tech resolution, before carrier aggregation.
+        """Read installed capacities by the IAM's own technology tokens, before carrier aggregation.
 
         Returns ``[year, region, technology, value, unit]``. Applies the capacity spec's
         optional ``postprocessing`` block (technology-variant merging, scaling) and puts
         link-like technologies on an input-capacity basis. Callers wanting PyPSA carriers use
-        :meth:`get_capacities`; callers needing model-tech resolution (e.g. group-wise
+        :meth:`get_capacities`; callers needing the IAM's technology tokens (e.g. group-wise
         brownfield harmonisation) use this directly.
         """
         cap_spec = self.quantities["capacity"]

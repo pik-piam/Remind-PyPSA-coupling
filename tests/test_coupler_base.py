@@ -205,7 +205,7 @@ def test_full_capacity_targets_match_reference():
 
 
 def test_prepare_capacities_stops_before_carrier_aggregation():
-    """prepare_capacities is the model-tech seam consumers reach for (brownfield
+    """prepare_capacities is the IAM-technology-token seam consumers reach for (brownfield
     harmonisation); get_capacities is the same data aggregated to PyPSA carriers."""
     a = _coupler()
     raw = a.prepare_capacities()

@@ -49,7 +49,6 @@ def annotate_cost_rows(
 CURRENCY_COST_PARAMETERS = {"investment", "VOM", "fuel"}
 
 
-# TODO: Implement more generic deflator for different currency years
 def apply_currency_factor(
     values: pd.DataFrame,
     currency_factor: float,

@@ -72,7 +72,7 @@ default:
     rename: {tall: year, all_regi: region}
     unit: USD/tC
     to_unit: USD/tCO2
-  # TODO: gdx currently doesn't have space cooling demand yet
+  # The GDX load sectors carry no space cooling (the mif does) — see ISSUES.md P2-2.
   demand_fe_sectors:
     symbol: p32_load_sector
     rename: {ttot: year, all_regi: region, loadPy32: sector}

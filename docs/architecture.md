@@ -10,12 +10,6 @@ Guiding rule:
 > **IAM-side logic lives in the package. PyPSA-side logic lives in the model.**
 > `Coupler` is the seam where the two meet.
 
-!!! info "Quantities vs symbols"
-    A **quantity** is a coupling name — iampypsa's own stable name for something PyPSA needs
-    (`co2_price`, `capacity`, `tech_data`). A **symbol** is GAMS's word for a set, scalar,
-    parameter or variable in a GDX file; IAMC calls its equivalent a *variable*. The
-    `quantities/` layer maps the former onto the latter, so "symbol" appears only in
-    `formats/gdx.py`, where it is the right word.
 
 ---
 
@@ -128,7 +122,7 @@ Methods, grouped by whether they're IAM-specific or shared:
 | `build_co2_prices(years=None)` | concrete, inherited | rarely — only if the model's CO2 handling diverges. |
 | `downscale_country_demand(regional=None)` | concrete, inherited | the model needs extra steps (e.g. a historical-calibration adjustment). |
 | `build_discount_rates(year)` | concrete, inherited | rarely. |
-| `prepare_capacities()` | concrete, inherited | rarely — capacities at model-tech resolution, before carrier aggregation. |
+| `prepare_capacities()` | concrete, inherited | rarely — capacities by the IAM's own technology tokens, before carrier aggregation. |
 | `get_capacities(tech_map, …)` | concrete, inherited | rarely — the same, aggregated to the model's PyPSA carriers. |
 
 ---

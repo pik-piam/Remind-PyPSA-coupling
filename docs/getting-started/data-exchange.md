@@ -2,6 +2,15 @@
 
 This page provides background information regarding the data that can be exchanged between IAMs and PyPSA.
 
+!!! info "Quantities vs symbols"
+    A **quantity** is a coupling name — iampypsa's own stable name for something PyPSA needs
+    (`co2_price`, `capacity`, `tech_data`). A **symbol** is GAMS's word for a set, scalar,
+    parameter or variable in a GDX file; IAMC calls its equivalent a *variable*. The
+    `quantities/` layer maps the former onto the latter, so "symbol" belongs in
+    `formats/gdx.py`, where it is the right word. The spec key naming the source is
+    `name:` — the shipped YAMLs still spell it `symbol:`, which stays accepted as an alias
+    until they are migrated.
+    
 ## IAM → PyPSA (in active use)
 
 Four pathway variables are exchanged from the IAM to PyPSA. Each has a distinct format.

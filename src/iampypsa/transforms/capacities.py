@@ -2,9 +2,9 @@
 
 In pipeline order: postprocess variant tokens (:func:`apply_postprocessing`), put link-like
 technologies on an input-capacity basis (:func:`adjust_link_capacities_to_input`), then map
-model tech tokens to PyPSA carriers and sum (:func:`aggregate_capacities_to_carriers`).
+IAM technology tokens to PyPSA carriers and sum (:func:`aggregate_capacities_to_carriers`).
 
-Reading the symbols and sequencing these is the Coupler's job — see
+Reading the quantities and sequencing these is the Coupler's job — see
 ``Coupler.prepare_capacities`` / ``Coupler.get_capacities``.
 """
 
@@ -57,7 +57,7 @@ def aggregate_capacities_to_carriers(
     min_value: float = 0.0,
     round_digits: int = 2,
 ) -> pd.DataFrame:
-    """Map model tech tokens to target carrier names, sum per (group, carrier).
+    """Map IAM technology tokens to target carrier names, sum per (group, carrier).
 
     Returns ``[year, region, carrier, value, unit]``. ``tech_to_carrier`` may be many-to-many:
     several tokens sharing a carrier are summed; one token feeding several carriers is
@@ -81,7 +81,6 @@ def aggregate_capacities_to_carriers(
     return grouped.sort_values([*group_cols, "carrier"]).reset_index(drop=True)
 
 
-# TODO symbol still referenced
 def apply_postprocessing(
     caps: pd.DataFrame,
     *,
@@ -90,7 +89,7 @@ def apply_postprocessing(
     tech_col: str = "technology",
     value_col: str = "value",
 ) -> pd.DataFrame:
-    """Apply the optional ``postprocessing`` block from the capacity symbol spec.
+    """Apply the optional ``postprocessing`` block from the capacity quantity spec.
 
     Two steps, both driven by config — no-op when params are absent (e.g. IAMC configs
     that have no ``postprocessing`` block):

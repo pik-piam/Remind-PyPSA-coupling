@@ -1,7 +1,7 @@
 """Extract a CO2 price pathway.
 
 The transform is name-agnostic: it takes an already-loaded frame with canonical columns
-``[region, year, value]`` (the loader/Coupler handles the GDX symbol + renames). Unit
+``[region, year, value]`` (the loader/Coupler handles the source name + renames). Unit
 conversion happens at the load seam and currency scaling in ``costs.apply_currency_factor``,
 so nothing here changes a magnitude.
 """
