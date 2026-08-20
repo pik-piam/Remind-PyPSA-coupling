@@ -36,8 +36,8 @@ for path in sorted(src_dir.rglob("[!_]*.py")):
     # Set the edit path to link the documentation back to the original Python file
     mkdocs_gen_files.set_edit_path(full_doc_path, path.relative_to(root))
 
-    # Dotted module path (e.g. "couplers.base") as the nav title — unique across the whole
-    # package, unlike the bare leaf filename (both couplers/base.py and downscale/base.py would
+    # Dotted module path (e.g. "models.remind.coupler") as the nav title — unique across the whole
+    # package, unlike the bare leaf filename (both formats/iamc.py and models/iamc/coupler.py would
     # otherwise collide on the title "base").
     nav_entries.append((".".join(parts), doc_path))
 

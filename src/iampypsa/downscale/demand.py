@@ -1,8 +1,9 @@
 """Disaggregate IAM regional demand to country level (region→country, Stage 1).
 
-Single-member regions are a no-op; multi-member regions are split by SSP GDP/population
-shares. Demand attributed to unconfigured countries is dropped (with a warning above 1% of
-regional demand).
+Single-member regions are a no-op; multi-member regions are split by proxy shares — a
+sector-specific blend of registered proxies (e.g. GDP/population for AC, heating/cooling
+degree-day demand for heating/cooling; see ``downscale.proxy.build_proxy_shares``). Demand
+attributed to unconfigured countries is dropped, with a warning naming them and their share.
 """
 
 import logging
@@ -14,8 +15,6 @@ from iampypsa.downscale.proxy import build_proxy_shares
 logger = logging.getLogger(__name__)
 
 
-# TODO  add example of proxies/weights
-# TODO -> should this be vectorised?
 def disaggregate_demand_to_country(
     sectoral_load: pd.DataFrame,
     region_to_countries: dict[str, list[str]],
@@ -27,7 +26,13 @@ def disaggregate_demand_to_country(
 
     ``proxies`` is a name→frame registry (e.g. ``{"population": ..., "gdp": ...,
     "heating_demand": ..., "cooling_demand": ...}``); each sector's ``sector_weights`` entry names
-    which proxies to blend. Passed straight to :func:`build_proxy_shares`.
+    which proxies to blend, e.g.::
+
+        sector_weights = {"AC": {"gdp": 0.6, "population": 0.4},
+                          "heating": {"heating_demand": 1.0}}
+
+    Both are passed straight to :func:`~iampypsa.downscale.proxy.build_proxy_shares`, whose
+    docstring carries a worked example of the proxy frames' shape.
     """
     rows: list[dict] = []
     warned: set[str] = set()

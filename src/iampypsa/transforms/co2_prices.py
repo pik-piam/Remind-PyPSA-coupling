@@ -1,17 +1,16 @@
-"""Extract and convert a CO2 price pathway.
+"""Extract a CO2 price pathway.
 
 The transform is name-agnostic: it takes an already-loaded frame with canonical columns
-``[region, year, value]`` (the loader/Coupler handles the GDX symbol + renames).
+``[region, year, value]`` (the loader/Coupler handles the source name + renames). Unit
+conversion happens at the load seam and currency scaling in ``costs.apply_currency_factor``,
+so nothing here changes a magnitude.
 """
 
 from collections.abc import Sequence
 
 import pandas as pd
 
-# Centralized in iampypsa.units (GDX backend reports per tonne carbon; PyPSA wants per tonne CO2).
-from iampypsa.units import TONNE_C_TO_TONNE_CO2
-
-
+# TODO why is this in transforms? is it not just a reader?
 def extract_co2_prices(
     raw: pd.DataFrame,
     regions: Sequence[str] | None = None,
@@ -24,7 +23,7 @@ def extract_co2_prices(
     """Extract the per-(region, year) CO2 price pathway, filtered and reindexed.
 
     Filters to ``regions`` if given and, if ``years`` is given, reindexes to the full
-    ``regions × years`` grid (missing entries filled with 0, matching the Eur rule).
+    ``regions × years`` grid (missing entries filled with 0).
     """
     df = raw[[region_col, year_col, value_col]].copy()
     df[year_col] = df[year_col].astype(int)
@@ -44,15 +43,3 @@ def extract_co2_prices(
     return df.sort_values([region_col, year_col]).reset_index(drop=True)
 
 
-def convert_co2_prices(
-    prices: pd.DataFrame,
-    currency_factor: float = 1.0,
-    *,
-    carbon_to_co2: bool = True,
-    value_col: str = "value",
-) -> pd.DataFrame:
-    """Convert CO2 prices to PyPSA units: tC→tCO2 (optional) and a currency factor."""
-    out = prices.copy()
-    factor = currency_factor * (TONNE_C_TO_TONNE_CO2 if carbon_to_co2 else 1.0)
-    out[value_col] = out[value_col] * factor
-    return out

@@ -8,11 +8,10 @@ import pytest
 from iampypsa.downscale import (
     build_demand_proxy_from_dd,
     build_proxy_shares,
-    build_ssp_shares,
     disaggregate_demand_to_country,
     normalise,
 )
-from iampypsa.io import read_degree_days
+from iampypsa.reference import read_degree_days
 
 CDD = Path(__file__).parent / "data" / "cdd_filtered.csv"
 HDD = Path(__file__).parent / "data" / "hdd_filtered.csv"
@@ -56,14 +55,12 @@ def test_build_proxy_shares_cooling_demand_only():
     assert shares["CN"] == pytest.approx(0.2)
 
 
-def test_build_proxy_shares_ac_matches_legacy_gdp_pop():
-    """AC (GDP/pop blend) is numerically identical to the pre-refactor build_ssp_shares."""
+def test_build_proxy_shares_ac_gdp_pop_blend():
     pop = _proxy({"DE": 80.0, "FR": 60.0}, year=2030)
     gdp = _proxy({"DE": 40.0, "FR": 10.0}, year=2030)
     weights = {"AC": {"gdp": 0.5, "population": 0.5}}
-    new = build_proxy_shares(["DE", "FR"], 2030, "AC", {"population": pop, "gdp": gdp}, weights)
-    old = build_ssp_shares(["DE", "FR"], 2030, "AC", pop, gdp, weights)  # thin shim
-    assert new == pytest.approx(old)
+    shares = build_proxy_shares(["DE", "FR"], 2030, "AC", {"population": pop, "gdp": gdp}, weights)
+    assert shares == pytest.approx({"DE": 0.6857142857142857, "FR": 0.3142857142857143})
 
 
 def test_build_proxy_shares_missing_proxy_raises():
@@ -150,10 +147,10 @@ def test_read_degree_days_bad_selector_raises():
         read_degree_days(CDD, dd_type="XDD", tlim_setpoint=22, rcp="4_5", ssp="SSP2")
 
 
-def test_iamc_symbols_include_space_cooling():
+def test_iamc_quantities_include_space_cooling():
     """The Space Cooling FE variable is mapped to the `space_cooling` sector token."""
-    from iampypsa.io.remind_symbols import load_symbol_specs
+    from iampypsa.quantities import load_quantity_specs
 
-    variables = load_symbol_specs(backend="iamc")["demand_fe_sectors"]["variables"]
+    variables = load_quantity_specs(backend="iamc")["demand_fe_sectors"]["variables"]
     key = "FE|Buildings|non-Heating|Electricity|Space Cooling"
     assert variables.get(key) == "space_cooling"

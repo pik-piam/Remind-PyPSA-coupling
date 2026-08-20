@@ -1,0 +1,168 @@
+# Quantity map for the generic IAMC model-intercomparison exchange file.
+#
+# Every entry is a `variables:` or `symbol:` spec (see docs/getting-started/data-exchange.md).
+# Nothing here is IAM-specific: an intercomparison file that follows the IAMC variable tree
+# couples with no code, and a file that deviates is served by an overlay YAML passed as
+# `quantities_path=` rather than by a new coupler.
+#
+# Unit strings must match the file's `Unit` column exactly and exist in
+# iampypsa.units.UNIT_CONVERSIONS.
+
+default:
+  # --- Currency -------------------------------------------------------------
+  # What every monetary quantity in this file is reported in. Values are NOT deflated between
+  # currency years; converting into the PyPSA baseline's currency is config["currency_factor"].
+  currency:
+    name: USD
+    year: 2017
+
+  # Which quantity spec supplies each techno-economic parameter. IamcCoupler loads exactly
+  # these, in this order; drop an entry to stop sourcing that parameter from the IAM.
+  cost_parameters:
+    investment: cost_investment
+    lifetime: tech_lifetime
+    FOM: cost_omf
+    VOM: cost_omv
+    efficiency: efficiency
+    fuel: fuel_price
+    CO2 intensity: emission_factor
+
+  # Canonical technology → the priced primary-energy carrier it burns. Technologies absent
+  # here get a fuel price of 0.
+  tech_fuel_map:
+    coal-pulverised: coal-fuel
+    gas-ocgt: gas-fuel
+    gas-ccgt: gas-fuel
+    oil: oil-fuel
+    biomass-igcc: biomass-fuel
+    nuclear: uranium-fuel
+
+  co2_price:
+    symbol: "Price|Carbon"
+    unit: "US$2017/t CO2"
+    to_unit: "USD/tCO2"
+
+  discount_rate:
+    symbol: "Discount Rate"
+    unit: "unitless"
+
+  capacity:
+    variables:
+      "Capacity|Electricity|Coal":            coal-pulverised
+      "Capacity|Electricity|Gas|CC":          gas-ccgt
+      "Capacity|Electricity|Gas|GT":          gas-ocgt
+      "Capacity|Electricity|Oil":             oil
+      "Capacity|Electricity|Biomass":         biomass-igcc
+      "Capacity|Electricity|Nuclear":         nuclear
+      "Capacity|Electricity|Hydro":           hydro
+      "Capacity|Electricity|Wind|Onshore":    wind-onshore
+      "Capacity|Electricity|Wind|Offshore":   wind-offshore
+      "Capacity|Electricity|Solar|PV":        solar-pv
+    label_col: technology
+    to_unit: MW
+
+  demand_fe_sectors:
+    variables:
+      "Final Energy|Electricity|Residential and Commercial": AC
+      "Final Energy|Electricity|Industry":                   industry
+      "Final Energy|Electricity|Transportation":             EV_pass
+      "Final Energy|Electricity|Hydrogen":                   electrolysis
+    label_col: sector
+    to_unit: MWh
+
+  cost_investment:
+    variables:
+      "Capital Cost|Electricity|Coal":          coal-pulverised
+      "Capital Cost|Electricity|Gas|CC":        gas-ccgt
+      "Capital Cost|Electricity|Gas|GT":        gas-ocgt
+      "Capital Cost|Electricity|Oil":           oil
+      "Capital Cost|Electricity|Biomass":       biomass-igcc
+      "Capital Cost|Electricity|Nuclear":       nuclear
+      "Capital Cost|Electricity|Hydro":         hydro
+      "Capital Cost|Electricity|Wind|Onshore":  wind-onshore
+      "Capital Cost|Electricity|Wind|Offshore": wind-offshore
+      "Capital Cost|Electricity|Solar|PV":      solar-pv
+    label_col: technology
+    to_unit: "USD/MW"
+
+  tech_lifetime:
+    variables:
+      "Lifetime|Electricity|Coal":          coal-pulverised
+      "Lifetime|Electricity|Gas|CC":        gas-ccgt
+      "Lifetime|Electricity|Gas|GT":        gas-ocgt
+      "Lifetime|Electricity|Oil":           oil
+      "Lifetime|Electricity|Biomass":       biomass-igcc
+      "Lifetime|Electricity|Nuclear":       nuclear
+      "Lifetime|Electricity|Hydro":         hydro
+      "Lifetime|Electricity|Wind|Onshore":  wind-onshore
+      "Lifetime|Electricity|Wind|Offshore": wind-offshore
+      "Lifetime|Electricity|Solar|PV":      solar-pv
+    label_col: technology
+    to_unit: "yr"
+
+  # Fixed O&M is expected as percent-of-capex per year — the basis PyPSA uses. An exchange
+  # file reporting it as an absolute currency amount needs a coupler that divides by capex.
+  cost_omf:
+    variables:
+      "OM Cost|Fixed|Electricity|Coal":          coal-pulverised
+      "OM Cost|Fixed|Electricity|Gas|CC":        gas-ccgt
+      "OM Cost|Fixed|Electricity|Gas|GT":        gas-ocgt
+      "OM Cost|Fixed|Electricity|Oil":           oil
+      "OM Cost|Fixed|Electricity|Biomass":       biomass-igcc
+      "OM Cost|Fixed|Electricity|Nuclear":       nuclear
+      "OM Cost|Fixed|Electricity|Hydro":         hydro
+      "OM Cost|Fixed|Electricity|Wind|Onshore":  wind-onshore
+      "OM Cost|Fixed|Electricity|Wind|Offshore": wind-offshore
+      "OM Cost|Fixed|Electricity|Solar|PV":      solar-pv
+    label_col: technology
+    to_unit: "%/yr"
+
+  cost_omv:
+    variables:
+      "OM Cost|Variable|Electricity|Coal":          coal-pulverised
+      "OM Cost|Variable|Electricity|Gas|CC":        gas-ccgt
+      "OM Cost|Variable|Electricity|Gas|GT":        gas-ocgt
+      "OM Cost|Variable|Electricity|Oil":           oil
+      "OM Cost|Variable|Electricity|Biomass":       biomass-igcc
+      "OM Cost|Variable|Electricity|Nuclear":       nuclear
+      "OM Cost|Variable|Electricity|Hydro":         hydro
+      "OM Cost|Variable|Electricity|Wind|Onshore":  wind-onshore
+      "OM Cost|Variable|Electricity|Wind|Offshore": wind-offshore
+      "OM Cost|Variable|Electricity|Solar|PV":      solar-pv
+    label_col: technology
+    to_unit: "USD/MWh"
+
+  efficiency:
+    variables:
+      "Efficiency|Electricity|Coal":    coal-pulverised
+      "Efficiency|Electricity|Gas|CC":  gas-ccgt
+      "Efficiency|Electricity|Gas|GT":  gas-ocgt
+      "Efficiency|Electricity|Oil":     oil
+      "Efficiency|Electricity|Biomass": biomass-igcc
+      "Efficiency|Electricity|Nuclear": nuclear
+    label_col: technology
+    to_unit: "p.u."
+
+  # Priced primary-energy carriers; broadcast onto the technologies via tech_fuel_map.
+  fuel_price:
+    variables:
+      "Price|Primary Energy|Coal":     coal-fuel
+      "Price|Primary Energy|Gas":      gas-fuel
+      "Price|Primary Energy|Oil":      oil-fuel
+      "Price|Primary Energy|Biomass":  biomass-fuel
+      "Price|Primary Energy|Uranium":  uranium-fuel
+    label_col: technology
+    to_unit: "USD/MWh_th"   # thermal-input basis: marginal_cost = fuel / efficiency
+
+  emission_factor:
+    variables:
+      "Emissions Intensity|CO2|Electricity|Coal":    coal-pulverised
+      "Emissions Intensity|CO2|Electricity|Gas|CC":  gas-ccgt
+      "Emissions Intensity|CO2|Electricity|Gas|GT":  gas-ocgt
+      "Emissions Intensity|CO2|Electricity|Oil":     oil
+    label_col: technology
+    to_unit: "t_CO2/MWh_th"
+    fallback:
+      biomass-igcc: {value: 0.0, reason: "carbon-neutral by convention"}
+
+overrides: {}

@@ -1,8 +1,8 @@
 """Tests for the shared capacity-target transforms (synthetic + real EUR data).
 
 Validates the generator-carrier pipeline against installed_capacities.csv. Carriers that
-need spec-driven consolidation (VRE merge, battery scaling, link η-adjustment) are exercised
-in the consolidation tests below.
+need spec-driven postprocessing (token merge, scaling, link η-adjustment) are exercised
+in the postprocessing tests below.
 """
 
 from pathlib import Path
@@ -13,7 +13,7 @@ import pytest
 from iampypsa.transforms.capacities import (
     adjust_link_capacities_to_input,
     aggregate_capacities_to_carriers,
-    apply_consolidation,
+    apply_postprocessing,
 )
 
 DATA = Path(__file__).parent / "data"
@@ -46,87 +46,108 @@ def test_aggregate_sums_and_filters():
     assert out.query("carrier=='solar'")["unit"].iloc[0] == "MW"
 
 
-def test_apply_consolidation_noop_without_params():
-    """A config with no consolidation block (e.g. IAMC) leaves capacities untouched."""
+def test_aggregate_preserves_one_tech_feeding_several_carriers():
+    """A REMIND tech mapped to several carriers (e.g. wind-offshore -> offwind, offwind-ac)
+    must feed each carrier the full value, not just the first-listed one."""
+    caps = pd.DataFrame({"year": [2050], "region": ["DEU"],
+                         "technology": ["wind-offshore"], "value": [12.0]})
+    tmap = pd.DataFrame({"model_tech": ["wind-offshore", "wind-offshore"],
+                         "target_carrier": ["offwind", "offwind-ac"]})
+    out = aggregate_capacities_to_carriers(
+        caps, tmap, map_tech_col="model_tech", map_carrier_col="target_carrier"
+    ).set_index("carrier")["value"]
+    assert out["offwind"] == pytest.approx(12.0)
+    assert out["offwind-ac"] == pytest.approx(12.0)
+
+
+def test_apply_postprocessing_noop_without_params():
+    """A config with no postprocessing block (e.g. IAMC) leaves capacities untouched."""
     caps = pd.DataFrame({"year": [2050, 2050], "region": ["DEU", "DEU"],
                          "technology": ["elh2VRE", "storspv"], "value": [10.0, 5.0]})
-    out = apply_consolidation(caps)
+    out = apply_postprocessing(caps)
     pd.testing.assert_frame_equal(out, caps)
 
 
-def test_apply_consolidation_merges_vre_and_scales_battery():
-    """Consolidation block: elh2VRE→elh2 merge and storX→btin scaling."""
+def test_apply_postprocessing_merges_and_scales():
+    """Postprocessing block: elh2VRE→elh2 merge and storX→btin merge+scaling."""
     caps = pd.DataFrame(
         {"year": [2050, 2050, 2050], "region": ["DEU", "DEU", "DEU"],
          "technology": ["elh2VRE", "storspv", "storwindon"], "value": [10.0, 5.0, 2.0]})
-    out = apply_consolidation(
+    out = apply_postprocessing(
         caps,
-        vre_to_primary={"elh2VRE": "elh2"},
-        battery_scaling={"storspv": 4.0, "storwindon": 1.2},
+        merge={"elh2": ["elh2", "elh2VRE"], "btin": ["btin", "storspv", "storwindon"]},
+        scale={"storspv": 4.0, "storwindon": 1.2},
     ).set_index("technology")["value"]
     assert out.loc["elh2"] == pytest.approx(10.0)
     assert out.loc["btin"].sum() == pytest.approx(5.0 * 4.0 + 2.0 * 1.2)
 
 
-def test_apply_consolidation_uses_btin_directly_when_present():
+def test_apply_postprocessing_uses_target_directly_when_present():
     """Bidirectional guard: an explicit btin capacity is kept; storX rows are dropped."""
     caps = pd.DataFrame(
         {"year": [2050, 2050], "region": ["DEU", "DEU"],
          "technology": ["btin", "storspv"], "value": [7.0, 5.0]})
-    out = apply_consolidation(caps, battery_scaling={"storspv": 4.0}).set_index("technology")["value"]
+    out = apply_postprocessing(
+        caps, merge={"btin": ["btin", "storspv"]}, scale={"storspv": 4.0}
+    ).set_index("technology")["value"]
     assert out["btin"] == pytest.approx(7.0)
     assert "storspv" not in out.index
 
 
-def test_build_capacity_targets_reads_consolidation_from_symbols():
-    """build_capacity_targets applies the consolidation block declared in the capacity spec."""
-    from iampypsa.transforms.capacities import build_capacity_targets
+def test_get_capacities_reads_postprocessing_from_symbols():
+    """get_capacities applies the postprocessing block declared in the capacity spec."""
+    from iampypsa.coupler import Coupler
 
     class _FakeLoader:
-        def load_symbol(self, ref, rename_columns=None):
+        def read(self, ref, rename_columns=None):
             if ref == "p32_capAvg":
                 return pd.DataFrame({"year": [2050], "region": ["DEU"],
                                      "technology": ["storspv"], "value": [5.0]})
             return pd.DataFrame({"year": [], "region": [], "technology": [], "value": []})
 
-        def resolve_symbol(self, ref):
+        def resolve(self, ref):
             return ref
 
-    symbols = {
+    quantities = {
         "capacity": {
             "symbol": "p32_capAvg",
-            "consolidation": {"battery_scaling": {"storspv": 4.0}, "link_techs": []},
+            "postprocessing": {
+                "merge": {"btin": ["btin", "storspv"]},
+                "scale": {"storspv": 4.0},
+                "link_techs": [],
+            },
         },
     }
     tmap = pd.DataFrame({"model_tech": ["btin"], "target_carrier": ["battery charger"]})
-    out = build_capacity_targets(
-        _FakeLoader(), symbols, ["DEU"], tmap,
-        map_tech_col="model_tech", map_carrier_col="target_carrier",
+    coupler = Coupler(_FakeLoader(), quantities, {}, {}, model_regions=["DEU"])
+    out = coupler.get_capacities(
+        tmap, map_tech_col="model_tech", map_carrier_col="target_carrier",
     )
     assert out.query("carrier == 'battery charger'")["value"].iloc[0] == pytest.approx(5.0 * 4.0)
 
 
 def test_generator_targets_match_reference():
-    from iampypsa.io import RemindLoader, build_capacity_reporting_technologies, load_technology_parameters
-    from iampypsa.io.remind_symbols import load_symbol_specs
-    from iampypsa.io.technology_mapping import iam_name
-    from iampypsa.transforms.capacities import prepare_capacities
+    from iampypsa import IamLoader
+    from iampypsa.models.remind import build_capacity_reporting_technologies
+    from iampypsa.quantities import load_technology_parameters
+    from iampypsa.quantities import load_quantity_specs
+    from iampypsa.quantities.schema import get_iam_name
+    from iampypsa.coupler import Coupler
+    from iampypsa.quantities import rename_technologies
 
-    from iampypsa.io.remind_symbols import rename_technologies
-
-    loader = RemindLoader(str(GDX))
-    symbols = load_symbol_specs(backend=loader.backend)
-    raw = prepare_capacities(loader, symbols)
-    raw = rename_technologies(raw, symbols.get("technology_names"))
+    loader = IamLoader(str(GDX))
+    quantities = load_quantity_specs(backend=loader.backend)
+    raw = Coupler(loader, quantities, {}, {}).prepare_capacities()
+    raw = rename_technologies(raw, quantities.get("technology_names"))
     raw["year"] = raw["year"].astype(int)
 
     technology_mapping = load_technology_parameters(str(TECH_MAPPING))["technologies"]
-    reports_capacity = build_capacity_reporting_technologies()
+    reports_capacity = build_capacity_reporting_technologies(load_quantity_specs(backend="iamc"))
     tmap = pd.DataFrame(
         [
-            {"PyPSA": tech, "IAM": iam_name(tech, spec)}
+            {"PyPSA": tech, "IAM": get_iam_name(tech, spec)}
             for tech, spec in technology_mapping.items()
-            if iam_name(tech, spec) in reports_capacity
+            if get_iam_name(tech, spec) in reports_capacity
         ]
     )
 

@@ -4,7 +4,7 @@ A *proxy* is the reference distribution used to split a coarse IAM regional valu
 country-level members.  Proxies are supplied as a name→frame registry
 (``{"population": ..., "gdp": ..., "heating_demand": ..., "cooling_demand": ...}``); each proxy
 frame is a ``MultiIndex[(iso2, year)]`` with a ``value`` column (the shape produced by
-``io.ssp.read_ssp_data`` and — via :func:`build_demand_proxy_from_dd` — ``io.degree_days.read_degree_days``).
+``reference.ssp.read_ssp_data`` and — via :func:`build_demand_proxy_from_dd` — ``reference.degree_days.read_degree_days``).
 A sector's weight dict names which proxies to blend and with what weight (e.g.
 ``{"gdp": 0.6, "population": 0.4}`` for AC, ``{"heating_demand": 1.0}`` for heating,
 ``{"cooling_demand": 1.0}`` for cooling). No proxy is privileged.
@@ -17,7 +17,6 @@ degree-days are an intensity and would over-allocate to small hot/cold countries
 import logging
 
 import pandas as pd
-from typing_extensions import deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -156,30 +155,3 @@ def build_proxy_shares(
         blended = term if blended is None else blended.add(term, fill_value=0.0)
 
     return normalise(blended).to_dict()
-
-@deprecated(
-    "build_ssp_shares is deprecated since 0.3.0; use build_proxy_shares with an explicit "
-    "proxies registry instead."
-)
-def build_ssp_shares(
-    members: list[str],
-    year: int,
-    sector: str,
-    pop_data: pd.DataFrame,
-    gdp_data: pd.DataFrame,
-    sector_weights: dict,
-    configured_countries: set[str] | None = None,
-) -> dict[str, float]:
-    """Deprecated thin shim over :func:`build_proxy_shares` for the population/GDP-only case.
-
-    Prefer calling ``build_proxy_shares`` with an explicit ``proxies`` registry; this wrapper
-    exists so pre-registry callers keep working.
-    """
-    return build_proxy_shares(
-        members,
-        year,
-        sector,
-        {"population": pop_data, "gdp": gdp_data},
-        sector_weights,
-        configured_countries,
-    )

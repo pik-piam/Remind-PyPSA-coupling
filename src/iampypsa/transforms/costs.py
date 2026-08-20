@@ -5,20 +5,15 @@ or directly set them from values specified in the mapping.
 
 The *extraction* of individual cost parameters is source-specific and lives in each ``Coupler`` subclass.
 The shared functions (which live here) — provide the conversion/mapping and merging tools.
-
-Unit factors are centrally defined in ``iampypsa.units`` (re-exported below
-for convenience) so any IAM or PyPSA coupler can swap the conversion table without touching transforms.
 """
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import pandas as pd
 
-from iampypsa.io.technology_mapping import build_technology_sources, iam_name
-# Unit conventions are centralized in iampypsa.units; re-exported here for convenient imports.
-from iampypsa.units import DEFAULT_ETA_EXPONENTS
+from iampypsa.quantities.schema import build_technology_sources, get_iam_name
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +22,60 @@ def annotate_cost_rows(
     costs: pd.DataFrame,
     *,
     parameter: str,
-    unit: str,
-    factor: float = 1.0,
+    unit: str | None = None,
 ) -> pd.DataFrame:
-    """Annotate ``parameter``/``unit`` onto a cost-row frame, optionally scaling ``value`` by ``factor``."""
+    """Annotate ``parameter`` (and optionally ``unit``) onto a cost-row frame.
+
+    Omit ``unit`` to keep the one the load layer already stamped from the spec's ``to_unit:``.
+    Pass it only to override a declared unit — hardcoding a unit that merely restates the YAML
+    lets the two drift apart.
+
+    Args:
+        costs: Cost rows to annotate.
+        parameter: Canonical parameter name to write into the ``parameter`` column.
+        unit: Unit to force onto the ``unit`` column, overriding the loaded one.
+    """
     costs = costs.copy()
     costs["parameter"] = parameter
-    costs["unit"] = unit
-    if factor != 1.0:
-        costs["value"] = costs["value"] * factor
+    if unit is not None:
+        costs["unit"] = unit
     return costs
+
+
+#: Which ``parameter`` values of a *cost table* are currency-denominated. Excludes physical
+#: units (lifetime/efficiency/CO2 intensity) and FOM (a ratio — the factor cancels). The CO2
+#: price is monetary too, but is a single-quantity frame with no ``parameter`` column to match
+#: on, so it scales via ``parameters=None`` rather than by being listed here.
+CURRENCY_COST_PARAMETERS = {"investment", "VOM", "fuel"}
+
+
+# see ISSUES.md P3-1 for the missing deflator 
+def apply_currency_factor(
+    values: pd.DataFrame,
+    currency_factor: float,
+    parameters: Iterable[str] | None = CURRENCY_COST_PARAMETERS,
+) -> pd.DataFrame:
+    """Scale ``value`` by ``currency_factor`` for currency-denominated rows.
+
+    The single seam for currency on every monetary quantity — cost parameters and the CO2
+    price pathway alike. One-directional (IAM USD -> PyPSA baseline currency); it converts
+    between currencies, not between currency *years* (e.g. an IAM's US$2017 vs the baseline's
+    own reporting year), which nothing handles yet.
+    Args:
+        values: Long frame with a ``value`` column, and a ``parameter`` column if selecting.
+        currency_factor: Multiplier into the baseline currency; ``1.0`` is a no-op.
+        parameters: ``parameter`` values to restrict scaling to, for a multi-quantity cost
+            table. Pass ``None`` for a single-quantity monetary frame such as the CO2 price
+            pathway, which has no ``parameter`` column — then every row is scaled.
+    """
+    if currency_factor == 1.0:
+        return values.copy()  # copy even when a no-op: never alias the caller's frame
+    values = values.copy()
+    if parameters is None:
+        values["value"] *= currency_factor
+    else:
+        values.loc[values["parameter"].isin(set(parameters)), "value"] *= currency_factor
+    return values
 
 
 def broadcast_fuel_prices(
@@ -74,22 +113,45 @@ def broadcast_fuel_prices(
 
 def convert_investment_to_input_capacity_basis(
     costs: pd.DataFrame,
-    eta_exponents: Mapping[str, float] = DEFAULT_ETA_EXPONENTS,
+    link_techs: Iterable[str],
 ) -> pd.DataFrame:
-    """Convert per-output-kW investment to per-input-kW by multiplying by efficiency**exp.
+    """Convert per-output-kW investment to per-input-kW by multiplying by efficiency.
 
-    Some IAMs report investment per kW of output capacity; PyPSA needs per kW of input
-    (``p_nom``). For each technology in ``eta_exponents``, ``investment`` is multiplied by
-    ``efficiency ** exp`` (exp=1 uses eta directly; exp=0.5 takes the one-way value out of a
-    pre-squared round-trip efficiency).
+    IAMs report investment per kW of output capacity; PyPSA needs per kW of input (``p_nom``)
+    for link-like technologies — ordinary generators need no adjustment and must not be listed
+    in ``link_techs``. Which techs need this is specific to how the calling model's own
+    network-building code consumes the result — see the caller for the reasoning per
+    technology.
     """
     costs = costs.copy()
-    for tech, exp in eta_exponents.items():
+    for tech in link_techs:
         inv = (costs["technology"] == tech) & (costs["parameter"] == "investment")
         eff = (costs["technology"] == tech) & (costs["parameter"] == "efficiency")
         if inv.any() and eff.any():
-            costs.loc[inv, "value"] *= costs.loc[eff, "value"].values ** exp
+            costs.loc[inv, "value"] *= costs.loc[eff, "value"].values
     return costs
+
+
+def select_discount_rate(rates: pd.DataFrame, year: int, regions: Iterable[str]) -> pd.Series:
+    """Return the discount rate per region for ``year``, indexed by region.
+
+    Falls back to the most recent earlier year's value when a region has no value for
+    ``year`` (e.g. a trailing NaN in the source), logging a warning for those regions.
+    """
+    last = rates.sort_values("year").groupby("region")["value"].last()
+    missing = set(regions) - set(last.index)
+    if missing:
+        raise ValueError(
+            f"No discount rate for year {year} or any earlier year, regions: {sorted(missing)}"
+        )
+    exact = rates[rates["year"].astype(str) == str(year)].set_index("region")["value"]
+    filled = last.index.difference(exact.index)
+    if len(filled):
+        logger.warning(
+            "Discount rate absent for year %d in regions %s; using most-recent value.",
+            year, sorted(filled),
+        )
+    return exact.combine_first(last)
 
 
 def add_discount_rate(
@@ -97,7 +159,7 @@ def add_discount_rate(
     discount_rate: float,
     *,
     source: str = "IAM",
-    reference: str = "p_r",
+    reference: str = "",
 ) -> pd.DataFrame:
     """Add a ``discount rate`` row for every technology that does not already have one.
 
@@ -124,7 +186,7 @@ def _flatten_technology_mapping(technology_mapping: Mapping[str, Any]) -> pd.Dat
     ``source_spec`` holds the raw per-parameter spec: the strings ``"IAM"``/``"PyPSA"`` or a
     ``{value: ...}`` dict — resolved from each entry's ``source:``/``overrides:`` (or bare
     string) via ``build_technology_sources``. ``canonical`` resolves the entry's ``iam_name:`` key
-    (defaults to the entry name) via ``iam_name``.
+    (defaults to the entry name) via ``get_iam_name``.
 
     Args:
         technology_mapping: The parsed technology-mapping YAML (``{"technologies": {...}}``'s
@@ -133,7 +195,7 @@ def _flatten_technology_mapping(technology_mapping: Mapping[str, Any]) -> pd.Dat
     rows = [
         {
             "technology": tech,
-            "canonical": iam_name(tech, spec),
+            "canonical": get_iam_name(tech, spec),
             "parameter": param,
             "source_spec": src,
         }
@@ -264,23 +326,34 @@ def apply_overrides(
 ) -> pd.DataFrame:
     """Update and insert ``overrides`` onto ``costs`` by ``(technology, parameter)``.
 
-    Rows whose key is absent from ``costs`` are added; for keys present in both,
-    ``value``/``unit``/``source``/``further description`` are overwritten from ``overrides``.
+    In the default pipeline  ``costs`` is the PyPSA baseline from :func:`build_pypsa_techdata` and ``overrides`` is the IAM 
+    table from :func:`build_iam_techdata`, or the mapping YAML's fixed values from :func:`build_fixed_value_overrides` 
+    (see docs/getting-started/technology-mapping.md)
+
+    NOTE: ``overrides`` overwrites baseline costs. `source` is kept.
+
+    Args:
+        costs: The frame being overridden — the baseline whose values lose on a key clash.
+        overrides: The frame that wins, and whose unmatched keys are inserted.
+
+    Returns:
+        The merged long frame, one row per ``(technology, parameter)``.
     """
     base = costs.set_index(["technology", "parameter"]).copy()
-    ov = overrides.set_index(["technology", "parameter"]).copy()
-    if ov.index.duplicated().any():
+    ovr = overrides.set_index(["technology", "parameter"]).copy()
+    if ovr.index.duplicated().any():
         raise ValueError(
             f"Duplicate overrides for (technology, parameter): "
-            f"{ov.index[ov.index.duplicated()].tolist()}"
+            f"{ovr.index[ovr.index.duplicated()].tolist()}"
         )
-    extra = ov.index.difference(base.index)
+
+    extra = ovr.index.difference(base.index)
     if len(extra) > 0:
-        base = pd.concat([base, ov.loc[extra, base.columns.intersection(ov.columns)]])
-    shared = ov.index.intersection(base.index)
+        base = pd.concat([base, ovr.loc[extra, base.columns.intersection(ovr.columns)]])
+    shared = ovr.index.intersection(base.index)
     for col in ["value", "unit", "source", "further description"]:
-        if col in ov.columns:
-            base.loc[shared, col] = ov.loc[shared, col]
+        if col in ovr.columns:
+            base.loc[shared, col] = ovr.loc[shared, col]
     merged = base.reset_index()
     if merged.duplicated(subset=["technology", "parameter"]).any():
         dups = merged[merged.duplicated(subset=["technology", "parameter"], keep=False)]

@@ -1,5 +1,8 @@
 """Tests for the central unit-conversion table and resolver."""
 
+import pathlib
+import re
+
 import pytest
 
 from iampypsa.units import (
@@ -9,6 +12,8 @@ from iampypsa.units import (
     unit_factor,
 )
 
+MODELS = pathlib.Path(__file__).parent.parent / "src" / "iampypsa" / "models"
+
 
 def test_identity_is_one_without_a_table_entry():
     assert unit_factor("p.u.", "p.u.") == 1.0
@@ -16,11 +21,45 @@ def test_identity_is_one_without_a_table_entry():
 
 
 def test_known_pairs_match_remind_conventions():
-    assert unit_factor("$/tC", "$/tCO2") == pytest.approx(TONNE_C_TO_TONNE_CO2)
+    assert unit_factor("USD/tC", "USD/tCO2") == pytest.approx(TONNE_C_TO_TONNE_CO2)
     assert unit_factor("TW", "MW") == 1e6
     assert unit_factor("TWa", "MWh") == pytest.approx(1e6 * HOURS_PER_YEAR)
-    assert unit_factor("T$/TWa", "$/MWh") == pytest.approx(1e6 / HOURS_PER_YEAR)
+    assert unit_factor("TUSD/TWa", "USD/MWh") == pytest.approx(1e6 / HOURS_PER_YEAR)
     assert unit_factor("p.u.", "%/yr") == 100.0
+    # Nuclear's mass basis: TWa->MWh over Mt->g.
+    assert unit_factor("TWa/Mt_Ur", "MWh/g_U") == pytest.approx(HOURS_PER_YEAR / 1e6)
+
+
+def test_no_conversion_arithmetic_in_the_couplers():
+    """Every unit number comes from the table — a coupler may call ``unit_factor`` for a
+    quantity whose unit is only known after loading, but never spell the factor out."""
+    literal = re.compile(r"HOURS_PER_YEAR|(?<![\w.])\d+(\.\d+)?e-?\d+")
+    offenders = [
+        path.relative_to(MODELS).as_posix()
+        for path in MODELS.rglob("*.py")
+        if literal.search(path.read_text())
+    ]
+    assert offenders == []
+
+
+def test_currency_targets_use_one_token():
+    """Every monetary target unit says USD, so the two backends cannot label the same
+    parameter differently."""
+    monetary = [to_unit for _, to_unit in UNIT_CONVERSIONS if "$" in to_unit or "USD" in to_unit]
+    assert monetary  # guard against the filter silently matching nothing
+    assert all(u.startswith("USD") for u in monetary), monetary
+
+
+def test_dollar_survives_only_in_units_the_mif_owns():
+    """``$`` is allowed only in ``US$<year>`` source units, which must match the mif's own
+    ``Unit`` column verbatim. Units we declare ourselves (the GDX map) say ``USD``."""
+    offenders = [
+        unit
+        for pair in UNIT_CONVERSIONS
+        for unit in pair
+        if "$" in unit and not unit.startswith("US$")
+    ]
+    assert not offenders, offenders
 
 
 def test_unknown_pair_fails_loud():

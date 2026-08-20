@@ -1,7 +1,16 @@
 # Data exchange between IAMs and PyPSA
 
-This page documents what data can be exchanged between IAMs and PyPSA.
+This page provides background information regarding the data that can be exchanged between IAMs and PyPSA.
 
+!!! info "Quantities vs symbols"
+    A **quantity** is a coupling name — iampypsa's own stable name for something PyPSA needs
+    (`co2_price`, `capacity`, `tech_data`). A **symbol** is GAMS's word for a set, scalar,
+    parameter or variable in a GDX file; IAMC calls its equivalent a *variable*. The
+    `quantities/` layer maps the former onto the latter, so "symbol" belongs in
+    `formats/gdx.py`, where it is the right word. The spec key naming the source is
+    `name:` — the shipped YAMLs still spell it `symbol:`, which stays accepted as an alias
+    until they are migrated.
+    
 ## IAM → PyPSA (in active use)
 
 Four pathway variables are exchanged from the IAM to PyPSA. Each has a distinct format.
@@ -9,8 +18,8 @@ Four pathway variables are exchanged from the IAM to PyPSA. Each has a distinct 
 | Variable | Dimensionality | What it is | Produced by |
 |---|---|---|---|
 | **Demand** | one value per (region, year, sector) | Annual sectoral electricity demand — a yearly total, **not** an hourly profile | `Coupler.build_regional_demand()` |
-| **Costs** | several components per (region, technology, year) | Investment, FOM, VOM, efficiency, lifetime, fuel cost, CO2 intensity | `Coupler.extract_cost_parameters(year)` |
-| **Capacities** | one value per (region, technology, year) | Installed-capacity targets from the IAM | `iampypsa.transforms.capacities.build_capacity_targets(...)` |
+| **Costs and technology data** | several components per (region, technology, year) | Investment, FOM, VOM, efficiency, lifetime, fuel cost, CO2 intensity | `Coupler.extract_cost_parameters(year)` |
+| **Capacities** | one value per (region, technology, year) | Installed-capacity targets from the IAM | `Coupler.get_capacities(...)` |
 | **CO2 price** | one value per (region, year) | The regional carbon-price pathway | `Coupler.build_co2_prices()` |
 
 A few things worth knowing about all four:
@@ -18,12 +27,19 @@ A few things worth knowing about all four:
 - All data comes in long-format tables with key columns like `region`, `year`,
   ... and a `value` + `unit` column.
 - Units and the underlying IAM symbol names are declared in a YAML config
-  (`remind_symbols_gdx.yaml` / `remind_symbols_mif.yaml` for the REMIND backends) and applied
+  (e.g. `models/remind/quantities_gdx.yaml` / `quantities_mif.yaml`) and applied
   once, at load time.
-- **Costs** can be set by the IAM, by the PyPSA default, or to a fixed value (see
-  [Technology mapping](technology-mapping.md)). A separate `Coupler.discount_rates(year)` method
-  supplies the per-region discount rate, merged into the cost table alongside these components.
-  For consistency with the IAM, additional technologies may need to be added on the PyPSA side.
+- **Costs and technical parameters** can be sourced by the IAM, by the PyPSA cost table, or set
+  directly to a user-set value. This is governed by a `yaml` mapping (see
+  [Technology mapping](technology-mapping.md)). The regional discount rate can be read directly
+  from supported IAMs via `Coupler.build_discount_rates(year)` and is added to the
+  techno-economics table used by the coupled PyPSA.
+- **Currency conversion and discount rates**: monetary values are converted from the IAM's base
+  currency (e.g. USD2017 for REMIND) to the PyPSA model's currency (e.g. EUR2015 for PyPSA-Eur) via the
+  `currency_factor` parameter (default is `1.0`). This factor is set on the `Coupler`'s `config`
+  (e.g. a `currency_factor` key in the model's own coupling config, such as
+  `config.remind_de.yaml`) — not in the technology mapping — and is *not* intended for inflation
+  correction or other currency-year adjustments.
 - **Demand** is supplied as an *annual* total per sector and IAM region. This is then downscaled
   to country level (see [Downscaling demand](downscaling-demand.md)), based on SSP projections
   for GDP and population as well as heating degree days (HDDs) and cooling degree days (CDDs).
@@ -44,4 +60,4 @@ firm-capacity constraints.
 
 ## Next
 
-- [Integrating a PyPSA model](integrating-a-model.md) — the general pattern for wiring IAM variables into the PyPSA workflow.
+- [Technology mapping](technology-mapping.md) — how costs and capacities get mapped onto PyPSA's own carrier/technology names.

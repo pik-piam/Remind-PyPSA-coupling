@@ -81,9 +81,9 @@ def filter_gdx(source: Path, dest: Path) -> None:
 
 
 def filter_mif(source: Path, dest: Path) -> None:
-    from iampypsa.io.remind_symbols import load_symbol_specs
+    from iampypsa.quantities import load_quantity_specs
 
-    specs = load_symbol_specs(backend="iamc")
+    specs = load_quantity_specs(backend="iamc")
     variables: set[str] = set()
     for spec in specs.values():
         if not isinstance(spec, dict):

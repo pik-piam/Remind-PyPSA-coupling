@@ -12,11 +12,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from iampypsa.couplers.remind import RemindGdxCoupler
-from iampypsa.io import RemindLoader, build_capacity_reporting_technologies, load_technology_parameters
-from iampypsa.io.remind_symbols import load_symbol_specs
-from iampypsa.io.technology_mapping import iam_name
-from iampypsa.transforms.capacities import build_capacity_targets
+from iampypsa.models.remind import RemindGdxCoupler
+from iampypsa import IamLoader
+    from iampypsa.models.remind import build_capacity_reporting_technologies
+    from iampypsa.quantities import load_technology_parameters
+from iampypsa.quantities import load_quantity_specs
+from iampypsa.quantities.schema import get_iam_name
 from iampypsa.transforms.costs import build_iam_techdata, convert_investment_to_input_capacity_basis
 
 HERE = Path(__file__).parent
@@ -35,13 +36,13 @@ YEARS = [2090, 2100]
 
 
 def _coupler() -> RemindGdxCoupler:
-    loader = RemindLoader(str(HERE / "remind2pypsa_amt_filtered.gdx"))
-    symbols = load_symbol_specs(backend=loader.backend)
+    loader = IamLoader(str(HERE / "remind2pypsa_amt_filtered.gdx"))
+    quantities = load_quantity_specs(backend=loader.backend)
     pop = pd.read_csv(HERE / "ssp_population_filtered.csv").set_index(["iso2", "year"])
     gdp = pd.read_csv(HERE / "ssp_gdp_filtered.csv").set_index(["iso2", "year"])
     return RemindGdxCoupler(
         loader,
-        symbols,
+        quantities,
         region_map=REGION_MAP,
         config={
             "sector_weights": SECTOR_WEIGHTS,
@@ -49,8 +50,7 @@ def _coupler() -> RemindGdxCoupler:
             "planning_horizons": YEARS,
         },
         model_regions=["DEU", "EWN", "CHA"],
-        ssp_population=pop,
-        ssp_gdp=gdp,
+        reference_data={"population": pop, "gdp": gdp},
     )
 
 
@@ -77,22 +77,21 @@ if __name__ == "__main__":
     is_eff = (remind_long["parameter"] == "efficiency") & (remind_long["technology"] == "battery-inverter")
     remind_long.loc[is_eff, "value"] **= 2
     costs_raw = convert_investment_to_input_capacity_basis(
-        build_iam_techdata(tech_mapping, remind_long)
+        build_iam_techdata(tech_mapping, remind_long), ["electrolysis"]
     )
     costs_raw.to_csv(REF / "costs_raw_overwritten.csv", index=False)
     print(f"costs_raw_overwritten.csv: {len(costs_raw)} rows")
 
-    reports_capacity = build_capacity_reporting_technologies()
+    reports_capacity = build_capacity_reporting_technologies(load_quantity_specs(backend="iamc"))
     tmap = pd.DataFrame(
         [
-            {"PyPSA": tech, "IAM": iam_name(tech, spec)}
+            {"PyPSA": tech, "IAM": get_iam_name(tech, spec)}
             for tech, spec in tech_mapping.items()
-            if iam_name(tech, spec) in reports_capacity
+            if get_iam_name(tech, spec) in reports_capacity
         ]
     )
-    capacities = build_capacity_targets(
-        coupler.loader, coupler.symbols, coupler.model_regions, tmap,
-        map_tech_col="IAM", map_carrier_col="PyPSA",
+    capacities = coupler.get_capacities(
+        tmap, map_tech_col="IAM", map_carrier_col="PyPSA"
     )
     capacities.to_csv(REF / "installed_capacities.csv", index=False)
     print(f"installed_capacities.csv: {len(capacities)} rows")

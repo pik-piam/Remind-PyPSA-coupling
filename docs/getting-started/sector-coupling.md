@@ -8,8 +8,8 @@ loads are in electricity, with no other energy carriers involved. See the REMIND
     This representation of sector coupling is still under development — for example,
     [`PyPSA-China`](https://github.com/pik-piam/PyPSA-China-PIK) handles heat differently.
 
-REMIND currently provides sectoral electricity demand for the following sectors (see
-`remind_symbols_gdx.yaml` / `remind_symbols_mif.yaml`):
+As an example, REMIND currently provides sectoral electricity demand for the following sectors (see
+`models/remind/quantities_gdx.yaml` / `quantities_mif.yaml`):
 
 - Hydrogen electrolysis (`electrolysis`)
 - EV passenger (`EV_pass`)

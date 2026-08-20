@@ -26,7 +26,7 @@ solar: {source: IAM, iam_name: solar-pv}
 PHS: {source: PyPSA}
 
 # PyPSA entry + iam_name: baseline-sourced, but iam_name still matters if this carrier also
-# participates in capacity-target mapping (build_capacity_targets), which uses the same key.
+# participates in capacity-target mapping (get_capacities), which uses the same key.
 battery inverter: {source: PyPSA, iam_name: battery-inverter}
 
 # Partial override: sourced from the IAM overall, but one parameter is fixed to a constant

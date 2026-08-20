@@ -48,17 +48,14 @@ live from the IIASA API), `docu` (build these docs locally), `jupyter`. E.g.
 
 ## Usage
 
-If coupling with REMIND, you can construct the `Coupler` subclass matching your REMIND backend (`RemindGdxCoupler` for `.gdx`, `RemindIamcCoupler` for IAMC `.mif`/`.csv`), and then call its methods from PyPSA's Snakemake rules:
+`build_coupler` detects the source format, pairs it with the matching coupler for that IAM, and returns it ready to use from PyPSA's Snakemake rules:
 
 ```python
-from iampypsa import RemindIamcCoupler, RemindLoader, load_symbol_specs
-from iampypsa.couplers.remind import read_region_map
+from iampypsa import build_coupler
 
-loader = RemindLoader("REMIND.mif")
-coupler = RemindIamcCoupler(
-    loader=loader,
-    symbols=load_symbol_specs(backend=loader.backend),
-    region_map=read_region_map(),
+coupler = build_coupler(
+    "REMIND.mif",          # or REMIND.gdx — the suffix selects the backend and the coupler
+    model="remind",
     config={
         "planning_horizons": [2030, 2050],
         "sector_weights": {"AC": {"gdp": 0.6, "population": 0.4}},
@@ -72,22 +69,27 @@ co2_prices = coupler.build_co2_prices()        # regional CO2 price pathway
 costs = coupler.extract_cost_parameters(2030)  # cost components for one year
 ```
 
-Alternatively, for a single step, you may also call the `io`/`transforms` functions directly instead of going through a `Coupler`:
+For a single step, you may also reach past the facade and call the layers directly:
 
 ```python
-from iampypsa import RemindLoader, load_symbol_specs
-from iampypsa.io.remind_symbols import load_frame
-from iampypsa.transforms.co2_prices import extract_co2_prices, convert_co2_prices
+from iampypsa import IamLoader, load_quantity_specs
+from iampypsa.quantities import load_quantity
+from iampypsa.transforms.co2_prices import extract_co2_prices
+from iampypsa.transforms.costs import apply_currency_factor
 
-loader = RemindLoader("REMIND.mif")
-symbols = load_symbol_specs(backend=loader.backend)
+loader = IamLoader("REMIND.mif")
+quantities = load_quantity_specs(backend=loader.backend)
 
-raw = load_frame(loader, symbols["co2_price"])
+raw = load_quantity(loader, quantities["co2_price"])  # unit conversion applied here
 prices = extract_co2_prices(raw, regions=["DEU", "FRA"], years=[2030, 2050])
-co2_prices = convert_co2_prices(prices, currency_factor=1.0, carbon_to_co2=False)
+co2_prices = apply_currency_factor(prices, currency_factor=1.0, parameters=None)
 ```
 
 See [Getting started](https://pik-piam.github.io/IAM-PyPSA-coupling/getting-started/) for a more complete tutorial.
+
+> [!IMPORTANT]
+> Upgrading a consumer from before the 2026-08 restructure (`iampypsa.io`, `RemindLoader`,
+> `load_symbol_specs`)? There are no shims — see [`docs/migration.md`](docs/migration.md).
 
 ## Documentation
 

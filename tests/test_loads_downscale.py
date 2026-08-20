@@ -5,12 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from iampypsa.downscale import (
-    ProportionalDownscaler,
-    build_ssp_shares,
-    disaggregate_demand_to_country,
-)
-from iampypsa.transforms.loads import TWA_TO_MWH, convert_loads
+from iampypsa.downscale import disaggregate_demand_to_country
 
 DATA = Path(__file__).parent / "data"
 GDX = DATA / "remind2pypsa_amt_filtered.gdx"
@@ -27,39 +22,51 @@ SECTOR_WEIGHTS = {
 COUNTRIES = {"DE", "AT", "BE", "LU", "NL", "CN", "HK", "MO", "TW"}
 
 
-def test_convert_loads_unit_and_grouping():
-    raw = pd.DataFrame(
-        {"year": [2030, 2030], "region": ["DEU", "DEU"], "sector": ["AC", "AC"], "value": [1.0, 0.5]}
-    )
-    out = convert_loads(raw)
-    assert out["value"].iloc[0] == pytest.approx(1.5 * TWA_TO_MWH)  # summed then converted
+def test_build_regional_demand_labels_and_groups():
+    from iampypsa.models.remind import RemindGdxCoupler
+
+    class _FakeLoader:
+        backend = "gdx"
+
+        def resolve(self, ref):
+            return ref if isinstance(ref, str) else ref[0]
+
+        def read(self, ref, rename_columns=None):
+            return pd.DataFrame(
+                {"year": [2030, 2030], "region": ["DEU", "DEU"], "sector": ["AC", "AC"], "value": [1.0, 0.5]}
+            )
+
+    quantities = {"demand_fe_sectors": {"symbol": "p32_load_sector"}}
+    coupler = RemindGdxCoupler(_FakeLoader(), quantities, region_map={}, config={}, model_regions=["DEU"])
+    out = coupler.build_regional_demand()
+    assert out["value"].iloc[0] == pytest.approx(1.5)
     assert out["unit"].iloc[0] == "MWh_el"
 
 
-def test_build_ssp_shares_blend_and_normalise():
-    pop = pd.DataFrame({"iso2": ["DE", "FR"], "year": [2030, 2030], "value": [80.0, 60.0]}).set_index(["iso2", "year"])
-    gdp = pd.DataFrame({"iso2": ["DE", "FR"], "year": [2030, 2030], "value": [40.0, 10.0]}).set_index(["iso2", "year"])
-    shares = build_ssp_shares(["DE", "FR"], 2030, "AC", pop, gdp, {"AC": {"gdp": 0.5, "population": 0.5}})
-    assert sum(shares.values()) == pytest.approx(1.0)
-    # DE has higher GDP and pop -> larger share
-    assert shares["DE"] > shares["FR"]
-
-
-def test_proportional_downscaler_splits_by_share():
-    coarse = pd.DataFrame({"region": ["EUR"], "sector": ["AC"], "value": [100.0]})
-    shares = pd.DataFrame({"region": ["EUR", "EUR"], "fine_id": ["DE", "FR"], "share": [0.7, 0.3]})
-    out = ProportionalDownscaler().downscale(coarse, shares).set_index("region")["value"]
+def test_disaggregation_splits_proportionally_to_the_proxy():
+    """A region's value is split by its members' proxy shares — 70/30 here, and it sums back."""
+    coarse = pd.DataFrame(
+        {"year": [2030], "region": ["EUR"], "sector": ["AC"], "value": [100.0], "unit": ["MWh"]}
+    )
+    gdp = pd.DataFrame(
+        {"iso2": ["DE", "FR"], "year": [2030, 2030], "value": [70.0, 30.0]}
+    ).set_index(["iso2", "year"])
+    out = disaggregate_demand_to_country(
+        coarse, {"EUR": ["DE", "FR"]}, {"gdp": gdp}, {"AC": {"gdp": 1.0}}, {"DE", "FR"}
+    ).set_index("region")["value"]
     assert out["DE"] == pytest.approx(70.0)
     assert out["FR"] == pytest.approx(30.0)
 
 
-def test_convert_loads_matches_reference_regional():
-    from iampypsa.io import read_gdx_symbol as read_gdx
+def test_build_regional_demand_matches_reference_regional():
+    from iampypsa.models.remind import RemindGdxCoupler
+    from iampypsa import IamLoader
+    from iampypsa.quantities import load_quantity_specs
 
-    raw = read_gdx(str(GDX), "p32_load_sector",
-                   rename_columns={"ttot": "year", "all_regi": "region", "loadPy32": "sector"})
-    raw["year"] = raw["year"].astype(int)
-    got = convert_loads(raw, regions=["DEU"]).query(
+    loader = IamLoader(str(GDX))
+    quantities = load_quantity_specs(backend=loader.backend)
+    coupler = RemindGdxCoupler(loader, quantities, region_map={}, config={}, model_regions=["DEU"])
+    got = coupler.build_regional_demand().query(
         "region == 'DEU' and year == 2090 and sector == 'AC'"
     )["value"].iloc[0]
     ref = pd.read_csv(SECT_LOAD).query("region=='DEU' and year==2090 and sector=='AC'")["value"].iloc[0]
@@ -67,7 +74,7 @@ def test_convert_loads_matches_reference_regional():
 
 
 def test_full_ssp_downscaling_matches_reference():
-    from iampypsa.couplers.remind import read_region_map
+    from iampypsa.models.remind import read_region_map
 
     region_to_countries = read_region_map(source="model_region", target="country", file_path=str(REGION_MAP))
     pop = pd.read_csv(DATA / "ssp_population_filtered.csv").set_index(["iso2", "year"])

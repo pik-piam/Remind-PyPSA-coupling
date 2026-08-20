@@ -5,12 +5,11 @@ description = "Tools to couple IAMs and PyPSA power models"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "numpy>1.9", 
-    "pandas>2", 
+    "numpy>1.9",
+    "pandas>2",
     "pyyaml",
     "country_converter",
-    "typing_extensions",
-    "pytest"]
+    "typing_extensions"]
 
 [project.urls]
 Homepage = "https://github.com/pik-piam/IAM-PyPSA-coupling/"
@@ -20,14 +19,16 @@ Documentation = "https://pik-piam.github.io/IAM-PyPSA-coupling/"
 [project.optional-dependencies]
 jupyter = ["ipykernel","ipython"]
 gdx = ["gamspy"]
-ssp = ["httpx"]   # live SSP fetch from the IIASA API (iampypsa.io.ssp.fetch_ssp_data)
+ssp = ["httpx"]   # live SSP fetch from the IIASA API (iampypsa.reference.ssp.fetch_ssp_data)
+test = ["pytest"]
 docu= ["mkdocs<2", "mkdocs_gen_files", "mkdocstrings[python]", "mkdocs-literate-nav", "mkdocs-material", "mkdocs-include-dir-to-nav"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
-iampypsa = ["data/*.yaml"]
+"iampypsa.models.remind" = ["*.yaml", "*.csv"]
+"iampypsa.models.iamc" = ["*.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

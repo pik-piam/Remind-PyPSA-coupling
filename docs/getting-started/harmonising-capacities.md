@@ -3,7 +3,7 @@
 A PyPSA model typically starts from its own existing power-plant database (e.g.
 [powerplantmatching](https://github.com/PyPSA/powerplantmatching) for PyPSA-Eur). The IAM,
 independently, reports capacity targets per (region, technology, year) via
-`iampypsa.transforms.capacities.build_capacity_targets`. These need to be harmonised.
+`Coupler.get_capacities`. These need to be harmonised.
 
 ## The general approach
 
